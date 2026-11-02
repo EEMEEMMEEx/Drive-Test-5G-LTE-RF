@@ -1,0 +1,16 @@
+# Dependencies & Build Output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local Environment & IDE
+.env
+.env.*
+.vscode/
+.idea/
+AGENTS.md
+
+# Cloned upstream tool repo (installed copies are tracked in .claude/skills/)
+replica-skill/
+__pycache__/
+*.pyc
