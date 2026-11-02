@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #0b0f17;
+  --color-surface: #131b29;
+  --color-surface-elevated: #1c273b;
+  --color-border: #26344d;
+  --color-border-input: #556b8e;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-accent: #38bdf8;
+  --color-on-accent: #06131f;
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+}
+
+.light-theme {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-input: #64748b;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-accent: #0284c7;
+  --color-on-accent: #ffffff;
+  --color-danger: #dc2626;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+}
+
+/* Modern Web Guidance: Dialog backdrop styling */
+dialog::backdrop {
+  background-color: rgba(3, 7, 18, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+/* Modern Web Guidance: Content-visibility containment for complex multi-column dashboard panels */
+.rf-containment-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px auto 480px;
+}
+
+@supports not (content-visibility: auto) {
+  .rf-containment-panel {
+    contain: layout style paint;
+  }
+}
+
+/* Modern Web Guidance: Responsive container-queried tables */
+.rf-table-container {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+.rf-data-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background-color: var(--color-surface-elevated);
+}
+
+.rf-data-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background-color: var(--color-surface);
+}
+
