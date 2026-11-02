@@ -1,0 +1,37 @@
+feature,area,priority,original,clone,notes
+Live RF Signal Gauge (RSRP/RSRQ/SINR/RSSI/CQI/TA),dashboard,must,yes,yes,Radial gauge with quality badges and dBm/dB readouts
+Serving Cell & 5G NR SA/NSA + CSI telemetry card,dashboard,must,yes,yes,Displays MCC/MNC operator Cell ID eNodeB/Sector PCI TAC Band EARFCN DL Freq/BW and CSI-RSRP/RSRQ/SINR
+Carrier Aggregation (CaSnapshot) multi-band display,dashboard,must,yes,yes,Shows primary + secondary component carriers and total aggregated bandwidth
+Real-time GPS telemetry bar (Lat/Lon/Speed/Alt/Bearing/Accuracy),dashboard,must,yes,yes,Supports live geolocation and realistic RF drive-test route simulation
+Neighbor Cells table with delta dB comparison,dashboard,must,yes,yes,Lists intra/inter-frequency neighbors with PCI Band EARFCN RSRP RSRQ
+Multi-SIM slot selector (SIM 1 / SIM 2),dashboard,should,yes,yes,Switches active subscription profile and operator telemetry
+Campaign Start dialog with 4 presets (Site audit/Urban/Highway/Indoor),dashboard,must,yes,yes,Configures campaign name preset cadence and weak signal threshold
+Recording Cadence selector (Eco 5s / Standard 2s / Precise 1s),dashboard,must,yes,yes,Controls sampling interval during active drive test
+Weak Signal RSRP Alert threshold with live banner notification,dashboard,should,yes,yes,Triggers visual alert when serving RSRP drops below configured dBm threshold
+Campaign Pause & Resume with PAUSE session_events logging,dashboard,must,yes,yes,Tracks pause timestamps and durationMs in session_events
+Active Speed Test runner (Ping/Jitter/Loaded Ping/Download/Upload),dashboard,must,yes,yes,Executes phased throughput test and stores SpeedTest record
+Light Network Probe (periodic ping & jitter monitoring),dashboard,should,yes,yes,Logs LIGHT_PROBE events in session_events without interrupting RF capture
+Car Mode high-contrast oversized windshield dashboard,dashboard,should,yes,yes,Full-screen large typography mode for safe in-vehicle viewing
+Finished Campaign Summary modal on stop,dashboard,should,yes,yes,Displays immediate route KPIs score and quick links to Analytics/Export
+Interactive Route Map with 5 color modes (RSRP/RSRQ/SINR/Tech/Speed),map,must,yes,yes,Colors trajectory points dynamically by selected metric
+4 Map Color Palettes (CLASSIC/THERMIQUE/VIRIDIS/OCEAN),map,must,yes,yes,Full palette switching with live legend updates
+Map dot size & RSRP Good/Poor threshold sliders,map,should,yes,yes,Customizes marker radius and RSRP classification cutoffs
+Map overlays for Current Cell Neighbor Cells Handovers & Missed Handovers,map,must,yes,yes,Renders sector lines handover markers and missed-handover warnings
+Map orientation (North Up / Heading Up) Follow Position & Dark/Light style,map,should,yes,yes,Camera tracking rotation and base map theme switching
+Campaigns list with search RSRP sparklines & Avg RSRP badge,campaigns,must,yes,yes,Instant search filtering and inline canvas sparkline per campaign
+Campaign multi-select & Delete with Undo snackbar,campaigns,should,yes,yes,Batch selection and non-destructive undoable deletion
+Export Campaign to exact 24-column CSV format,campaigns,must,yes,yes,Matches exact com.drivetest.app v1.8.0 CSV header and row formatting
+Export Campaign to OpenGIS KML 2.2 & RFC 7946 GeoJSON,campaigns,must,yes,yes,Generates styled KML placemarks + route LineString and GeoJSON FeatureCollection
+Export Campaign to formatted Engineering PDF Report,campaigns,should,yes,yes,Printable/downloadable RF drive-test summary and diagnostic report
+Analytics Tab 1 (Signal time-series & quality distribution),analytics,must,yes,yes,RSRP/RSRQ/SINR charts and Excellent/Good/Fair/Poor coverage breakdown
+Analytics Tab 2 (Empirical CDF percentile curves P10/P50/P90),analytics,must,yes,yes,Cumulative distribution functions for RSRP RSRQ and SINR
+Analytics Tabs 3 & 4 (Network split & Band Usage breakdown),analytics,must,yes,yes,RAT distribution NR status and per-band sample share + average RSRP/SINR
+Analytics Tabs 5 & 6 (Handover Trace log & Unique Cell Sites inventory),analytics,must,yes,yes,Chronological handover/ping-pong log and aggregated eNodeB/gNodeB site table
+Analytics Tab 7 (Route Diagnosis 0-100 score & 5 problem area detectors),analytics,must,yes,yes,Detects WEAK_SIGNAL POOR_QUALITY FREQUENT_HANDOVERS LOW_THROUGHPUT HIGH_LOADED_LATENCY
+Advanced Route Analysis (synchronized Map / Timeline / Cells scrubber),analytics,should,yes,yes,Correlates RSRP Ping Jitter Pauses and Handovers along route timeline
+Campaign Comparison (A vs B spatial & KPI delta analysis),analytics,should,yes,yes,Computes delta RSRP/RSRQ/SINR handover delta and side-by-side comparison
+5-Step Spotlight interactive onboarding tutorial,onboarding,could,yes,yes,Guided walkthrough of Gauge Campaign Start Map Modes Export and Diagnosis
+Home Screen Glance Widgets preview (SignalWidget & CampaignWidget),widgets,could,yes,yes,Interactive preview of Android Glance home screen widgets
+Multi-language UI localization (EN/FR/DE/ES/IT/PT/NL),i18n,could,yes,yes,Full 7-language dictionary switcher matching APK resource splits
+Pre-loaded realistic 5G NR / LTE multi-scenario sample campaigns,simulation,could,yes,yes,Includes Urban 5G NSA Highway Handover and Indoor Coverage Hole campaigns
+Android OS BOOT_COMPLETED background broadcast receiver,system,could,yes,skip,Native Android OS boot broadcast receiver does not apply to browser runtime
