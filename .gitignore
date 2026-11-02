@@ -14,3 +14,5 @@ AGENTS.md
 replica-skill/
 __pycache__/
 *.pyc
+
+.vercel
