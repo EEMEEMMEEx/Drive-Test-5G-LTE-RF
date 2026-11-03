@@ -100,8 +100,8 @@ export function App() {
   // Map & Analytics Options
   const [mapOptions, setMapOptions] = useState<MapOptions>({
     colorMode: 'BY_RSRP',
-    darkMap: true,
-    mapType: 'NORMAL',
+    darkMap: false,
+    mapType: 'GOOGLE_HYBRID',
     signalPalette: 'CLASSIC',
     showCurrentCell: true,
     showNeighborCells: false,

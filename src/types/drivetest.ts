@@ -17,7 +17,16 @@ export type SessionEventType = 'PAUSE' | 'LIGHT_PROBE';
 
 export type MapColorMode = 'BY_RSRP' | 'BY_RSRQ' | 'BY_SINR' | 'BY_TECHNOLOGY' | 'BY_SPEED';
 export type SignalPalette = 'CLASSIC' | 'THERMIQUE' | 'VIRIDIS' | 'OCEAN';
-export type MapBaseType = 'NORMAL' | 'SATELLITE' | 'TERRAIN' | 'HYBRID';
+export type MapBaseType =
+  | 'NORMAL'
+  | 'SATELLITE'
+  | 'TERRAIN'
+  | 'HYBRID'
+  | 'GOOGLE_ROADMAP'
+  | 'GOOGLE_SATELLITE'
+  | 'GOOGLE_HYBRID'
+  | 'GOOGLE_TERRAIN'
+  | 'CARTO_DARK';
 
 export type DiagnosticIssueType =
   | 'WEAK_SIGNAL'

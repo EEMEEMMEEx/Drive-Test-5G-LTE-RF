@@ -3,6 +3,8 @@ import L from 'leaflet';
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   BarChart3,
   CheckCircle2,
   Compass,
@@ -40,6 +42,9 @@ import {
 } from '../../services/rfAnalyticsEngine';
 import type { TranslationDictionary } from '../../i18n/translations';
 import { RfToggleSwitch } from '../common/RfToggleSwitch';
+import { OpenUiCard } from '../openui/OpenUiCard';
+import { OpenUiChips, type OpenUiChipItem } from '../openui/OpenUiChips';
+import { OpenUiMetric } from '../openui/OpenUiMetric';
 
 export interface RouteMapViewProps {
   campaigns: Campaign[];
@@ -54,24 +59,76 @@ export interface RouteMapViewProps {
   t: TranslationDictionary;
 }
 
-const TILE_URLS: Record<MapBaseType, { url: string; attribution: string }> = {
+interface TileConfig {
+  url: string;
+  attribution: string;
+  subdomains?: string[];
+  maxZoom?: number;
+}
+
+const TILE_URLS: Record<MapBaseType, TileConfig> = {
+  GOOGLE_HYBRID: {
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+  },
+  GOOGLE_SATELLITE: {
+    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+  },
+  GOOGLE_ROADMAP: {
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+  },
+  GOOGLE_TERRAIN: {
+    url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+  },
+  CARTO_DARK: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; CARTO &copy; OpenStreetMap contributors',
+    subdomains: ['a', 'b', 'c', 'd'],
+    maxZoom: 19,
+  },
   NORMAL: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
+    subdomains: ['a', 'b', 'c'],
+    maxZoom: 19,
   },
   SATELLITE: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri World Imagery',
+    maxZoom: 19,
   },
   TERRAIN: {
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenTopoMap',
+    subdomains: ['a', 'b', 'c'],
+    maxZoom: 17,
   },
   HYBRID: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: '&copy; Esri Hybrid',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: '&copy; Google Maps',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
   },
 };
+
+const MAP_TYPE_CHIPS: OpenUiChipItem<MapBaseType>[] = [
+  { id: 'GOOGLE_HYBRID', label: 'Google Hybrid' },
+  { id: 'GOOGLE_SATELLITE', label: 'Google Sat' },
+  { id: 'GOOGLE_ROADMAP', label: 'Google Road' },
+  { id: 'CARTO_DARK', label: 'Dark Map' },
+  { id: 'NORMAL', label: 'OSM' },
+];
 
 function getPointColor(m: Measurement, options: MapOptions): string {
   if (options.colorMode === 'BY_TECHNOLOGY') {
@@ -150,6 +207,11 @@ export function RouteMapView({
     return sortedMeasurements[sortedMeasurements.length - 1];
   }, [sortedMeasurements, selectedPointId]);
 
+  const selectedMeasurementIndex = useMemo(() => {
+    if (!selectedMeasurement) return -1;
+    return sortedMeasurements.findIndex((m) => m.id === selectedMeasurement.id);
+  }, [sortedMeasurements, selectedMeasurement]);
+
   const selectedHandover = useMemo<HandoverEvent | undefined>(() => {
     if (!selectedMeasurement) return undefined;
     return mobility.handoverEvents.find(
@@ -185,10 +247,11 @@ export function RouteMapView({
         preferCanvas: false,
       });
 
-      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.NORMAL;
+      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.GOOGLE_HYBRID;
       const tileLayer = L.tileLayer(tileCfg.url, {
         attribution: tileCfg.attribution,
-        maxZoom: 19,
+        subdomains: tileCfg.subdomains ?? ['0', '1', '2', '3'],
+        maxZoom: tileCfg.maxZoom ?? 20,
       }).addTo(map);
 
       const group = L.layerGroup().addTo(map);
@@ -196,6 +259,14 @@ export function RouteMapView({
       mapInstanceRef.current = map;
       tileLayerRef.current = tileLayer;
       layerGroupRef.current = group;
+
+      setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch {
+          // safe
+        }
+      }, 150);
     } catch {
       // Fallback gracefully when running in headless jsdom or offline
     }
@@ -222,10 +293,11 @@ export function RouteMapView({
       if (tileLayerRef.current) {
         map.removeLayer(tileLayerRef.current);
       }
-      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.NORMAL;
+      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.GOOGLE_HYBRID;
       tileLayerRef.current = L.tileLayer(tileCfg.url, {
         attribution: tileCfg.attribution,
-        maxZoom: 19,
+        subdomains: tileCfg.subdomains ?? ['0', '1', '2', '3'],
+        maxZoom: tileCfg.maxZoom ?? 20,
       }).addTo(map);
     } catch {
       // Ignore tile update error in jsdom
@@ -249,20 +321,20 @@ export function RouteMapView({
         m.gps.longitude,
       ]);
       L.polyline(latLngs, {
-        color: '#38bdf8',
-        weight: 2.5,
-        opacity: 0.55,
+        color: '#0284c7',
+        weight: 3,
+        opacity: 0.65,
       }).addTo(group);
 
       // Serving cell site markers and sector lines
       if (options.showCurrentCell) {
         for (const site of cellSites) {
           const siteMarker = L.circleMarker([site.latitude, site.longitude], {
-            radius: 7,
+            radius: 8,
             color: '#f8fafc',
             weight: 2,
             fillColor: getTechnologyColor(site.technology),
-            fillOpacity: 0.9,
+            fillOpacity: 0.95,
           });
           siteMarker.bindTooltip(
             `Site PCI ${site.pci} · CID ${site.cellId} (${site.technology})`,
@@ -280,7 +352,7 @@ export function RouteMapView({
                 [servingSite.latitude, servingSite.longitude],
               ],
               {
-                color: '#22d3ee',
+                color: '#06b6d4',
                 weight: 2,
                 dashArray: '5, 5',
                 opacity: 0.85,
@@ -366,7 +438,7 @@ export function RouteMapView({
     currentLocation,
   ]);
 
-  // Compute SVG bounding box for Vector Route Overlay (interactive in both browser & offline/test)
+  // Compute SVG bounding box for Vector Route Overlay
   const vectorBounds = useMemo(() => {
     if (sortedMeasurements.length === 0) {
       return { minLat: 13.75, maxLat: 13.76, minLon: 100.5, maxLon: 100.51 };
@@ -418,13 +490,26 @@ export function RouteMapView({
     currentLocation?.bearing ??
     (selectedMeasurement ? selectedMeasurement.gps.bearing : 0);
 
+  const stepToAdjacentSample = (delta: number) => {
+    if (selectedMeasurementIndex < 0 || sortedMeasurements.length === 0) return;
+    const nextIdx = Math.max(
+      0,
+      Math.min(sortedMeasurements.length - 1, selectedMeasurementIndex + delta)
+    );
+    setSelectedPointId(sortedMeasurements[nextIdx].id);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Top Toolbar */}
-      <div className="bg-surface border border-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+      {/* Top HUD Toolbar wrapped in OpenUiCard */}
+      <OpenUiCard
+        className="shadow-sm"
+        bodyClassName="!p-3 sm:!p-4 flex flex-wrap items-center justify-between gap-3"
+      >
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-surface-elevated border border-border rounded-lg px-3 py-1.5">
-            <MapPin className="w-4 h-4 text-accent" />
+          {/* Campaign Selector */}
+          <div className="flex items-center gap-2 bg-surface-elevated border border-border/80 rounded-xl px-3 py-1.5 shadow-xs">
+            <MapPin className="w-4 h-4 text-accent shrink-0" />
             <label htmlFor="map-campaign-select" className="sr-only">
               {t.campaignName}
             </label>
@@ -433,7 +518,7 @@ export function RouteMapView({
               aria-label={t.campaignName}
               value={selectedCampaignId}
               onChange={(e) => onSelectCampaign(Number(e.target.value))}
-              className="bg-transparent text-sm font-medium text-text focus:outline-none"
+              className="bg-transparent text-xs sm:text-sm font-semibold text-text focus:outline-none cursor-pointer pr-1"
             >
               {campaigns.length === 0 && (
                 <option value={0} className="bg-surface text-text-muted">
@@ -441,7 +526,7 @@ export function RouteMapView({
                 </option>
               )}
               {campaigns.map((c) => (
-                <option key={c.id} value={c.id} className="bg-surface text-text">
+                <option key={c.id} value={c.id} className="bg-surface text-text font-medium">
                   {c.name} ({c.measurementCount} pts)
                 </option>
               ))}
@@ -450,24 +535,24 @@ export function RouteMapView({
 
           {/* Live Status Badge */}
           <div
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
               isRunning
-                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
-                : 'bg-surface-elevated text-text-muted border-border'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30 animate-pulse'
+                : 'bg-surface-elevated text-text-muted border-border/80'
             }`}
           >
-            <Radio className={`w-3.5 h-3.5 ${isRunning ? 'animate-pulse text-emerald-400' : 'text-text-muted'}`} />
+            <Radio className={`w-3.5 h-3.5 ${isRunning ? 'text-emerald-500' : 'text-text-muted'}`} />
             <span>{isRunning ? 'LIVE TRACKING' : 'REPLAY MODE'}</span>
           </div>
 
-          {/* Follow My Position */}
+          {/* Follow My Position Toggle */}
           <button
             type="button"
             onClick={() => updateOption('followMyPosition', !options.followMyPosition)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               options.followMyPosition
-                ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
-                : 'bg-surface-elevated text-text-muted border-border hover:bg-surface-elevated'
+                ? 'bg-accent/15 text-accent border-accent/40 shadow-xs'
+                : 'bg-surface-elevated text-text-muted border-border/80 hover:text-text'
             }`}
             title="Follow My Position"
           >
@@ -479,10 +564,10 @@ export function RouteMapView({
           <button
             type="button"
             onClick={() => updateOption('headingUp', !options.headingUp)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               options.headingUp
-                ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
-                : 'bg-surface-elevated text-text-muted border-border hover:bg-surface-elevated'
+                ? 'bg-accent/15 text-accent border-accent/40 shadow-xs'
+                : 'bg-surface-elevated text-text-muted border-border/80 hover:text-text'
             }`}
             title="Toggle Orientation (Heading Up / North Up)"
           >
@@ -491,94 +576,94 @@ export function RouteMapView({
           </button>
         </div>
 
-        {/* Right Controls: Map Type, Dark/Light, Options Drawer, Analytics */}
+        {/* Right Controls: Map Engine Chips, Dark Toggle, Drawer Toggle, Analytics */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-surface-elevated border border-border rounded-lg p-0.5">
-            {(['NORMAL', 'SATELLITE', 'TERRAIN', 'HYBRID'] as MapBaseType[]).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => updateOption('mapType', type)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
-                  options.mapType === type
-                    ? 'bg-accent text-on-accent font-semibold'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
+          {/* Map Base Engine Chips */}
+          <OpenUiChips
+            items={MAP_TYPE_CHIPS}
+            selectedId={options.mapType}
+            onChange={(id) => updateOption('mapType', id)}
+            size="sm"
+            ariaLabel="Map Layer Engine"
+          />
 
+          {/* Dark / Light Base Map Toggle */}
           <button
             type="button"
-            onClick={() => updateOption('darkMap', !options.darkMap)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text border border-border hover:bg-surface-elevated"
+            onClick={() => {
+              const nextDark = !options.darkMap;
+              onUpdateOptions({
+                ...options,
+                darkMap: nextDark,
+                mapType: nextDark ? 'CARTO_DARK' : 'GOOGLE_HYBRID',
+              });
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated text-text border border-border/80 hover:border-accent/40 transition-all"
             aria-label="Toggle Dark Map"
           >
             {options.darkMap ? (
               <>
                 <Moon className="w-3.5 h-3.5 text-accent" />
-                <span>Dark</span>
+                <span className="hidden sm:inline">Dark</span>
               </>
             ) : (
               <>
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span>Light</span>
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Light</span>
               </>
             )}
           </button>
 
+          {/* Map Layer Options Drawer Button */}
           <button
             type="button"
             onClick={() => setDrawerOpen((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               drawerOpen
-                ? 'bg-accent text-on-accent border-accent'
-                : 'bg-surface-elevated text-text border-border hover:bg-surface-elevated'
+                ? 'bg-accent text-on-accent border-accent shadow-sm'
+                : 'bg-surface-elevated text-text border-border/80 hover:border-accent/40'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>{t.mapOptions}</span>
           </button>
 
+          {/* Navigate to Analytics */}
           <button
             type="button"
             onClick={onNavigateToAnalytics}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/90 hover:bg-indigo-500 text-white transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-all"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>{t.navAnalytics}</span>
           </button>
         </div>
-      </div>
+      </OpenUiCard>
 
       {/* Collapsible Map Layer Controls Drawer */}
       {drawerOpen && (
-        <div
+        <OpenUiCard
           data-testid="map-options-drawer"
-          className="bg-surface border border-border rounded-xl p-4 space-y-4 shadow-xl"
-        >
-          <div className="flex items-center justify-between border-b border-border pb-2.5">
-            <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-semibold text-text">{t.mapOptions}</h3>
-            </div>
+          title={t.mapOptions}
+          subtitle="Configure RF render palettes, dot sizes, and active cell topology overlays"
+          icon={<Layers className="w-4 h-4 text-accent" />}
+          actions={
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              className="text-text-muted hover:text-text p-1"
+              className="p-1.5 text-text-muted hover:text-text rounded-lg hover:bg-surface-elevated transition"
               aria-label="Close Map Options"
             >
               <X className="w-4 h-4" />
             </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          }
+          className="shadow-md animate-in fade-in slide-in-from-top-2 duration-150"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Column 1: Color Metric & Palette */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   {t.markerColorMode}
                 </label>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -595,10 +680,10 @@ export function RouteMapView({
                       key={item.id}
                       type="button"
                       onClick={() => updateOption('colorMode', item.id)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border text-left transition ${
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-all ${
                         options.colorMode === item.id
-                          ? 'bg-cyan-500/20 border-accent text-accent'
-                          : 'bg-surface-elevated border-border text-text-muted hover:border-border'
+                          ? 'bg-accent/15 border-accent text-accent font-bold shadow-xs'
+                          : 'bg-surface-elevated border-border/80 text-text-muted hover:text-text hover:border-border'
                       }`}
                     >
                       {item.label}
@@ -608,8 +693,8 @@ export function RouteMapView({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-text-muted mb-1.5">
-                  <span className="inline-flex items-center gap-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  <span className="inline-flex items-center gap-1.5">
                     <Palette className="w-3.5 h-3.5 text-accent" />
                     {t.signalPalette}
                   </span>
@@ -621,10 +706,10 @@ export function RouteMapView({
                         key={pal}
                         type="button"
                         onClick={() => updateOption('signalPalette', pal)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                           options.signalPalette === pal
-                            ? 'bg-indigo-500/25 border-indigo-400 text-indigo-200'
-                            : 'bg-surface-elevated border-border text-text-muted hover:text-text'
+                            ? 'bg-indigo-500/20 border-indigo-500 text-indigo-500 dark:text-indigo-300 font-bold'
+                            : 'bg-surface-elevated border-border/80 text-text-muted hover:text-text'
                         }`}
                       >
                         {pal}
@@ -636,11 +721,11 @@ export function RouteMapView({
             </div>
 
             {/* Column 2: Sliders (Point Size & Custom RSRP Thresholds) */}
-            <div className="space-y-3 bg-surface-elevated border border-border rounded-lg p-3">
+            <div className="space-y-4 bg-surface-elevated/70 border border-border/80 rounded-2xl p-4">
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-xs font-semibold mb-1.5">
                   <span className="text-text-muted">{t.pointSize}</span>
-                  <span className="font-mono text-accent">{options.dotSize} px</span>
+                  <span className="font-mono font-bold text-accent">{options.dotSize} px</span>
                 </div>
                 <input
                   type="range"
@@ -650,14 +735,14 @@ export function RouteMapView({
                   step={1}
                   value={options.dotSize}
                   onChange={(e) => updateOption('dotSize', Number(e.target.value))}
-                  className="w-full accent-cyan-400"
+                  className="w-full accent-cyan-500 cursor-pointer"
                 />
               </div>
 
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-xs font-semibold mb-1.5">
                   <span className="text-text-muted">RSRP Good Threshold</span>
-                  <span className="font-mono text-emerald-400">{options.rsrpGood} dBm</span>
+                  <span className="font-mono font-bold text-emerald-500">{options.rsrpGood} dBm</span>
                 </div>
                 <input
                   type="range"
@@ -667,14 +752,14 @@ export function RouteMapView({
                   step={1}
                   value={options.rsrpGood}
                   onChange={(e) => updateOption('rsrpGood', Number(e.target.value))}
-                  className="w-full accent-emerald-400"
+                  className="w-full accent-emerald-500 cursor-pointer"
                 />
               </div>
 
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-xs font-semibold mb-1.5">
                   <span className="text-text-muted">RSRP Poor Threshold</span>
-                  <span className="font-mono text-rose-400">{options.rsrpPoor} dBm</span>
+                  <span className="font-mono font-bold text-rose-500">{options.rsrpPoor} dBm</span>
                 </div>
                 <input
                   type="range"
@@ -684,14 +769,14 @@ export function RouteMapView({
                   step={1}
                   value={options.rsrpPoor}
                   onChange={(e) => updateOption('rsrpPoor', Number(e.target.value))}
-                  className="w-full accent-rose-400"
+                  className="w-full accent-rose-500 cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Column 3: Map Layer Switches */}
-            <div className="space-y-2 bg-surface-elevated border border-border rounded-lg p-3">
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+            <div className="space-y-2 bg-surface-elevated/70 border border-border/80 rounded-2xl p-4">
+              <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                 Active RF Overlays
               </div>
 
@@ -729,7 +814,7 @@ export function RouteMapView({
               ).map((layer) => (
                 <div
                   key={layer.key}
-                  className="py-1.5 px-2 rounded-lg hover:bg-surface-elevated transition"
+                  className="py-1 px-1 rounded-xl hover:bg-surface transition"
                 >
                   <RfToggleSwitch
                     id={`map-layer-${layer.key}`}
@@ -745,80 +830,81 @@ export function RouteMapView({
               ))}
             </div>
           </div>
-        </div>
+        </OpenUiCard>
       )}
 
-      {/* Main Map Area + Selected Point Inspector */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left 2 Columns: Leaflet Canvas + Interactive Vector Route Overlay */}
-        <div className="lg:col-span-2 space-y-3">
-          {/* Leaflet Container */}
-          <div className="relative rounded-xl overflow-hidden border border-border bg-surface-elevated h-[340px]">
+      {/* Main Map Layout: Left (Google Map + Vector Trace) & Right (Inspector) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left Column (8 cols): Map Canvas & Vector Trace */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Leaflet / Google Map Canvas Card */}
+          <div className="relative rounded-2xl overflow-hidden border border-border bg-surface shadow-sm h-[480px] sm:h-[540px] lg:h-[580px]">
             <div
               ref={mapContainerRef}
-              className={`w-full h-full transition-transform duration-300 ${
-                options.darkMap ? 'brightness-90 contrast-125 hue-rotate-180 invert' : ''
-              }`}
+              className="w-full h-full transition-transform duration-300"
               style={{
-                transform: options.headingUp ? `rotate(${-latestBearing}deg)` : 'none',
+                transform: options.headingUp ? `rotate(${-latestBearing}deg)` : undefined,
               }}
             />
 
-            {/* Floating Route Summary Ribbon */}
-            <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 bg-surface-elevated backdrop-blur-md border border-border rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-text-muted">Samples:</span>
-              <span className="font-mono font-semibold text-text">
-                {sortedMeasurements.length}
-              </span>
+            {/* Floating Glassmorphic Route Summary Ribbon */}
+            <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 bg-surface/90 backdrop-blur-md border border-border/80 shadow-md rounded-xl px-3.5 py-2 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted font-medium">Samples:</span>
+                <span className="font-mono font-bold text-text">
+                  {sortedMeasurements.length}
+                </span>
+              </div>
               <span className="text-border">|</span>
-              <span className="text-text-muted">Avg RSRP:</span>
-              <span className="font-mono font-semibold text-accent">
-                {signalStats.avgRsrp} dBm
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted font-medium">Avg RSRP:</span>
+                <span className="font-mono font-bold text-accent">
+                  {signalStats.avgRsrp} dBm
+                </span>
+              </div>
               <span className="text-border">|</span>
-              <span className="text-text-muted">Handovers:</span>
-              <span className="font-mono font-semibold text-amber-300">
-                {mobility.handovers}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted font-medium">Handovers:</span>
+                <span className="font-mono font-bold text-amber-500">
+                  {mobility.handovers}
+                </span>
+              </div>
               {mobility.missedHandovers > 0 && (
                 <>
                   <span className="text-border">|</span>
-                  <span className="text-rose-400 font-medium">
-                    Missed HO: {mobility.missedHandovers}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
+                    <span>Missed HO: {mobility.missedHandovers}</span>
+                  </div>
                 </>
               )}
             </div>
           </div>
 
           {/* Interactive Vector Route Trace & Cell Overlay (Works Offline & in Tests) */}
-          <div className="bg-surface border border-border rounded-xl p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-accent" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-                  Interactive Vector RF Trace ({options.colorMode.replace('BY_', '')})
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-muted">
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+          <OpenUiCard
+            title={`Interactive Vector RF Trace (${options.colorMode.replace('BY_', '')})`}
+            subtitle="High-precision Cartesian coordinate route projection"
+            icon={<Navigation className="w-4 h-4 text-accent" />}
+            badge={
+              <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-text-muted">
+                <span className="inline-flex items-center gap-1 bg-surface-elevated px-2 py-0.5 rounded-full border border-border">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                   Good (&ge; {options.rsrpGood} dBm)
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                <span className="inline-flex items-center gap-1 bg-surface-elevated px-2 py-0.5 rounded-full border border-border">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
                   Fair
                 </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                <span className="inline-flex items-center gap-1 bg-surface-elevated px-2 py-0.5 rounded-full border border-border">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
                   Poor (&lt; {options.rsrpPoor} dBm)
                 </span>
               </div>
-            </div>
-
+            }
+          >
             <svg
               viewBox="0 0 640 280"
-              className="w-full h-56 bg-surface-elevated rounded-lg border border-border"
+              className="w-full h-56 bg-surface-elevated rounded-xl border border-border/80 shadow-inner"
               role="img"
               aria-label="Interactive RF Route Trace Map"
             >
@@ -861,55 +947,71 @@ export function RouteMapView({
                 />
               )}
 
-              {/* Serving Cell Vector Lines */}
+              {/* Serving Cell Lines & Site Pins */}
               {options.showCurrentCell &&
-                selectedMeasurement &&
+                cellSites.map((site) => {
+                  const sPt = projectToSvg(site.latitude, site.longitude);
+                  return (
+                    <g key={`site-${site.cellId}`}>
+                      <circle
+                        cx={sPt.x}
+                        cy={sPt.y}
+                        r={7}
+                        fill={getTechnologyColor(site.technology)}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                      />
+                      <text
+                        x={sPt.x}
+                        y={sPt.y - 10}
+                        fontSize="10"
+                        fill="var(--color-text)"
+                        textAnchor="middle"
+                        fontWeight="600"
+                      >
+                        PCI {site.pci}
+                      </text>
+                    </g>
+                  );
+                })}
+
+              {/* Serving cell line to selected point */}
+              {options.showCurrentCell && selectedMeasurement && (
                 (() => {
-                  const site = cellSiteById.get(selectedMeasurement.radio.cellId);
-                  if (!site) return null;
-                  const from = projectToSvg(
+                  const sSite = cellSiteById.get(selectedMeasurement.radio.cellId);
+                  if (!sSite) return null;
+                  const pt = projectToSvg(
                     selectedMeasurement.gps.latitude,
                     selectedMeasurement.gps.longitude
                   );
-                  const to = projectToSvg(site.latitude, site.longitude);
+                  const sitePt = projectToSvg(sSite.latitude, sSite.longitude);
                   return (
-                    <g>
-                      <line
-                        x1={from.x}
-                        y1={from.y}
-                        x2={to.x}
-                        y2={to.y}
-                        stroke="#22d3ee"
-                        strokeWidth={1.75}
-                        strokeDasharray="4 4"
-                      />
-                      <rect
-                        x={to.x - 6}
-                        y={to.y - 6}
-                        width={12}
-                        height={12}
-                        rx={3}
-                        fill={getTechnologyColor(site.technology)}
-                        stroke="#f8fafc"
-                        strokeWidth={1.5}
-                      />
-                    </g>
+                    <line
+                      x1={pt.x}
+                      y1={pt.y}
+                      x2={sitePt.x}
+                      y2={sitePt.y}
+                      stroke="#06b6d4"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                    />
                   );
-                })()}
+                })()
+              )}
 
-              {/* Handover rings */}
+              {/* Handover Halo Rings */}
               {options.showHandovers &&
-                mobility.handoverEvents.map((ho) => {
+                mobility.handoverEvents.map((ho, idx) => {
                   const pt = projectToSvg(
                     ho.measurement.gps.latitude,
                     ho.measurement.gps.longitude
                   );
                   return (
                     <circle
-                      key={ho.id}
+                      key={`ho-halo-${idx}`}
                       cx={pt.x}
                       cy={pt.y}
-                      r={options.dotSize + 5}
+                      r={options.dotSize + 6}
                       fill="none"
                       stroke={ho.isPingPong ? '#ef4444' : '#f59e0b'}
                       strokeWidth={2}
@@ -917,16 +1019,16 @@ export function RouteMapView({
                   );
                 })}
 
-              {/* Missed Handover rings */}
+              {/* Missed Handover Halo Rings */}
               {options.showMissedHandovers &&
-                mobility.missedHandoverEvents.map((mho) => {
+                mobility.missedHandoverEvents.map((mho, idx) => {
                   const pt = projectToSvg(
                     mho.measurement.gps.latitude,
                     mho.measurement.gps.longitude
                   );
                   return (
                     <circle
-                      key={mho.id}
+                      key={`mho-halo-${idx}`}
                       cx={pt.x}
                       cy={pt.y}
                       r={options.dotSize + 7}
@@ -959,216 +1061,241 @@ export function RouteMapView({
                 );
               })}
             </svg>
-          </div>
+          </OpenUiCard>
         </div>
 
-        {/* Right Column: Selected Point Inspector Card */}
-        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col justify-between space-y-4">
-          {selectedMeasurement ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-accent">
-                    Point Telemetry Inspector
-                  </span>
-                  <h3 className="text-base font-bold text-text flex items-center gap-2 mt-0.5">
-                    <span>
-                      PCI {selectedMeasurement.radio.pci} · Cell {selectedMeasurement.radio.cellId}
-                    </span>
-                  </h3>
-                </div>
+        {/* Right Column (4 cols): Selected Point Inspector Card */}
+        <div className="lg:col-span-4">
+          <OpenUiCard
+            title="Point Telemetry Inspector"
+            subtitle={
+              selectedMeasurement
+                ? `Sample #${selectedMeasurementIndex + 1} of ${sortedMeasurements.length}`
+                : 'Selected GPS sample RF parameters'
+            }
+            icon={<Activity className="w-4 h-4 text-accent" />}
+            badge={
+              selectedMeasurement && (
                 <span
-                  className="px-2.5 py-1 rounded-full text-xs font-bold text-slate-950"
+                  className="px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-xs"
                   style={{
                     backgroundColor: getTechnologyColor(
                       selectedMeasurement.radio.technology
                     ),
                   }}
                 >
-                  {selectedMeasurement.radio.technology.replace('_', ' ')} (
-                  {selectedMeasurement.radio.nrStatus})
+                  {selectedMeasurement.radio.technology.replace('_', ' ')}
                 </span>
-              </div>
-
-              {/* RF Key Metrics Grid */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                  <div className="text-[11px] text-text-muted">RSRP</div>
-                  <div
-                    className="text-lg font-mono font-bold"
-                    style={{
-                      color: getSignalColor(
-                        selectedMeasurement.radio.rsrp,
-                        'BY_RSRP',
-                        options.signalPalette,
-                        options.rsrpGood,
-                        options.rsrpPoor
-                      ),
-                    }}
-                  >
-                    {selectedMeasurement.radio.rsrp} dBm
-                  </div>
-                </div>
-
-                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                  <div className="text-[11px] text-text-muted">RSRQ</div>
-                  <div className="text-lg font-mono font-bold text-text">
-                    {selectedMeasurement.radio.rsrq} dB
-                  </div>
-                </div>
-
-                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                  <div className="text-[11px] text-text-muted">SINR</div>
-                  <div className="text-lg font-mono font-bold text-accent">
-                    {selectedMeasurement.radio.sinr.toFixed(1)} dB
-                  </div>
-                </div>
-
-                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                  <div className="text-[11px] text-text-muted">RSSI</div>
-                  <div className="text-lg font-mono font-bold text-text">
-                    {selectedMeasurement.radio.rssi} dBm
-                  </div>
-                </div>
-              </div>
-
-              {/* Serving Cell & GPS Details */}
-              <div className="bg-surface-elevated border border-border rounded-lg p-3 space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Operator / MCC-MNC</span>
-                  <span className="font-mono text-text">
-                    {selectedMeasurement.radio.operatorName} ({selectedMeasurement.radio.mcc}-
-                    {selectedMeasurement.radio.mnc})
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Band / EARFCN</span>
-                  <span className="font-mono text-text">
-                    Band {selectedMeasurement.radio.band} · {selectedMeasurement.radio.earfcn}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Speed</span>
-                  <span className="font-mono text-text">
-                    {(selectedMeasurement.gps.speed * 3.6).toFixed(1)} km/h (
-                    {selectedMeasurement.gps.speed.toFixed(1)} m/s)
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Coordinates</span>
-                  <span className="font-mono text-text-muted">
-                    {selectedMeasurement.gps.latitude.toFixed(5)},{' '}
-                    {selectedMeasurement.gps.longitude.toFixed(5)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Handover / Missed Handover Alerts for Selected Point */}
-              {selectedHandover && (
-                <div className="bg-amber-500/15 border border-amber-500/40 rounded-lg p-2.5 text-xs flex items-start gap-2">
-                  <RefreshCw className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              )
+            }
+          >
+            {selectedMeasurement ? (
+              <div className="space-y-4">
+                {/* Cell Header Identity */}
+                <div className="bg-surface-elevated border border-border/80 rounded-xl p-3 flex items-center justify-between">
                   <div>
-                    <div className="font-semibold text-amber-300">
-                      {selectedHandover.isPingPong
-                        ? 'Ping-Pong Handover Detected'
-                        : 'Cell Handover Event'}
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                      Serving Cell
                     </div>
-                    <div className="text-text-muted mt-0.5">
-                      PCI {selectedHandover.previousPci} (CID {selectedHandover.previousCellId})
-                      {' -> '}PCI {selectedHandover.newPci} (CID {selectedHandover.newCellId})
+                    <div className="text-sm font-bold text-text mt-0.5">
+                      PCI {selectedMeasurement.radio.pci} · Cell ID {selectedMeasurement.radio.cellId}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] font-semibold text-text-muted">NR State</div>
+                    <div className="text-xs font-mono font-bold text-accent">
+                      {selectedMeasurement.radio.nrStatus}
                     </div>
                   </div>
                 </div>
-              )}
 
-              {selectedMissedHo && (
-                <div className="bg-rose-500/15 border border-rose-500/40 rounded-lg p-2.5 text-xs flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-semibold text-rose-300">
-                      Missed Handover (+{selectedMissedHo.marginDb} dB Neighbor)
-                    </div>
-                    <div className="text-text-muted mt-0.5">
-                      Neighbor PCI {selectedMissedHo.neighborPci} at{' '}
-                      {selectedMissedHo.neighborRsrp} dBm vs Serving {selectedMissedHo.servingRsrp}{' '}
-                      dBm
-                    </div>
-                  </div>
+                {/* RF Key Metrics Grid using OpenUiMetric */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <OpenUiMetric
+                    label="RSRP"
+                    value={selectedMeasurement.radio.rsrp}
+                    unit="dBm"
+                    variant={
+                      selectedMeasurement.radio.rsrp >= options.rsrpGood
+                        ? 'success'
+                        : selectedMeasurement.radio.rsrp <= options.rsrpPoor
+                        ? 'danger'
+                        : 'warning'
+                    }
+                  />
+                  <OpenUiMetric
+                    label="RSRQ"
+                    value={selectedMeasurement.radio.rsrq}
+                    unit="dB"
+                    variant={selectedMeasurement.radio.rsrq >= -12 ? 'success' : 'default'}
+                  />
+                  <OpenUiMetric
+                    label="SINR"
+                    value={selectedMeasurement.radio.sinr.toFixed(1)}
+                    unit="dB"
+                    variant="accent"
+                  />
+                  <OpenUiMetric
+                    label="RSSI"
+                    value={selectedMeasurement.radio.rssi}
+                    unit="dBm"
+                    variant="default"
+                  />
                 </div>
-              )}
 
-              {/* Neighbor Cells List */}
-              {options.showNeighborCells && (
-                <div className="space-y-1.5">
-                  <div className="text-xs font-semibold text-text-muted flex items-center justify-between">
-                    <span>{t.neighborCells}</span>
-                    <span className="font-mono text-[11px]">
-                      {selectedMeasurement.radio.neighborCells.length} visible
+                {/* Serving Cell & GPS Details Card */}
+                <div className="bg-surface-elevated/70 border border-border/80 rounded-xl p-3 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted font-medium">Operator</span>
+                    <span className="font-mono font-semibold text-text">
+                      {selectedMeasurement.radio.operatorName} ({selectedMeasurement.radio.mcc}-
+                      {selectedMeasurement.radio.mnc})
                     </span>
                   </div>
-                  {selectedMeasurement.radio.neighborCells.length > 0 ? (
-                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
-                      {selectedMeasurement.radio.neighborCells.map((nb, idx) => {
-                        const delta = nb.rsrp - selectedMeasurement.radio.rsrp;
-                        return (
-                          <div
-                            key={`${nb.pci}-${idx}`}
-                            className="flex items-center justify-between bg-surface-elevated border border-border rounded px-2.5 py-1.5 text-xs"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-text">
-                                PCI {nb.pci}
-                              </span>
-                              <span className="text-[11px] text-text-muted">
-                                {nb.technology.replace('_', ' ')} · EARFCN {nb.earfcn}
-                              </span>
-                            </div>
-                            <div className="font-mono">
-                              <span className="text-text">{nb.rsrp} dBm</span>
-                              <span
-                                className={`ml-1.5 text-[11px] ${
-                                  delta > 0 ? 'text-rose-400 font-semibold' : 'text-text-muted'
-                                }`}
-                              >
-                                ({delta > 0 ? `+${delta}` : delta} dB)
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-text-muted italic">
-                      No neighbor cells reported at this sample.
-                    </div>
-                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted font-medium">Band / EARFCN</span>
+                    <span className="font-mono font-semibold text-text">
+                      Band {selectedMeasurement.radio.band} · {selectedMeasurement.radio.earfcn}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted font-medium">Vehicle Speed</span>
+                    <span className="font-mono font-semibold text-text">
+                      {(selectedMeasurement.gps.speed * 3.6).toFixed(1)} km/h
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted font-medium">GPS Coordinates</span>
+                    <span className="font-mono text-text-muted text-[11px]">
+                      {selectedMeasurement.gps.latitude.toFixed(5)},{' '}
+                      {selectedMeasurement.gps.longitude.toFixed(5)}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-text-muted">
-              <Eye className="w-8 h-8 text-text-muted mb-2" />
-              <p className="text-sm font-medium">No Route Measurements</p>
-              <p className="text-xs text-text-muted mt-1">
-                Start a drive test session or select a recorded campaign.
-              </p>
-            </div>
-          )}
 
-          {/* Quick Point Stepper Footer */}
-          {sortedMeasurements.length > 0 && (
-            <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
-              <span className="inline-flex items-center gap-1">
-                <Activity className="w-3.5 h-3.5 text-accent" />
-                Sample #{sortedMeasurements.findIndex((m) => m.id === selectedMeasurement?.id) + 1}{' '}
-                of {sortedMeasurements.length}
-              </span>
-              <span className="inline-flex items-center gap-1 text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Cov {signalStats.coveragePercent}%
-              </span>
-            </div>
-          )}
+                {/* Handover / Missed Handover Alerts */}
+                {selectedHandover && (
+                  <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl p-3 text-xs flex items-start gap-2.5 shadow-xs">
+                    <RefreshCw className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-spin-slow" />
+                    <div>
+                      <div className="font-bold text-amber-600 dark:text-amber-400">
+                        {selectedHandover.isPingPong
+                          ? 'Ping-Pong Handover Detected'
+                          : 'Cell Handover Event'}
+                      </div>
+                      <div className="text-text-muted mt-1">
+                        PCI {selectedHandover.previousPci} (CID {selectedHandover.previousCellId})
+                        {' -> '}PCI {selectedHandover.newPci} (CID {selectedHandover.newCellId})
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedMissedHo && (
+                  <div className="bg-rose-500/15 border border-rose-500/30 rounded-xl p-3 text-xs flex items-start gap-2.5 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-rose-600 dark:text-rose-400">
+                        Missed Handover (+{selectedMissedHo.marginDb} dB Neighbor)
+                      </div>
+                      <div className="text-text-muted mt-1">
+                        Neighbor PCI {selectedMissedHo.neighborPci} at{' '}
+                        {selectedMissedHo.neighborRsrp} dBm vs Serving {selectedMissedHo.servingRsrp}{' '}
+                        dBm
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Neighbor Cells List */}
+                {options.showNeighborCells && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center justify-between">
+                      <span>{t.neighborCells}</span>
+                      <span className="font-mono text-[11px] font-semibold text-accent">
+                        {selectedMeasurement.radio.neighborCells.length} visible
+                      </span>
+                    </div>
+                    {selectedMeasurement.radio.neighborCells.length > 0 ? (
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        {selectedMeasurement.radio.neighborCells.map((nb, idx) => {
+                          const delta = nb.rsrp - selectedMeasurement.radio.rsrp;
+                          return (
+                            <div
+                              key={`${nb.pci}-${idx}`}
+                              className="flex items-center justify-between bg-surface-elevated border border-border/80 rounded-xl px-3 py-1.5 text-xs"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-text">
+                                  PCI {nb.pci}
+                                </span>
+                                <span className="text-[11px] text-text-muted">
+                                  {nb.technology.replace('_', ' ')} · EARFCN {nb.earfcn}
+                                </span>
+                              </div>
+                              <div className="font-mono">
+                                <span className="font-bold text-text">{nb.rsrp} dBm</span>
+                                <span
+                                  className={`ml-1.5 text-[11px] font-semibold ${
+                                    delta > 0 ? 'text-rose-500' : 'text-text-muted'
+                                  }`}
+                                >
+                                  ({delta > 0 ? `+${delta}` : delta} dB)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-text-muted italic bg-surface-elevated/50 p-2 rounded-xl text-center">
+                        No neighbor cells reported at this sample.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Point Stepper Controls */}
+                <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => stepToAdjacentSample(-1)}
+                    disabled={selectedMeasurementIndex <= 0}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <div className="text-center">
+                    <div className="text-[11px] font-mono text-text-muted">
+                      #{selectedMeasurementIndex + 1} / {sortedMeasurements.length}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => stepToAdjacentSample(1)}
+                    disabled={selectedMeasurementIndex >= sortedMeasurements.length - 1}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <span>Next</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center text-text-muted">
+                <div className="w-12 h-12 rounded-2xl bg-surface-elevated border border-border flex items-center justify-center text-text-muted mb-3">
+                  <Eye className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-semibold text-text">No Route Measurements</p>
+                <p className="text-xs text-text-muted mt-1 max-w-xs">
+                  Start a drive test session or select a recorded campaign.
+                </p>
+              </div>
+            )}
+          </OpenUiCard>
         </div>
       </div>
     </div>
