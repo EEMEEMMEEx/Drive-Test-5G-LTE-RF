@@ -51,6 +51,8 @@ export interface TranslationDictionary {
   importCsv: string;
   deleteCampaign: string;
   undoDelete: string;
+  clearAllData: string;
+  clearTelemetry: string;
   tabSignal: string;
   tabCdf: string;
   tabNetwork: string;
@@ -116,6 +118,8 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     importCsv: 'Import CSV Log',
     deleteCampaign: 'Delete',
     undoDelete: 'Undo Delete',
+    clearAllData: 'Clear All Data',
+    clearTelemetry: 'Clear Live Telemetry',
     tabSignal: 'Signal',
     tabCdf: 'CDF',
     tabNetwork: 'Network',
@@ -179,6 +183,8 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     importCsv: 'นำเข้าไฟล์ CSV',
     deleteCampaign: 'ลบแคมเปญ',
     undoDelete: 'เลิกทำ',
+    clearAllData: 'ล้างค่าทั้งหมด',
+    clearTelemetry: 'ล้างค่ามาตรวัด',
     tabSignal: 'สัญญาณ',
     tabCdf: 'การแจกแจง CDF',
     tabNetwork: 'เทคโนโลยี',
@@ -242,6 +248,8 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     importCsv: 'Importer CSV',
     deleteCampaign: 'Supprimer',
     undoDelete: 'Annuler',
+    clearAllData: 'Effacer tout',
+    clearTelemetry: 'Réinitialiser la télémétrie',
     tabSignal: 'Signal',
     tabCdf: 'CDF',
     tabNetwork: 'Réseau',
@@ -305,6 +313,8 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     importCsv: 'CSV importieren',
     deleteCampaign: 'Löschen',
     undoDelete: 'Rückgängig',
+    clearAllData: 'Alle Daten löschen',
+    clearTelemetry: 'Telemetrie zurücksetzen',
     tabSignal: 'Signal',
     tabCdf: 'CDF',
     tabNetwork: 'Netzwerk',
@@ -368,6 +378,8 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     importCsv: 'Importar CSV',
     deleteCampaign: 'Eliminar',
     undoDelete: 'Deshacer',
+    clearAllData: 'Borrar todos los datos',
+    clearTelemetry: 'Restablecer telemetría',
     tabSignal: 'Señal',
     tabCdf: 'CDF',
     tabNetwork: 'Red',

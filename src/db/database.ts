@@ -7,7 +7,7 @@ export function loadDatabaseState(): SeedDatabaseState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as SeedDatabaseState;
-      if (Array.isArray(parsed.campaigns) && parsed.campaigns.length > 0) {
+      if (Array.isArray(parsed.campaigns)) {
         return parsed;
       }
     }
@@ -25,6 +25,17 @@ export function saveDatabaseState(state: SeedDatabaseState): void {
   } catch {
     // Ignore storage quota errors in restricted environments
   }
+}
+
+export function clearDatabaseState(): SeedDatabaseState {
+  const empty: SeedDatabaseState = {
+    campaigns: [],
+    measurements: [],
+    speedTests: [],
+    sessionEvents: [],
+  };
+  saveDatabaseState(empty);
+  return empty;
 }
 
 export function resetDatabaseToSeed(): SeedDatabaseState {

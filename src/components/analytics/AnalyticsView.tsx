@@ -462,6 +462,9 @@ export function AnalyticsView({
                 onChange={(e) => onSelectCampaign(Number(e.target.value))}
                 className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm font-medium text-slate-100 focus:border-sky-400 focus:outline-none"
               >
+                {campaigns.length === 0 && (
+                  <option value={0}>No Campaigns Available</option>
+                )}
                 {campaigns.map((camp) => (
                   <option key={camp.id} value={camp.id}>
                     {camp.name} ({camp.measurementCount} pts)
