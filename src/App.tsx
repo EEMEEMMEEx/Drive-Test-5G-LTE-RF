@@ -623,7 +623,7 @@ export function App() {
     setDeletedBackup(null);
   }, []);
 
-  const t = TRANSLATIONS[locale];
+  const t = TRANSLATIONS[locale] ?? TRANSLATIONS.en;
   const latestMeasurement =
     currentMeasurements[currentMeasurements.length - 1] ?? liveSample;
   const handleClearAllData = useCallback(() => {
@@ -711,19 +711,20 @@ export function App() {
               <span className="hidden md:inline">{t.replayTutorial}</span>
             </button>
 
-            <div className="flex items-center gap-1 bg-surface-elevated border border-border rounded-lg px-2 py-1">
-              <Globe className="w-3.5 h-3.5 text-text-muted" />
+            <div className="flex items-center gap-1.5 bg-surface-elevated border border-border rounded-lg px-2.5 py-1.5 hover:border-accent/40 transition">
+              <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
               <select
                 aria-label="Select interface language"
                 value={locale}
                 onChange={(e) => setLocale(e.target.value as SupportedLocale)}
-                className="bg-transparent text-xs font-medium text-text focus:outline-none"
+                className="bg-surface-elevated text-xs font-semibold text-text focus:outline-none cursor-pointer"
               >
-                <option value="en">EN</option>
-                <option value="th">TH</option>
-                <option value="fr">FR</option>
-                <option value="de">DE</option>
-                <option value="es">ES</option>
+                <option value="en" className="bg-surface-elevated text-text font-semibold">
+                  EN
+                </option>
+                <option value="th" className="bg-surface-elevated text-text font-semibold">
+                  TH
+                </option>
               </select>
             </div>
 
