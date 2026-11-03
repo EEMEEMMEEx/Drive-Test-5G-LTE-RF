@@ -1,9 +1,15 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import App, { setTourCompleted } from '../App';
 
 describe('App End-to-End UI Integration', () => {
+  beforeEach(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
+  });
+
   it('renders Live Monitor in Standby by default (no fake signal) and starts/stops a campaign', () => {
     render(<App />);
 
@@ -109,4 +115,37 @@ describe('App End-to-End UI Integration', () => {
     expect(screen.queryByText(/Spotlight Step 2 \/ 5/i)).not.toBeInTheDocument();
   });
 
+  it('supports mobile hamburger menu navigation and bottom dock page switching', () => {
+    setTourCompleted(true);
+    render(<App />);
+
+    // Mobile hamburger menu toggle
+    const menuBtn = screen.getByRole('button', { name: /Toggle navigation menu/i });
+    expect(menuBtn).toHaveAttribute('aria-expanded', 'false');
+
+    // Open mobile menu drawer
+    fireEvent.click(menuBtn);
+    expect(menuBtn).toHaveAttribute('aria-expanded', 'true');
+    const drawer = screen.getByRole('dialog', { name: /Mobile Navigation Menu/i });
+    expect(drawer).toBeInTheDocument();
+
+    // Navigate to Route Map from inside mobile drawer
+    const mapButtons = screen.getAllByRole('button', { name: /Route Map/i });
+    fireEvent.click(mapButtons[mapButtons.length - 1]);
+    expect(screen.getByText(/Map Layer Controls/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Mobile Navigation Menu/i })).not.toBeInTheDocument();
+
+    // Reopen menu and test closing with Escape key
+    fireEvent.click(menuBtn);
+    expect(screen.getByRole('dialog', { name: /Mobile Navigation Menu/i })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /Mobile Navigation Menu/i })).not.toBeInTheDocument();
+
+    // Test mobile bottom navigation dock
+    const bottomNav = screen.getByLabelText('Mobile Bottom Navigation');
+    expect(bottomNav).toBeInTheDocument();
+    const campaignsDockBtn = screen.getByRole('button', { name: /^Logs$/i });
+    fireEvent.click(campaignsDockBtn);
+    expect(screen.getByPlaceholderText(/Filter campaigns/i)).toBeInTheDocument();
+  });
 });

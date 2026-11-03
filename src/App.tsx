@@ -14,7 +14,9 @@ import {
 import { APP_VERSION } from './version';
 import { TRANSLATIONS, type SupportedLocale } from './i18n/translations';
 import { clearDatabaseState, loadDatabaseState, resetDatabaseToSeed, saveDatabaseState } from './db/database';
-import type { SeedDatabaseState } from './db/seedData';
+import { DEFAULT_MAP_TYPE, sanitizeMapType } from './types/drivetest';
+import type {
+ SeedDatabaseState } from './db/seedData';
 import type {
   Campaign,
   CampaignFinishedSummary,
@@ -22,6 +24,7 @@ import type {
   DiagnosticThresholds,
   GpsInfo,
   LightNetworkProbe,
+  MapBaseType,
   MapOptions,
   Measurement,
   MeasurementCadence,
@@ -29,6 +32,7 @@ import type {
   SimInfo,
   SpeedTestProgress,
   SpeedTestResult,
+
 } from './types/drivetest';
 import {
   BLANK_RADIO_INFO,
@@ -52,6 +56,7 @@ import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { WidgetsPreviewModal } from './components/widgets/WidgetsPreviewModal';
 import { SpotlightTutorial } from './components/tutorial/SpotlightTutorial';
 import { OpenUiNavDock } from './components/openui/OpenUiNavDock';
+import { OpenUiHeader } from './components/openui/OpenUiHeader';
 
 export type MainNavTab = 'DASHBOARD' | 'MAP' | 'CAMPAIGNS' | 'ANALYTICS';
 
@@ -87,6 +92,32 @@ export function setTourCompleted(completed = true): void {
   } else {
     inMemoryTourStore.delete(TOUR_COMPLETED_KEY);
   }
+}
+
+export const MAP_TYPE_STORAGE_KEY = 'sigpath_map_type';
+
+export function getInitialMapType(): MapBaseType {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored =
+        window.localStorage.getItem(MAP_TYPE_STORAGE_KEY) ||
+        window.localStorage.getItem('mapType') ||
+        window.localStorage.getItem('map_style');
+      if (stored) {
+        return sanitizeMapType(stored);
+      }
+      const storedOptions = window.localStorage.getItem('mapOptions');
+      if (storedOptions) {
+        const parsed = JSON.parse(storedOptions);
+        if (parsed && typeof parsed.mapType !== 'undefined') {
+          return sanitizeMapType(parsed.mapType);
+        }
+      }
+    } catch {
+      // fallback to default
+    }
+  }
+  return DEFAULT_MAP_TYPE;
 }
 
 export function App() {
@@ -132,10 +163,9 @@ export function App() {
   } | null>(null);
 
   // Map & Analytics Options
-  const [mapOptions, setMapOptions] = useState<MapOptions>({
+  const [mapOptions, setMapOptions] = useState<MapOptions>(() => ({
     colorMode: 'BY_RSRP',
-    darkMap: false,
-    mapType: 'GOOGLE_HYBRID',
+    mapType: getInitialMapType(),
     signalPalette: 'CLASSIC',
     showCurrentCell: true,
     showNeighborCells: false,
@@ -146,7 +176,20 @@ export function App() {
     rsrpPoor: -110,
     followMyPosition: true,
     headingUp: false,
-  });
+  }));
+
+  // Persist mapType changes to localStorage safely
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const safeType = sanitizeMapType(mapOptions.mapType);
+        window.localStorage.setItem(MAP_TYPE_STORAGE_KEY, safeType);
+        window.localStorage.setItem('mapType', safeType);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [mapOptions.mapType]);
 
   const [diagnosticThresholds, setDiagnosticThresholds] = useState<DiagnosticThresholds>(
     DEFAULT_DIAGNOSTIC_THRESHOLDS
@@ -682,108 +725,21 @@ export function App() {
   return (
     <div className={lightTheme ? 'light-theme min-h-screen bg-bg text-text' : 'min-h-screen bg-bg text-text'}>
       {/* Top App Header & Navigation Shell */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          {/* Brand Title & Version */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/40 flex items-center justify-center text-accent">
-              <Radio className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold tracking-tight text-text">
-                  {t.appTitle}
-                </h1>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-elevated border border-border text-accent">
-                  v{APP_VERSION}
-                </span>
-              </div>
-              <p className="text-xs text-text-muted hidden sm:block">
-                {t.appSubtitle}
-              </p>
-            </div>
-          </div>
-
-          {/* Primary Screen Navigation Tabs */}
-          <nav aria-label="Main navigation" className="hidden md:flex items-center gap-1 bg-surface-elevated border border-border rounded-xl p-1">
-            {(
-              [
-                { id: 'DASHBOARD', label: t.navDashboard, icon: Activity },
-                { id: 'MAP', label: t.navMap, icon: Compass },
-                { id: 'CAMPAIGNS', label: t.navCampaigns, icon: FolderKanban },
-                { id: 'ANALYTICS', label: t.navAnalytics, icon: BarChart3 },
-              ] as const
-            ).map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
-                    isActive
-                      ? 'bg-accent text-on-accent shadow-sm'
-                      : 'text-text-muted hover:text-text'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Utility Controls: Widgets, Tutorial, Language, Theme */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsWidgetsOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent flex items-center gap-1.5"
-            >
-              <LayoutGrid className="w-3.5 h-3.5 text-accent" />
-              <span className="hidden md:inline">{t.widgetsPreview}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleReplayTutorial}
-              className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-semibold text-text hover:border-accent hover:text-accent flex items-center gap-1.5 transition shadow-xs"
-              title="Replay Spotlight Tour"
-              aria-label="Interactive Guide - Replay tour"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-accent" />
-              <span className="hidden md:inline">{t.replayTutorial}</span>
-            </button>
-
-            <div className="flex items-center gap-1.5 bg-surface-elevated border border-border rounded-lg px-2.5 py-1.5 hover:border-accent/40 transition">
-              <Globe className="w-3.5 h-3.5 text-accent shrink-0" />
-              <select
-                aria-label="Select interface language"
-                value={locale}
-                onChange={(e) => setLocale(e.target.value as SupportedLocale)}
-                className="bg-surface-elevated text-xs font-semibold text-text focus:outline-none cursor-pointer"
-              >
-                <option value="en" className="bg-surface-elevated text-text font-semibold">
-                  EN
-                </option>
-                <option value="th" className="bg-surface-elevated text-text font-semibold">
-                  TH
-                </option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              aria-label="Toggle color theme"
-              onClick={() => setLightTheme((v) => !v)}
-              className="p-1.5 rounded-lg bg-surface-elevated border border-border text-text-muted hover:text-accent hover:border-accent transition"
-            >
-              {lightTheme ? <Moon className="w-4 h-4 text-accent" /> : <Sun className="w-4 h-4 text-warning" />}
-            </button>
-          </div>
-        </div>
-      </header>
+      <OpenUiHeader
+        appTitle={t.appTitle}
+        appSubtitle={t.appSubtitle}
+        appVersion={APP_VERSION}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        isRunning={isRunning}
+        onOpenWidgets={() => setIsWidgetsOpen(true)}
+        onReplayTutorial={handleReplayTutorial}
+        locale={locale}
+        onSelectLocale={setLocale}
+        lightTheme={lightTheme}
+        onToggleTheme={() => setLightTheme((v) => !v)}
+        t={t}
+      />
 
       {/* Main Screen Workspace */}
       <main className="max-w-7xl mx-auto px-4 py-5 pb-24 md:pb-6">
@@ -917,10 +873,10 @@ export function App() {
       {/* OpenUI Mobile Bottom Navigation Dock */}
       <OpenUiNavDock
         items={[
-          { id: 'DASHBOARD', label: 'Live', icon: Activity, badge: isRunning },
-          { id: 'MAP', label: 'Map', icon: Compass },
-          { id: 'CAMPAIGNS', label: 'Logs', icon: FolderKanban },
-          { id: 'ANALYTICS', label: 'Analytics', icon: BarChart3 },
+          { id: 'DASHBOARD', label: locale === 'th' ? 'สด' : 'Live', icon: Activity, badge: isRunning },
+          { id: 'MAP', label: locale === 'th' ? 'แผนที่' : 'Map', icon: Compass },
+          { id: 'CAMPAIGNS', label: locale === 'th' ? 'ประวัติ' : 'Logs', icon: FolderKanban },
+          { id: 'ANALYTICS', label: locale === 'th' ? 'วิเคราะห์' : 'Analytics', icon: BarChart3 },
         ]}
         activeId={activeTab}
         onSelect={(tab) => setActiveTab(tab as MainNavTab)}

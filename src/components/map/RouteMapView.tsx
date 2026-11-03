@@ -12,15 +12,14 @@ import {
   Eye,
   Layers,
   MapPin,
-  Moon,
   Navigation,
   Palette,
   Radio,
   RefreshCw,
   SlidersHorizontal,
-  Sun,
   X,
 } from 'lucide-react';
+import { DEFAULT_MAP_TYPE, sanitizeMapType } from '../../types/drivetest';
 import type {
   Campaign,
   CellSite,
@@ -91,18 +90,6 @@ const TILE_URLS: Record<MapBaseType, TileConfig> = {
     subdomains: ['0', '1', '2', '3'],
     maxZoom: 20,
   },
-  CARTO_DARK: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CARTO &copy; OpenStreetMap contributors',
-    subdomains: ['a', 'b', 'c', 'd'],
-    maxZoom: 19,
-  },
-  NORMAL: {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors',
-    subdomains: ['a', 'b', 'c'],
-    maxZoom: 19,
-  },
   SATELLITE: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; Esri World Imagery',
@@ -126,8 +113,6 @@ const MAP_TYPE_CHIPS: OpenUiChipItem<MapBaseType>[] = [
   { id: 'GOOGLE_HYBRID', label: 'Google Hybrid' },
   { id: 'GOOGLE_SATELLITE', label: 'Google Sat' },
   { id: 'GOOGLE_ROADMAP', label: 'Google Road' },
-  { id: 'CARTO_DARK', label: 'Dark Map' },
-  { id: 'NORMAL', label: 'OSM' },
 ];
 
 function getPointColor(m: Measurement, options: MapOptions): string {
@@ -160,6 +145,16 @@ export function RouteMapView({
   onNavigateToAnalytics,
   t,
 }: RouteMapViewProps) {
+  const activeMapType = sanitizeMapType(options.mapType);
+
+  useEffect(() => {
+    if (options.mapType !== activeMapType) {
+      onUpdateOptions({
+        ...options,
+        mapType: activeMapType,
+      });
+    }
+  }, [options.mapType, activeMapType, onUpdateOptions]);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
@@ -261,7 +256,7 @@ export function RouteMapView({
         preferCanvas: false,
       });
 
-      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.GOOGLE_HYBRID;
+      const tileCfg = TILE_URLS[activeMapType] ?? TILE_URLS[DEFAULT_MAP_TYPE];
       const tileLayer = L.tileLayer(tileCfg.url, {
         attribution: tileCfg.attribution,
         subdomains: tileCfg.subdomains ?? ['0', '1', '2', '3'],
@@ -307,7 +302,7 @@ export function RouteMapView({
       if (tileLayerRef.current) {
         map.removeLayer(tileLayerRef.current);
       }
-      const tileCfg = TILE_URLS[options.mapType] ?? TILE_URLS.GOOGLE_HYBRID;
+      const tileCfg = TILE_URLS[activeMapType] ?? TILE_URLS[DEFAULT_MAP_TYPE];
       tileLayerRef.current = L.tileLayer(tileCfg.url, {
         attribution: tileCfg.attribution,
         subdomains: tileCfg.subdomains ?? ['0', '1', '2', '3'],
@@ -316,7 +311,7 @@ export function RouteMapView({
     } catch {
       // Ignore tile update error in jsdom
     }
-  }, [options.mapType]);
+  }, [activeMapType]);
 
   // Render Leaflet markers, serving cell lines, handovers, and missed handovers
   useEffect(() => {
@@ -610,13 +605,13 @@ export function RouteMapView({
           </button>
         </div>
 
-        {/* Secondary Controls: Map Engine Chips, Dark Toggle, Drawer Toggle, Desktop Analytics */}
+        {/* Secondary Controls: Map Engine Chips, Drawer Toggle, Desktop Analytics */}
         <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto pt-2 md:pt-0 border-t border-border/60 md:border-t-0">
           {/* Map Base Engine Chips - Horizontally swipeable on mobile, compact on desktop */}
           <div className="overflow-x-auto no-scrollbar py-0.5 max-w-[calc(100vw-130px)] md:max-w-none">
             <OpenUiChips
               items={MAP_TYPE_CHIPS}
-              selectedId={options.mapType}
+              selectedId={activeMapType}
               onChange={(id) => updateOption('mapType', id)}
               size="sm"
               ariaLabel="Map Layer Engine"
@@ -624,27 +619,6 @@ export function RouteMapView({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Dark / Light Base Map Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                const nextDark = !options.darkMap;
-                onUpdateOptions({
-                  ...options,
-                  darkMap: nextDark,
-                  mapType: nextDark ? 'CARTO_DARK' : 'GOOGLE_HYBRID',
-                });
-              }}
-              className="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated text-text border border-border/80 hover:border-accent/40 transition-all"
-              aria-label="Toggle Dark Map"
-              title={options.darkMap ? 'Switch to Light Map' : 'Switch to Dark Map'}
-            >
-              {options.darkMap ? (
-                <Moon className="w-3.5 h-3.5 text-accent" />
-              ) : (
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-              )}
-            </button>
 
             {/* Map Layer Options Drawer Button */}
             <button
