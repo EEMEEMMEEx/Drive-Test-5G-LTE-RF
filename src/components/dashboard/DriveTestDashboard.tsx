@@ -77,8 +77,6 @@ export interface DriveTestDashboardProps {
   onSwitchToLiveMap: () => void;
   useRealBrowserGps: boolean;
   onToggleRealBrowserGps: (useReal: boolean) => void;
-  isTelemetryCleared?: boolean;
-  onClearTelemetry?: () => void;
   t: TranslationDictionary;
 }
 
@@ -121,8 +119,6 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     onSwitchToLiveMap,
     useRealBrowserGps,
     onToggleRealBrowserGps,
-    isTelemetryCleared,
-    onClearTelemetry,
     t,
   } = props;
 
@@ -213,7 +209,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const isStandby = currentRadio.technology === 'UNKNOWN' || Boolean(isTelemetryCleared && !isRunning);
+  const isStandby = !isRunning || currentRadio.technology === 'UNKNOWN';
   const rsrpPercent = isStandby ? 0 : Math.max(0, Math.min(100, ((currentRadio.rsrp + 135) / 80) * 100));
   const rsrpQualityColor =
     currentRadio.rsrp >= -90
@@ -512,17 +508,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
               >
                 Quick Start ({selectedPreset.replace('_', ' ')})
               </button>
-              {onClearTelemetry && (
-                <button
-                  type="button"
-                  onClick={onClearTelemetry}
-                  className="px-3 py-2 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text-muted hover:text-text hover:border-accent flex items-center gap-1.5"
-                  title="ล้างค่ามาตรวัดสัญญาณ RF ชั่วคราว / เข้าสู่โหมดสแตนด์บายว่าง (Reset RF gauge to standby)"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-accent" />
-                  <span>{t.clearTelemetry}</span>
-                </button>
-              )}
+
             </div>
           ) : (
             <div className="flex items-center gap-2">

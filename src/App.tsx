@@ -61,7 +61,7 @@ export function App() {
   const [db, setDb] = useState<SeedDatabaseState>(() => loadDatabaseState());
   const [selectedCampaignId, setSelectedCampaignId] = useState<number>(() => {
     const initial = loadDatabaseState();
-    return initial.campaigns[0]?.id ?? 1;
+    return initial.campaigns[0]?.id ?? 0;
   });
 
   // Live Drive Test Recording State
@@ -121,7 +121,6 @@ export function App() {
 
   // Live idle/standby sample so gauge works even before starting a campaign
   const [standbyTick, setStandbyTick] = useState(0);
-  const [isTelemetryCleared, setIsTelemetryCleared] = useState(false);
   const liveSample = useMemo(
     () =>
       generateSimulatedMeasurement({
@@ -225,7 +224,6 @@ export function App() {
     const intervalMs = getCadenceIntervalMs(cadence);
     const timer = window.setInterval(() => {
       const nextStep = stepRef.current + 1;
-      setIsTelemetryCleared(false);
       const now = Date.now();
       setStepIndex(nextStep);
       setElapsedMs((prev) => prev + intervalMs);
@@ -317,7 +315,6 @@ export function App() {
 
   const handleStartCampaign = useCallback(
     (name: string, preset: CampaignPreset, alertThreshold: number | null) => {
-      setIsTelemetryCleared(false);
       const now = Date.now();
       const newId =
         db.campaigns.reduce((max, c) => (c.id > max ? c.id : max), 0) + 1;
@@ -378,8 +375,7 @@ export function App() {
     setIsPaused((prev) => {
       const nextPaused = !prev;
       if (nextPaused && activeCampaignId !== null) {
-        setIsTelemetryCleared(false);
-      const now = Date.now();
+        const now = Date.now();
         setDb((old) => ({
           ...old,
           sessionEvents: [
@@ -479,7 +475,6 @@ export function App() {
     }, 500);
 
     window.setTimeout(() => {
-      setIsTelemetryCleared(false);
       const now = Date.now();
       const targetId = activeCampaignId ?? selectedCampaignId;
       const result: SpeedTestResult = {
@@ -628,14 +623,9 @@ export function App() {
     setDb(empty);
     setSelectedCampaignId(0);
     setDeletedBackup(null);
-    setIsTelemetryCleared(true);
   }, []);
 
-  const displayRadio = isRunning
-    ? latestMeasurement.radio
-    : isTelemetryCleared
-    ? BLANK_RADIO_INFO
-    : liveSample.radio;
+  const displayRadio = isRunning ? latestMeasurement.radio : BLANK_RADIO_INFO;
   const displayGps = isRunning ? latestMeasurement.gps : liveSample.gps;
 
   return (
@@ -787,8 +777,6 @@ export function App() {
             onSwitchToLiveMap={() => setActiveTab('MAP')}
             useRealBrowserGps={useRealBrowserGps}
             onToggleRealBrowserGps={setUseRealBrowserGps}
-            isTelemetryCleared={isTelemetryCleared}
-            onClearTelemetry={() => setIsTelemetryCleared(true)}
             t={t}
           />
         )}

@@ -1,6 +1,15 @@
 import { createInitialSeedData, type SeedDatabaseState } from './seedData';
 
-const STORAGE_KEY = 'rf_field_suite_db_v1';
+const STORAGE_KEY = 'rf_field_suite_db_v2';
+
+export function getEmptyDatabaseState(): SeedDatabaseState {
+  return {
+    campaigns: [],
+    measurements: [],
+    speedTests: [],
+    sessionEvents: [],
+  };
+}
 
 export function loadDatabaseState(): SeedDatabaseState {
   try {
@@ -12,11 +21,11 @@ export function loadDatabaseState(): SeedDatabaseState {
       }
     }
   } catch {
-    // Fallback to seed data if storage is unavailable or corrupted
+    // Fallback to empty clean state if storage is unavailable or corrupted
   }
-  const initial = createInitialSeedData();
-  saveDatabaseState(initial);
-  return initial;
+  const empty = getEmptyDatabaseState();
+  saveDatabaseState(empty);
+  return empty;
 }
 
 export function saveDatabaseState(state: SeedDatabaseState): void {
@@ -28,12 +37,7 @@ export function saveDatabaseState(state: SeedDatabaseState): void {
 }
 
 export function clearDatabaseState(): SeedDatabaseState {
-  const empty: SeedDatabaseState = {
-    campaigns: [],
-    measurements: [],
-    speedTests: [],
-    sessionEvents: [],
-  };
+  const empty = getEmptyDatabaseState();
   saveDatabaseState(empty);
   return empty;
 }
@@ -43,4 +47,3 @@ export function resetDatabaseToSeed(): SeedDatabaseState {
   saveDatabaseState(seed);
   return seed;
 }
-
