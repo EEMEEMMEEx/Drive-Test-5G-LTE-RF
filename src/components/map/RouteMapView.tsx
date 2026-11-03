@@ -421,10 +421,10 @@ export function RouteMapView({
   return (
     <div className="space-y-4">
       {/* Top Toolbar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface border border-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5">
-            <MapPin className="w-4 h-4 text-cyan-400" />
+          <div className="flex items-center gap-2 bg-surface-elevated border border-border rounded-lg px-3 py-1.5">
+            <MapPin className="w-4 h-4 text-accent" />
             <label htmlFor="map-campaign-select" className="sr-only">
               {t.campaignName}
             </label>
@@ -433,15 +433,15 @@ export function RouteMapView({
               aria-label={t.campaignName}
               value={selectedCampaignId}
               onChange={(e) => onSelectCampaign(Number(e.target.value))}
-              className="bg-transparent text-sm font-medium text-slate-100 focus:outline-none"
+              className="bg-transparent text-sm font-medium text-text focus:outline-none"
             >
               {campaigns.length === 0 && (
-                <option value={0} className="bg-slate-900 text-slate-400">
+                <option value={0} className="bg-surface text-text-muted">
                   No Campaigns Available
                 </option>
               )}
               {campaigns.map((c) => (
-                <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100">
+                <option key={c.id} value={c.id} className="bg-surface text-text">
                   {c.name} ({c.measurementCount} pts)
                 </option>
               ))}
@@ -453,10 +453,10 @@ export function RouteMapView({
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
               isRunning
                 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
-                : 'bg-slate-800/80 text-slate-300 border-slate-700'
+                : 'bg-surface-elevated text-text-muted border-border'
             }`}
           >
-            <Radio className={`w-3.5 h-3.5 ${isRunning ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
+            <Radio className={`w-3.5 h-3.5 ${isRunning ? 'animate-pulse text-emerald-400' : 'text-text-muted'}`} />
             <span>{isRunning ? 'LIVE TRACKING' : 'REPLAY MODE'}</span>
           </div>
 
@@ -467,7 +467,7 @@ export function RouteMapView({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
               options.followMyPosition
                 ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
-                : 'bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-800'
+                : 'bg-surface-elevated text-text-muted border-border hover:bg-surface-elevated'
             }`}
             title="Follow My Position"
           >
@@ -482,7 +482,7 @@ export function RouteMapView({
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
               options.headingUp
                 ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
-                : 'bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-800'
+                : 'bg-surface-elevated text-text-muted border-border hover:bg-surface-elevated'
             }`}
             title="Toggle Orientation (Heading Up / North Up)"
           >
@@ -493,7 +493,7 @@ export function RouteMapView({
 
         {/* Right Controls: Map Type, Dark/Light, Options Drawer, Analytics */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+          <div className="flex items-center bg-surface-elevated border border-border rounded-lg p-0.5">
             {(['NORMAL', 'SATELLITE', 'TERRAIN', 'HYBRID'] as MapBaseType[]).map((type) => (
               <button
                 key={type}
@@ -501,8 +501,8 @@ export function RouteMapView({
                 onClick={() => updateOption('mapType', type)}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
                   options.mapType === type
-                    ? 'bg-cyan-500 text-slate-950 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-accent text-on-accent font-semibold'
+                    : 'text-text-muted hover:text-text'
                 }`}
               >
                 {type}
@@ -513,12 +513,12 @@ export function RouteMapView({
           <button
             type="button"
             onClick={() => updateOption('darkMap', !options.darkMap)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800/80 text-slate-200 border border-slate-700 hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text border border-border hover:bg-surface-elevated"
             aria-label="Toggle Dark Map"
           >
             {options.darkMap ? (
               <>
-                <Moon className="w-3.5 h-3.5 text-cyan-400" />
+                <Moon className="w-3.5 h-3.5 text-accent" />
                 <span>Dark</span>
               </>
             ) : (
@@ -534,8 +534,8 @@ export function RouteMapView({
             onClick={() => setDrawerOpen((prev) => !prev)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
               drawerOpen
-                ? 'bg-cyan-500 text-slate-950 border-cyan-400'
-                : 'bg-slate-800 text-slate-100 border-slate-700 hover:bg-slate-700'
+                ? 'bg-accent text-on-accent border-accent'
+                : 'bg-surface-elevated text-text border-border hover:bg-surface-elevated'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -557,17 +557,17 @@ export function RouteMapView({
       {drawerOpen && (
         <div
           data-testid="map-options-drawer"
-          className="bg-slate-900/95 border border-slate-800 rounded-xl p-4 space-y-4 shadow-xl"
+          className="bg-surface border border-border rounded-xl p-4 space-y-4 shadow-xl"
         >
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div className="flex items-center justify-between border-b border-border pb-2.5">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-semibold text-slate-100">{t.mapOptions}</h3>
+              <Layers className="w-4 h-4 text-accent" />
+              <h3 className="text-sm font-semibold text-text">{t.mapOptions}</h3>
             </div>
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              className="text-slate-400 hover:text-slate-200 p-1"
+              className="text-text-muted hover:text-text p-1"
               aria-label="Close Map Options"
             >
               <X className="w-4 h-4" />
@@ -578,7 +578,7 @@ export function RouteMapView({
             {/* Column 1: Color Metric & Palette */}
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                <label className="block text-xs font-medium text-text-muted mb-1.5">
                   {t.markerColorMode}
                 </label>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -597,8 +597,8 @@ export function RouteMapView({
                       onClick={() => updateOption('colorMode', item.id)}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border text-left transition ${
                         options.colorMode === item.id
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                          : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-700'
+                          ? 'bg-cyan-500/20 border-accent text-accent'
+                          : 'bg-surface-elevated border-border text-text-muted hover:border-border'
                       }`}
                     >
                       {item.label}
@@ -608,9 +608,9 @@ export function RouteMapView({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                <label className="block text-xs font-medium text-text-muted mb-1.5">
                   <span className="inline-flex items-center gap-1">
-                    <Palette className="w-3.5 h-3.5 text-cyan-400" />
+                    <Palette className="w-3.5 h-3.5 text-accent" />
                     {t.signalPalette}
                   </span>
                 </label>
@@ -624,7 +624,7 @@ export function RouteMapView({
                         className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
                           options.signalPalette === pal
                             ? 'bg-indigo-500/25 border-indigo-400 text-indigo-200'
-                            : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                            : 'bg-surface-elevated border-border text-text-muted hover:text-text'
                         }`}
                       >
                         {pal}
@@ -636,11 +636,11 @@ export function RouteMapView({
             </div>
 
             {/* Column 2: Sliders (Point Size & Custom RSRP Thresholds) */}
-            <div className="space-y-3 bg-slate-950/60 border border-slate-800/80 rounded-lg p-3">
+            <div className="space-y-3 bg-surface-elevated border border-border rounded-lg p-3">
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-400">{t.pointSize}</span>
-                  <span className="font-mono text-cyan-300">{options.dotSize} px</span>
+                  <span className="text-text-muted">{t.pointSize}</span>
+                  <span className="font-mono text-accent">{options.dotSize} px</span>
                 </div>
                 <input
                   type="range"
@@ -656,7 +656,7 @@ export function RouteMapView({
 
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-400">RSRP Good Threshold</span>
+                  <span className="text-text-muted">RSRP Good Threshold</span>
                   <span className="font-mono text-emerald-400">{options.rsrpGood} dBm</span>
                 </div>
                 <input
@@ -673,7 +673,7 @@ export function RouteMapView({
 
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-400">RSRP Poor Threshold</span>
+                  <span className="text-text-muted">RSRP Poor Threshold</span>
                   <span className="font-mono text-rose-400">{options.rsrpPoor} dBm</span>
                 </div>
                 <input
@@ -690,8 +690,8 @@ export function RouteMapView({
             </div>
 
             {/* Column 3: Map Layer Switches */}
-            <div className="space-y-2 bg-slate-950/60 border border-slate-800/80 rounded-lg p-3">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            <div className="space-y-2 bg-surface-elevated border border-border rounded-lg p-3">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
                 Active RF Overlays
               </div>
 
@@ -729,7 +729,7 @@ export function RouteMapView({
               ).map((layer) => (
                 <div
                   key={layer.key}
-                  className="py-1.5 px-2 rounded-lg hover:bg-slate-900/80 transition"
+                  className="py-1.5 px-2 rounded-lg hover:bg-surface-elevated transition"
                 >
                   <RfToggleSwitch
                     id={`map-layer-${layer.key}`}
@@ -753,7 +753,7 @@ export function RouteMapView({
         {/* Left 2 Columns: Leaflet Canvas + Interactive Vector Route Overlay */}
         <div className="lg:col-span-2 space-y-3">
           {/* Leaflet Container */}
-          <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 h-[340px]">
+          <div className="relative rounded-xl overflow-hidden border border-border bg-surface-elevated h-[340px]">
             <div
               ref={mapContainerRef}
               className={`w-full h-full transition-transform duration-300 ${
@@ -765,24 +765,24 @@ export function RouteMapView({
             />
 
             {/* Floating Route Summary Ribbon */}
-            <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-lg px-3 py-1.5 text-xs">
-              <span className="text-slate-400">Samples:</span>
-              <span className="font-mono font-semibold text-slate-100">
+            <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 bg-surface-elevated backdrop-blur-md border border-border rounded-lg px-3 py-1.5 text-xs">
+              <span className="text-text-muted">Samples:</span>
+              <span className="font-mono font-semibold text-text">
                 {sortedMeasurements.length}
               </span>
-              <span className="text-slate-700">|</span>
-              <span className="text-slate-400">Avg RSRP:</span>
-              <span className="font-mono font-semibold text-cyan-300">
+              <span className="text-border">|</span>
+              <span className="text-text-muted">Avg RSRP:</span>
+              <span className="font-mono font-semibold text-accent">
                 {signalStats.avgRsrp} dBm
               </span>
-              <span className="text-slate-700">|</span>
-              <span className="text-slate-400">Handovers:</span>
+              <span className="text-border">|</span>
+              <span className="text-text-muted">Handovers:</span>
               <span className="font-mono font-semibold text-amber-300">
                 {mobility.handovers}
               </span>
               {mobility.missedHandovers > 0 && (
                 <>
-                  <span className="text-slate-700">|</span>
+                  <span className="text-border">|</span>
                   <span className="text-rose-400 font-medium">
                     Missed HO: {mobility.missedHandovers}
                   </span>
@@ -792,15 +792,15 @@ export function RouteMapView({
           </div>
 
           {/* Interactive Vector Route Trace & Cell Overlay (Works Offline & in Tests) */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+          <div className="bg-surface border border-border rounded-xl p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                <Navigation className="w-4 h-4 text-accent" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
                   Interactive Vector RF Trace ({options.colorMode.replace('BY_', '')})
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-muted">
                 <span className="inline-flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
                   Good (&ge; {options.rsrpGood} dBm)
@@ -818,7 +818,7 @@ export function RouteMapView({
 
             <svg
               viewBox="0 0 640 280"
-              className="w-full h-56 bg-slate-950/90 rounded-lg border border-slate-800/90"
+              className="w-full h-56 bg-surface-elevated rounded-lg border border-border"
               role="img"
               aria-label="Interactive RF Route Trace Map"
             >
@@ -830,7 +830,7 @@ export function RouteMapView({
                   y1={y}
                   x2={640}
                   y2={y}
-                  stroke="#1e293b"
+                  stroke="var(--color-border)"
                   strokeDasharray="3 3"
                 />
               ))}
@@ -841,7 +841,7 @@ export function RouteMapView({
                   y1={0}
                   x2={x}
                   y2={280}
-                  stroke="#1e293b"
+                  stroke="var(--color-border)"
                   strokeDasharray="3 3"
                 />
               ))}
@@ -850,7 +850,7 @@ export function RouteMapView({
               {sortedMeasurements.length > 1 && (
                 <polyline
                   fill="none"
-                  stroke="#334155"
+                  stroke="var(--color-border-input)"
                   strokeWidth={2.5}
                   points={sortedMeasurements
                     .map((m) => {
@@ -963,15 +963,15 @@ export function RouteMapView({
         </div>
 
         {/* Right Column: Selected Point Inspector Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col justify-between space-y-4">
           {selectedMeasurement ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between border-b border-border pb-3">
                 <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-accent">
                     Point Telemetry Inspector
                   </span>
-                  <h3 className="text-base font-bold text-slate-100 flex items-center gap-2 mt-0.5">
+                  <h3 className="text-base font-bold text-text flex items-center gap-2 mt-0.5">
                     <span>
                       PCI {selectedMeasurement.radio.pci} · Cell {selectedMeasurement.radio.cellId}
                     </span>
@@ -992,8 +992,8 @@ export function RouteMapView({
 
               {/* RF Key Metrics Grid */}
               <div className="grid grid-cols-2 gap-2.5">
-                <div className="bg-slate-950/80 border border-slate-800/90 rounded-lg p-2.5">
-                  <div className="text-[11px] text-slate-400">RSRP</div>
+                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
+                  <div className="text-[11px] text-text-muted">RSRP</div>
                   <div
                     className="text-lg font-mono font-bold"
                     style={{
@@ -1010,53 +1010,53 @@ export function RouteMapView({
                   </div>
                 </div>
 
-                <div className="bg-slate-950/80 border border-slate-800/90 rounded-lg p-2.5">
-                  <div className="text-[11px] text-slate-400">RSRQ</div>
-                  <div className="text-lg font-mono font-bold text-slate-100">
+                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
+                  <div className="text-[11px] text-text-muted">RSRQ</div>
+                  <div className="text-lg font-mono font-bold text-text">
                     {selectedMeasurement.radio.rsrq} dB
                   </div>
                 </div>
 
-                <div className="bg-slate-950/80 border border-slate-800/90 rounded-lg p-2.5">
-                  <div className="text-[11px] text-slate-400">SINR</div>
-                  <div className="text-lg font-mono font-bold text-cyan-300">
+                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
+                  <div className="text-[11px] text-text-muted">SINR</div>
+                  <div className="text-lg font-mono font-bold text-accent">
                     {selectedMeasurement.radio.sinr.toFixed(1)} dB
                   </div>
                 </div>
 
-                <div className="bg-slate-950/80 border border-slate-800/90 rounded-lg p-2.5">
-                  <div className="text-[11px] text-slate-400">RSSI</div>
-                  <div className="text-lg font-mono font-bold text-slate-200">
+                <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
+                  <div className="text-[11px] text-text-muted">RSSI</div>
+                  <div className="text-lg font-mono font-bold text-text">
                     {selectedMeasurement.radio.rssi} dBm
                   </div>
                 </div>
               </div>
 
               {/* Serving Cell & GPS Details */}
-              <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1.5 text-xs">
+              <div className="bg-surface-elevated border border-border rounded-lg p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Operator / MCC-MNC</span>
-                  <span className="font-mono text-slate-200">
+                  <span className="text-text-muted">Operator / MCC-MNC</span>
+                  <span className="font-mono text-text">
                     {selectedMeasurement.radio.operatorName} ({selectedMeasurement.radio.mcc}-
                     {selectedMeasurement.radio.mnc})
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Band / EARFCN</span>
-                  <span className="font-mono text-slate-200">
+                  <span className="text-text-muted">Band / EARFCN</span>
+                  <span className="font-mono text-text">
                     Band {selectedMeasurement.radio.band} · {selectedMeasurement.radio.earfcn}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Speed</span>
-                  <span className="font-mono text-slate-200">
+                  <span className="text-text-muted">Speed</span>
+                  <span className="font-mono text-text">
                     {(selectedMeasurement.gps.speed * 3.6).toFixed(1)} km/h (
                     {selectedMeasurement.gps.speed.toFixed(1)} m/s)
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Coordinates</span>
-                  <span className="font-mono text-slate-300">
+                  <span className="text-text-muted">Coordinates</span>
+                  <span className="font-mono text-text-muted">
                     {selectedMeasurement.gps.latitude.toFixed(5)},{' '}
                     {selectedMeasurement.gps.longitude.toFixed(5)}
                   </span>
@@ -1073,7 +1073,7 @@ export function RouteMapView({
                         ? 'Ping-Pong Handover Detected'
                         : 'Cell Handover Event'}
                     </div>
-                    <div className="text-slate-300 mt-0.5">
+                    <div className="text-text-muted mt-0.5">
                       PCI {selectedHandover.previousPci} (CID {selectedHandover.previousCellId})
                       {' -> '}PCI {selectedHandover.newPci} (CID {selectedHandover.newCellId})
                     </div>
@@ -1088,7 +1088,7 @@ export function RouteMapView({
                     <div className="font-semibold text-rose-300">
                       Missed Handover (+{selectedMissedHo.marginDb} dB Neighbor)
                     </div>
-                    <div className="text-slate-300 mt-0.5">
+                    <div className="text-text-muted mt-0.5">
                       Neighbor PCI {selectedMissedHo.neighborPci} at{' '}
                       {selectedMissedHo.neighborRsrp} dBm vs Serving {selectedMissedHo.servingRsrp}{' '}
                       dBm
@@ -1100,7 +1100,7 @@ export function RouteMapView({
               {/* Neighbor Cells List */}
               {options.showNeighborCells && (
                 <div className="space-y-1.5">
-                  <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
+                  <div className="text-xs font-semibold text-text-muted flex items-center justify-between">
                     <span>{t.neighborCells}</span>
                     <span className="font-mono text-[11px]">
                       {selectedMeasurement.radio.neighborCells.length} visible
@@ -1113,21 +1113,21 @@ export function RouteMapView({
                         return (
                           <div
                             key={`${nb.pci}-${idx}`}
-                            className="flex items-center justify-between bg-slate-950/70 border border-slate-800/80 rounded px-2.5 py-1.5 text-xs"
+                            className="flex items-center justify-between bg-surface-elevated border border-border rounded px-2.5 py-1.5 text-xs"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-semibold text-slate-200">
+                              <span className="font-mono font-semibold text-text">
                                 PCI {nb.pci}
                               </span>
-                              <span className="text-[11px] text-slate-400">
+                              <span className="text-[11px] text-text-muted">
                                 {nb.technology.replace('_', ' ')} · EARFCN {nb.earfcn}
                               </span>
                             </div>
                             <div className="font-mono">
-                              <span className="text-slate-200">{nb.rsrp} dBm</span>
+                              <span className="text-text">{nb.rsrp} dBm</span>
                               <span
                                 className={`ml-1.5 text-[11px] ${
-                                  delta > 0 ? 'text-rose-400 font-semibold' : 'text-slate-500'
+                                  delta > 0 ? 'text-rose-400 font-semibold' : 'text-text-muted'
                                 }`}
                               >
                                 ({delta > 0 ? `+${delta}` : delta} dB)
@@ -1138,7 +1138,7 @@ export function RouteMapView({
                       })}
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-500 italic">
+                    <div className="text-xs text-text-muted italic">
                       No neighbor cells reported at this sample.
                     </div>
                   )}
@@ -1146,10 +1146,10 @@ export function RouteMapView({
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center text-slate-400">
-              <Eye className="w-8 h-8 text-slate-600 mb-2" />
+            <div className="flex flex-col items-center justify-center h-64 text-center text-text-muted">
+              <Eye className="w-8 h-8 text-text-muted mb-2" />
               <p className="text-sm font-medium">No Route Measurements</p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 Start a drive test session or select a recorded campaign.
               </p>
             </div>
@@ -1157,9 +1157,9 @@ export function RouteMapView({
 
           {/* Quick Point Stepper Footer */}
           {sortedMeasurements.length > 0 && (
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted">
               <span className="inline-flex items-center gap-1">
-                <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                <Activity className="w-3.5 h-3.5 text-accent" />
                 Sample #{sortedMeasurements.findIndex((m) => m.id === selectedMeasurement?.id) + 1}{' '}
                 of {sortedMeasurements.length}
               </span>
