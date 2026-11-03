@@ -55,6 +55,40 @@ import { OpenUiNavDock } from './components/openui/OpenUiNavDock';
 
 export type MainNavTab = 'DASHBOARD' | 'MAP' | 'CAMPAIGNS' | 'ANALYTICS';
 
+const TOUR_COMPLETED_KEY = 'rf_field_suite_tour_completed_v1';
+const inMemoryTourStore = new Map<string, string>();
+
+export function isTourCompleted(): boolean {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const val = window.localStorage.getItem(TOUR_COMPLETED_KEY);
+      if (val !== null) return val === 'true';
+    }
+  } catch {
+    // Fallback to in-memory store
+  }
+  return inMemoryTourStore.get(TOUR_COMPLETED_KEY) === 'true';
+}
+
+export function setTourCompleted(completed = true): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (completed) {
+        window.localStorage.setItem(TOUR_COMPLETED_KEY, 'true');
+      } else {
+        window.localStorage.removeItem(TOUR_COMPLETED_KEY);
+      }
+    }
+  } catch {
+    // Safe fallback for restricted or headless storage environments
+  }
+  if (completed) {
+    inMemoryTourStore.set(TOUR_COMPLETED_KEY, 'true');
+  } else {
+    inMemoryTourStore.delete(TOUR_COMPLETED_KEY);
+  }
+}
+
 export function App() {
   const [locale, setLocale] = useState<SupportedLocale>('en');
   const [lightTheme, setLightTheme] = useState(false);
@@ -120,7 +154,16 @@ export function App() {
 
   // Modals
   const [isWidgetsOpen, setIsWidgetsOpen] = useState(false);
-  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(() => !isTourCompleted());
+
+  const handleCloseTutorial = useCallback(() => {
+    setIsTutorialOpen(false);
+    setTourCompleted(true);
+  }, []);
+
+  const handleReplayTutorial = useCallback(() => {
+    setIsTutorialOpen(true);
+  }, []);
 
   // Live idle/standby sample so gauge works even before starting a campaign
   const [standbyTick, setStandbyTick] = useState(0);
@@ -704,8 +747,10 @@ export function App() {
 
             <button
               type="button"
-              onClick={() => setIsTutorialOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent flex items-center gap-1.5"
+              onClick={handleReplayTutorial}
+              className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-semibold text-text hover:border-accent hover:text-accent flex items-center gap-1.5 transition shadow-xs"
+              title="Replay Spotlight Tour"
+              aria-label="Interactive Guide - Replay tour"
             >
               <HelpCircle className="w-3.5 h-3.5 text-accent" />
               <span className="hidden md:inline">{t.replayTutorial}</span>
@@ -883,7 +928,7 @@ export function App() {
 
       <SpotlightTutorial
         isOpen={isTutorialOpen}
-        onClose={() => setIsTutorialOpen(false)}
+        onClose={handleCloseTutorial}
         onNavigateTab={setActiveTab}
         onOpenWidgets={() => setIsWidgetsOpen(true)}
       />

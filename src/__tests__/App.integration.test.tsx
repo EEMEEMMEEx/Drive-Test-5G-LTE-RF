@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import App from '../App';
+import App, { setTourCompleted } from '../App';
 
 describe('App End-to-End UI Integration', () => {
   it('renders Live Monitor in Standby by default (no fake signal) and starts/stops a campaign', () => {
@@ -81,4 +81,32 @@ describe('App End-to-End UI Integration', () => {
     fireEvent.change(langSelect, { target: { value: 'th' } });
     expect(screen.getByText('มอนิเตอร์สด')).toBeInTheDocument();
   });
+  it('persists tour completed flag and allows replaying tour from Help menu', () => {
+    setTourCompleted(false);
+    const { unmount } = render(<App />);
+
+    // On first visit, tour should be visible
+    expect(screen.getByText(/Spotlight Step 1 \/ 5/i)).toBeInTheDocument();
+
+    // Skip sets flag and closes tour
+    fireEvent.click(screen.getByRole('button', { name: /Skip/i }));
+    expect(screen.queryByText(/Spotlight Step 1 \/ 5/i)).not.toBeInTheDocument();
+
+    unmount();
+
+    // On subsequent visit, tour should remain closed
+    render(<App />);
+    expect(screen.queryByText(/Spotlight Step 1 \/ 5/i)).not.toBeInTheDocument();
+
+    // Replay tour button reopens tour regardless of flag
+    fireEvent.click(screen.getByRole('button', { name: /Replay tour/i }));
+    expect(screen.getByText(/Spotlight Step 1 \/ 5/i)).toBeInTheDocument();
+
+    // Test Next stepper and completion
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    expect(screen.getByText(/Spotlight Step 2 \/ 5/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Skip/i }));
+    expect(screen.queryByText(/Spotlight Step 2 \/ 5/i)).not.toBeInTheDocument();
+  });
+
 });

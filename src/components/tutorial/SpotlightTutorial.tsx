@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowRight, Check, Compass, FolderKanban, Gauge, LayoutGrid, Play, X } from 'lucide-react';
 
 export interface SpotlightTutorialProps {
@@ -51,6 +51,12 @@ const STEPS: StepItem[] = [
 export function SpotlightTutorial(props: SpotlightTutorialProps) {
   const { isOpen, onClose, onNavigateTab, onOpenWidgets } = props;
   const [stepIdx, setStepIdx] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStepIdx(0);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -124,6 +130,7 @@ export function SpotlightTutorial(props: SpotlightTutorialProps) {
               <button
                 type="button"
                 onClick={() => {
+                  setStepIdx(0);
                   onClose();
                   onOpenWidgets();
                 }}
