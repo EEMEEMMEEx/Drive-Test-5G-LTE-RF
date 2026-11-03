@@ -36,6 +36,7 @@ import {
   triggerFileDownload,
 } from '../../services/exportService';
 import type { TranslationDictionary } from '../../i18n/translations';
+import { RfSiteAcceptanceReportModal } from '../reports/RfSiteAcceptanceReportModal';
 
 export interface CampaignListViewProps {
   campaigns: Campaign[];
@@ -216,19 +217,6 @@ export function CampaignListView({
 
   const handlePrintPdf = (campaign: Campaign) => {
     setPdfPreviewCampaign(campaign);
-    try {
-      if (typeof window !== 'undefined' && typeof window.print === 'function') {
-        setTimeout(() => {
-          try {
-            window.print();
-          } catch {
-            // Safe guard for test environments
-          }
-        }, 50);
-      }
-    } catch {
-      // Safe guard
-    }
   };
 
   return (
@@ -704,118 +692,13 @@ export function CampaignListView({
         </div>
       )}
 
-      {/* Printable PDF Engineering Report Modal */}
+      {/* Automated RF Site Acceptance & Audit Report Modal */}
       {pdfPreviewCampaign && (
-        <div
-          role="dialog"
-          aria-label="Engineering Drive Test Report"
-          className="fixed inset-0 z-50 bg-surface-elevated backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-accent" />
-                <div>
-                  <h3 className="text-base font-bold text-text">
-                    RF Engineering Drive Test Report
-                  </h3>
-                  <p className="text-xs text-text-muted">{pdfPreviewCampaign.name}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPdfPreviewCampaign(null)}
-                className="text-text-muted hover:text-text p-1"
-                aria-label="Close Report Preview"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {(() => {
-              const pts = measurementsByCampaign[pdfPreviewCampaign.id] ?? [];
-              const st = calculateSignalStats(pts);
-              const mob = detectMobilityEvents(pts);
-              return (
-                <div className="space-y-4 text-xs">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                      <div className="text-text-muted">Average RSRP</div>
-                      <div className="text-base font-mono font-bold text-accent mt-0.5">
-                        {st.avgRsrp} dBm
-                      </div>
-                    </div>
-                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                      <div className="text-text-muted">Average RSRQ / SINR</div>
-                      <div className="text-base font-mono font-bold text-text mt-0.5">
-                        {st.avgRsrq} dB / {st.avgSinr} dB
-                      </div>
-                    </div>
-                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                      <div className="text-text-muted">Coverage (&ge; -105 dBm)</div>
-                      <div className="text-base font-mono font-bold text-emerald-400 mt-0.5">
-                        {st.coveragePercent}%
-                      </div>
-                    </div>
-                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                      <div className="text-text-muted">Handovers / Cells</div>
-                      <div className="text-base font-mono font-bold text-amber-300 mt-0.5">
-                        {mob.handovers} HO / {mob.distinctCells} Cells
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-surface-elevated border border-border rounded-lg p-3 space-y-1 text-text-muted">
-                    <div>
-                      <span className="text-text-muted">Route Profile:</span>{' '}
-                      {getPresetLabel(pdfPreviewCampaign.preset, t)}
-                    </div>
-                    <div>
-                      <span className="text-text-muted">Distance & Samples:</span>{' '}
-                      {formatDistance(pdfPreviewCampaign.distanceMeters)} ({pts.length} samples)
-                    </div>
-                    <div>
-                      <span className="text-text-muted">Min / Max RSRP:</span> {st.minRsrp} dBm /{' '}
-                      {st.maxRsrp} dBm
-                    </div>
-                    {pdfPreviewCampaign.speedTestStatus === 'SUCCESS' && (
-                      <div>
-                        <span className="text-text-muted">Active Throughput:</span> DL{' '}
-                        {pdfPreviewCampaign.speedDownloadMbps.toFixed(1)} Mbps · UL{' '}
-                        {pdfPreviewCampaign.speedUploadMbps.toFixed(1)} Mbps · Ping{' '}
-                        {pdfPreviewCampaign.speedPingMs.toFixed(0)} ms
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setPdfPreviewCampaign(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text-muted hover:bg-surface-elevated"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    window.print();
-                  } catch {
-                    // Ignore in headless environment
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-accent text-on-accent hover:bg-cyan-400"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Now</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <RfSiteAcceptanceReportModal
+          campaign={pdfPreviewCampaign}
+          measurements={measurementsByCampaign[pdfPreviewCampaign.id] ?? []}
+          onClose={() => setPdfPreviewCampaign(null)}
+        />
       )}
     </div>
   );
