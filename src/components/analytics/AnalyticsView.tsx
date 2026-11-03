@@ -445,23 +445,23 @@ export function AnalyticsView({
   return (
     <div className="space-y-4 pb-8">
       {/* Top Campaign Selector & Campaign Comparison Bar */}
-      <section className="rounded-xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg">
+      <section className="rounded-xl border border-border bg-surface p-4 shadow-lg">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-sky-400" />
-              <span className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+              <BarChart3 className="h-5 w-5 text-accent" />
+              <span className="text-sm font-semibold uppercase tracking-wider text-text-muted">
                 {t.navAnalytics}
               </span>
             </div>
 
-            <label className="flex items-center gap-2 text-xs text-slate-400">
+            <label className="flex items-center gap-2 text-xs text-text-muted">
               <span>Active Session:</span>
               <select
                 aria-label="Select Active Campaign"
                 value={selectedCampaignId}
                 onChange={(e) => onSelectCampaign(Number(e.target.value))}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm font-medium text-slate-100 focus:border-sky-400 focus:outline-none"
+                className="rounded-lg border border-border bg-surface-elevated px-3 py-1.5 text-sm font-medium text-text focus:border-accent focus:outline-none"
               >
                 {campaigns.length === 0 && (
                   <option value={0}>No Campaigns Available</option>
@@ -477,8 +477,8 @@ export function AnalyticsView({
 
           {/* Campaign Comparison Selector */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-300">
-              <GitCompare className="h-4 w-4 text-sky-400" />
+            <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+              <GitCompare className="h-4 w-4 text-accent" />
               <span>{t.compareCampaigns}:</span>
             </div>
 
@@ -489,7 +489,7 @@ export function AnalyticsView({
                 const val = e.target.value;
                 setComparisonCampaignId(val === '' ? null : Number(val));
               }}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 focus:border-sky-400 focus:outline-none"
+              className="rounded-lg border border-border bg-surface-elevated px-2.5 py-1.5 text-xs text-text focus:border-accent focus:outline-none"
             >
               <option value="">None (Single Route)</option>
               {referenceCampaigns.map((ref) => (
@@ -500,7 +500,7 @@ export function AnalyticsView({
             </select>
 
             {comparisonCampaignId !== null && (
-              <div className="inline-flex rounded-lg border border-slate-700 bg-slate-950 p-0.5">
+              <div className="inline-flex rounded-lg border border-border bg-surface-elevated p-0.5">
                 {(['RSRP', 'RSRQ', 'SINR'] as ComparisonMetric[]).map((metric) => (
                   <button
                     key={metric}
@@ -508,8 +508,8 @@ export function AnalyticsView({
                     onClick={() => setComparisonMetric(metric)}
                     className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
                       comparisonMetric === metric
-                        ? 'bg-sky-500 text-slate-950'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-accent text-on-accent'
+                        : 'text-text-muted hover:text-text'
                     }`}
                   >
                     {metric}
@@ -522,7 +522,7 @@ export function AnalyticsView({
 
         {/* Comparison Results Banner */}
         {comparisonResult && (
-          <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/90 p-3">
+          <div className="mt-4 rounded-lg border border-border bg-surface-elevated p-3">
             {comparisonResult.error === 'NOT_ENOUGH_DATA' && (
               <div className="flex items-center gap-2 text-xs text-amber-400">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -542,8 +542,8 @@ export function AnalyticsView({
             {comparisonResult.error === null && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5">
-                    <div className="text-[11px] uppercase text-slate-400">
+                  <div className="rounded-lg border border-border bg-surface-elevated p-2.5">
+                    <div className="text-[11px] uppercase text-text-muted">
                       Mean {comparisonMetric} Delta
                     </div>
                     <div
@@ -563,49 +563,49 @@ export function AnalyticsView({
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5">
-                    <div className="text-[11px] uppercase text-slate-400">Improved Zones</div>
+                  <div className="rounded-lg border border-border bg-surface-elevated p-2.5">
+                    <div className="text-[11px] uppercase text-text-muted">Improved Zones</div>
                     <div className="mt-0.5 text-lg font-bold text-emerald-400">
                       {comparisonResult.improvedPercent}%
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5">
-                    <div className="text-[11px] uppercase text-slate-400">Degraded Zones</div>
+                  <div className="rounded-lg border border-border bg-surface-elevated p-2.5">
+                    <div className="text-[11px] uppercase text-text-muted">Degraded Zones</div>
                     <div className="mt-0.5 text-lg font-bold text-rose-400">
                       {comparisonResult.degradedPercent}%
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5">
-                    <div className="text-[11px] uppercase text-slate-400">Spatial Matches</div>
-                    <div className="mt-0.5 text-lg font-bold text-sky-400">
+                  <div className="rounded-lg border border-border bg-surface-elevated p-2.5">
+                    <div className="text-[11px] uppercase text-text-muted">Spatial Matches</div>
+                    <div className="mt-0.5 text-lg font-bold text-accent">
                       {comparisonResult.matchedCount} / {comparisonResult.totalCount} pts
                     </div>
                   </div>
                 </div>
 
                 {/* Spatial Delta Sample Bars */}
-                <div className="rf-table-container max-h-44 rounded-lg border border-slate-800">
+                <div className="rf-table-container max-h-44 rounded-lg border border-border">
                   <table className="rf-data-table w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                      <tr className="border-b border-border text-[11px] uppercase text-text-muted">
                         <th className="px-3 py-2">GPS Coordinate</th>
                         <th className="px-3 py-2">Active ({comparisonMetric})</th>
                         <th className="px-3 py-2">Reference ({comparisonMetric})</th>
                         <th className="px-3 py-2">Spatial Delta</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-border">
                       {comparisonResult.points.slice(0, 12).map((pt, idx) => (
-                        <tr key={idx} className="hover:bg-slate-900/50">
-                          <td className="px-3 py-1.5 font-mono text-slate-300">
+                        <tr key={idx} className="hover:bg-surface-elevated">
+                          <td className="px-3 py-1.5 font-mono text-text-muted">
                             {pt.latitude.toFixed(5)}, {pt.longitude.toFixed(5)}
                           </td>
-                          <td className="px-3 py-1.5 font-mono text-slate-200">
+                          <td className="px-3 py-1.5 font-mono text-text">
                             {pt.activeValue}
                           </td>
-                          <td className="px-3 py-1.5 font-mono text-slate-400">
+                          <td className="px-3 py-1.5 font-mono text-text-muted">
                             {pt.referenceValue}
                           </td>
                           <td className="px-3 py-1.5">
@@ -616,12 +616,12 @@ export function AnalyticsView({
                                     ? 'text-emerald-400'
                                     : pt.delta < 0
                                     ? 'text-rose-400'
-                                    : 'text-slate-400'
+                                    : 'text-text-muted'
                                 }`}
                               >
                                 {pt.delta > 0 ? `+${pt.delta}` : pt.delta} dB
                               </span>
-                              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-800">
+                              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-elevated">
                                 <div
                                   className={`h-full ${
                                     pt.delta >= 0 ? 'bg-emerald-500' : 'bg-rose-500'
@@ -647,7 +647,7 @@ export function AnalyticsView({
         <div
           role="tablist"
           aria-label="Analytics Sub-Tabs"
-          className="mt-4 flex flex-wrap gap-1.5 border-t border-slate-800 pt-3"
+          className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-3"
         >
           {SUB_TABS.map((tab) => {
             const Icon = tab.icon;
@@ -661,8 +661,8 @@ export function AnalyticsView({
                 onClick={() => setActiveTab(tab.id)}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                   isSelected
-                    ? 'bg-sky-500 text-slate-950 shadow-sm'
-                    : 'bg-slate-950/70 text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-accent text-on-accent shadow-sm'
+                    : 'bg-surface-elevated text-text-muted hover:bg-surface-elevated hover:text-text'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -677,61 +677,61 @@ export function AnalyticsView({
       {activeTab === 'SIGNAL' && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Avg RSRP</div>
-              <div className="mt-1 font-mono text-xl font-bold text-sky-400">
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Avg RSRP</div>
+              <div className="mt-1 font-mono text-xl font-bold text-accent">
                 {snapshot.signalStats.avgRsrp} <span className="text-xs font-normal">dBm</span>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Min RSRP</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Min RSRP</div>
               <div className="mt-1 font-mono text-xl font-bold text-rose-400">
                 {snapshot.signalStats.minRsrp} <span className="text-xs font-normal">dBm</span>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Max RSRP</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Max RSRP</div>
               <div className="mt-1 font-mono text-xl font-bold text-emerald-400">
                 {snapshot.signalStats.maxRsrp} <span className="text-xs font-normal">dBm</span>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Avg RSRQ</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Avg RSRQ</div>
               <div className="mt-1 font-mono text-xl font-bold text-amber-400">
                 {snapshot.signalStats.avgRsrq} <span className="text-xs font-normal">dB</span>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Avg SINR</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Avg SINR</div>
               <div className="mt-1 font-mono text-xl font-bold text-purple-400">
                 {snapshot.signalStats.avgSinr} <span className="text-xs font-normal">dB</span>
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Coverage</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Coverage</div>
               <div className="mt-1 font-mono text-xl font-bold text-emerald-400">
                 {snapshot.signalStats.coveragePercent}%
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Samples</div>
-              <div className="mt-1 font-mono text-xl font-bold text-slate-100">
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Samples</div>
+              <div className="mt-1 font-mono text-xl font-bold text-text">
                 {snapshot.signalStats.totalMeasurements}
               </div>
             </div>
           </div>
 
           {/* Interactive RSRP & RSRQ Over Time Chart */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+          <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
+                <Activity className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-semibold text-text">
                   RSRP & RSRQ Telemetry Over Time
                 </h3>
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <span className="inline-flex items-center gap-1.5 text-sky-400">
+                <span className="inline-flex items-center gap-1.5 text-accent">
                   <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
                   RSRP (dBm)
                 </span>
@@ -743,14 +743,14 @@ export function AnalyticsView({
             </div>
 
             {snapshot.timeSeries.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
+              <div className="py-12 text-center text-xs text-text-muted">
                 No time-series radio samples recorded for this campaign.
               </div>
             ) : (
               <div>
                 <svg
                   viewBox="0 0 760 230"
-                  className="h-56 w-full select-none overflow-visible rounded-lg bg-slate-950/80 p-2"
+                  className="h-56 w-full select-none overflow-visible rounded-lg bg-surface-elevated p-2"
                 >
                   {/* Horizontal Reference Lines */}
                   {[-60, -80, -100, -120].map((dbm) => {
@@ -762,13 +762,13 @@ export function AnalyticsView({
                           y1={y}
                           x2={740}
                           y2={y}
-                          stroke="#1e293b"
+                          stroke="var(--color-border)"
                           strokeDasharray="3 3"
                         />
                         <text
                           x={8}
                           y={y + 4}
-                          fill="#64748b"
+                          fill="var(--color-text-muted)"
                           fontSize="10"
                           fontFamily="monospace"
                         >
@@ -836,12 +836,12 @@ export function AnalyticsView({
                 </svg>
 
                 {hoveredTimeIndex !== null && snapshot.timeSeries[hoveredTimeIndex] && (
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs">
-                    <span className="font-mono text-slate-300">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-xs">
+                    <span className="font-mono text-text-muted">
                       t = +{(snapshot.timeSeries[hoveredTimeIndex].relativeMs / 1000).toFixed(1)}s (
                       {formatTimeShort(snapshot.timeSeries[hoveredTimeIndex].timestampMs)})
                     </span>
-                    <span className="font-mono font-semibold text-sky-400">
+                    <span className="font-mono font-semibold text-accent">
                       RSRP: {snapshot.timeSeries[hoveredTimeIndex].rsrp} dBm
                     </span>
                     <span className="font-mono font-semibold text-amber-400">
@@ -850,7 +850,7 @@ export function AnalyticsView({
                     <span className="font-mono text-purple-400">
                       SINR: {snapshot.timeSeries[hoveredTimeIndex].sinr.toFixed(1)} dB
                     </span>
-                    <span className="font-mono text-slate-400">
+                    <span className="font-mono text-text-muted">
                       PCI {snapshot.timeSeries[hoveredTimeIndex].pci} · Cell{' '}
                       {snapshot.timeSeries[hoveredTimeIndex].cellId}
                     </span>
@@ -861,25 +861,25 @@ export function AnalyticsView({
           </div>
 
           {/* Measured Throughput (SpeedTests) */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+          <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Gauge className="h-4 w-4 text-emerald-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
+                <h3 className="text-sm font-semibold text-text">
                   {t.speedTestTitle} ({speedTests.length})
                 </h3>
               </div>
             </div>
 
             {speedTests.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400">
+              <div className="py-6 text-center text-xs text-text-muted">
                 No active speed test measurements recorded in this campaign.
               </div>
             ) : (
-              <div className="rf-table-container rounded-lg border border-slate-800">
+              <div className="rf-table-container rounded-lg border border-border">
                 <table className="rf-data-table w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                    <tr className="border-b border-border text-[11px] uppercase text-text-muted">
                       <th className="px-3 py-2">Time</th>
                       <th className="px-3 py-2">Tech / Band</th>
                       <th className="px-3 py-2">Download</th>
@@ -889,23 +889,23 @@ export function AnalyticsView({
                       <th className="px-3 py-2">RSRP</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-border">
                     {speedTests.map((st) => (
-                      <tr key={st.id} className="hover:bg-slate-950/60">
-                        <td className="px-3 py-2 font-mono text-slate-300">
+                      <tr key={st.id} className="hover:bg-surface-elevated">
+                        <td className="px-3 py-2 font-mono text-text-muted">
                           {formatTimeShort(st.timestampMs)}
                         </td>
-                        <td className="px-3 py-2 font-medium text-slate-200">
+                        <td className="px-3 py-2 font-medium text-text">
                           {st.technology} ·{' '}
                           {getBandFrequencyLabel(st.band, st.technology === 'NR_5G')}
                         </td>
                         <td className="px-3 py-2 font-mono font-semibold text-emerald-400">
                           {st.downloadMbps.toFixed(1)} Mbps
                         </td>
-                        <td className="px-3 py-2 font-mono font-semibold text-sky-400">
+                        <td className="px-3 py-2 font-mono font-semibold text-accent">
                           {st.uploadMbps.toFixed(1)} Mbps
                         </td>
-                        <td className="px-3 py-2 font-mono text-slate-200">
+                        <td className="px-3 py-2 font-mono text-text">
                           {st.pingMs.toFixed(0)} ms
                         </td>
                         <td
@@ -917,7 +917,7 @@ export function AnalyticsView({
                         >
                           {st.loadedPingMs.toFixed(0)} ms
                         </td>
-                        <td className="px-3 py-2 font-mono text-slate-300">
+                        <td className="px-3 py-2 font-mono text-text-muted">
                           {st.rsrp} dBm
                         </td>
                       </tr>
@@ -934,42 +934,42 @@ export function AnalyticsView({
       {activeTab === 'CDF' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5">
-              <div className="text-xs text-slate-400">P10 (Cell Edge / Weakest 10%)</div>
+            <div className="rounded-xl border border-border bg-surface p-3.5">
+              <div className="text-xs text-text-muted">P10 (Cell Edge / Weakest 10%)</div>
               <div className="mt-1 font-mono text-2xl font-bold text-rose-400">
                 {cdfPercentiles.p10} dBm
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5">
-              <div className="text-xs text-slate-400">P50 (Median Route RSRP)</div>
-              <div className="mt-1 font-mono text-2xl font-bold text-sky-400">
+            <div className="rounded-xl border border-border bg-surface p-3.5">
+              <div className="text-xs text-text-muted">P50 (Median Route RSRP)</div>
+              <div className="mt-1 font-mono text-2xl font-bold text-accent">
                 {cdfPercentiles.p50} dBm
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5">
-              <div className="text-xs text-slate-400">P90 (Peak 10% Signal)</div>
+            <div className="rounded-xl border border-border bg-surface p-3.5">
+              <div className="text-xs text-text-muted">P90 (Peak 10% Signal)</div>
               <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">
                 {cdfPercentiles.p90} dBm
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+          <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-sky-400" />
-              <h3 className="text-sm font-semibold text-slate-100">
+              <TrendingUp className="h-4 w-4 text-accent" />
+              <h3 className="text-sm font-semibold text-text">
                 Cumulative Distribution Function (CDF) — RSRP (dBm)
               </h3>
             </div>
 
             {snapshot.cdfRsrp.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
+              <div className="py-12 text-center text-xs text-text-muted">
                 No valid RSRP samples available to build CDF curve.
               </div>
             ) : (
               <svg
                 viewBox="0 0 760 250"
-                className="h-60 w-full select-none rounded-lg bg-slate-950/80 p-2"
+                className="h-60 w-full select-none rounded-lg bg-surface-elevated p-2"
               >
                 {[10, 50, 90].map((pct) => {
                   const y = 210 - (pct / 100) * 185;
@@ -980,13 +980,13 @@ export function AnalyticsView({
                         y1={y}
                         x2={730}
                         y2={y}
-                        stroke="#1e293b"
+                        stroke="var(--color-border)"
                         strokeDasharray="4 4"
                       />
                       <text
                         x={10}
                         y={y + 4}
-                        fill="#94a3b8"
+                        fill="var(--color-text-muted)"
                         fontSize="10"
                         fontFamily="monospace"
                       >
@@ -1045,7 +1045,7 @@ export function AnalyticsView({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* 5G NR Usage Gauge */}
-            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/90 p-5">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-5">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-purple-300">
                 <Wifi className="h-4 w-4 text-purple-400" />
                 <span>5G NR Usage (SA + NSA)</span>
@@ -1053,7 +1053,7 @@ export function AnalyticsView({
               <div className="mt-3 font-mono text-4xl font-extrabold text-purple-400">
                 {snapshot.nrUsagePercent}%
               </div>
-              <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-surface-elevated">
                 <div
                   className="h-full bg-purple-500 transition-all"
                   style={{ width: `${Math.min(100, snapshot.nrUsagePercent)}%` }}
@@ -1062,11 +1062,11 @@ export function AnalyticsView({
             </div>
 
             {/* Horizontal Stacked Distribution Bar & Cards */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 lg:col-span-2">
-              <h3 className="text-sm font-semibold text-slate-100">
+            <div className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+              <h3 className="text-sm font-semibold text-text">
                 Radio Access Technology Breakdown
               </h3>
-              <div className="mt-3 flex h-5 w-full overflow-hidden rounded-lg bg-slate-950">
+              <div className="mt-3 flex h-5 w-full overflow-hidden rounded-lg bg-surface-elevated">
                 {snapshot.techBreakdown.map((item) => (
                   <div
                     key={item.technology}
@@ -1083,21 +1083,21 @@ export function AnalyticsView({
                 {snapshot.techBreakdown.map((item) => (
                   <div
                     key={item.technology}
-                    className="rounded-lg border border-slate-800 bg-slate-950/70 p-3"
+                    className="rounded-lg border border-border bg-surface-elevated p-3"
                   >
                     <div className="flex items-center gap-2">
                       <span
                         className="h-2.5 w-2.5 rounded-full"
                         style={{ backgroundColor: getTechnologyColor(item.technology) }}
                       />
-                      <span className="text-xs font-semibold text-slate-200">
+                      <span className="text-xs font-semibold text-text">
                         {item.technology}
                       </span>
                     </div>
-                    <div className="mt-1 font-mono text-lg font-bold text-slate-100">
+                    <div className="mt-1 font-mono text-lg font-bold text-text">
                       {item.percent}%
                     </div>
-                    <div className="text-[11px] text-slate-400">{item.count} samples</div>
+                    <div className="text-[11px] text-text-muted">{item.count} samples</div>
                   </div>
                 ))}
               </div>
@@ -1108,10 +1108,10 @@ export function AnalyticsView({
 
       {/* TAB 4: BANDS */}
       {activeTab === 'BANDS' && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+        <div className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-sky-400" />
-            <h3 className="text-sm font-semibold text-slate-100">
+            <Layers className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold text-text">
               Frequency Band Distribution
             </h3>
           </div>
@@ -1120,7 +1120,7 @@ export function AnalyticsView({
             {snapshot.bandUsage.map((b) => (
               <div
                 key={`${b.isNr ? 'NR' : 'LTE'}_${b.band}`}
-                className="rounded-lg border border-slate-800 bg-slate-950/70 p-3"
+                className="rounded-lg border border-border bg-surface-elevated p-3"
               >
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -1133,13 +1133,13 @@ export function AnalyticsView({
                     >
                       {b.isNr ? '5G NR' : 'LTE'}
                     </span>
-                    <span className="font-semibold text-slate-100">{b.freqLabel}</span>
+                    <span className="font-semibold text-text">{b.freqLabel}</span>
                   </div>
-                  <div className="font-mono text-slate-300">
+                  <div className="font-mono text-text-muted">
                     {b.count} pts ({b.percent}%)
                   </div>
                 </div>
-                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-elevated">
                   <div
                     className={`h-full ${b.isNr ? 'bg-purple-500' : 'bg-sky-500'}`}
                     style={{ width: `${Math.min(100, b.percent)}%` }}
@@ -1153,11 +1153,11 @@ export function AnalyticsView({
 
       {/* TAB 5: TRACE */}
       {activeTab === 'TRACE' && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+        <div className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Compass className="h-4 w-4 text-sky-400" />
-              <h3 className="text-sm font-semibold text-slate-100">
+              <Compass className="h-4 w-4 text-accent" />
+              <h3 className="text-sm font-semibold text-text">
                 2D GPS Route Signal Trace (RSRP Heatmap)
               </h3>
             </div>
@@ -1183,12 +1183,12 @@ export function AnalyticsView({
 
           <svg
             viewBox="0 0 760 320"
-            className="h-72 w-full rounded-lg border border-slate-800 bg-slate-950 p-2"
+            className="h-72 w-full rounded-lg border border-border bg-surface-elevated p-2"
           >
             {/* Polyline connecting route */}
             <polyline
               fill="none"
-              stroke="#334155"
+              stroke="var(--color-border-input)"
               strokeWidth="2"
               points={measurements
                 .map((m) => {
@@ -1237,19 +1237,19 @@ export function AnalyticsView({
           </svg>
 
           {hoveredTraceIndex !== null && measurements[hoveredTraceIndex] && (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs">
-              <span className="font-mono text-slate-300">
-                <MapPin className="mr-1 inline h-3.5 w-3.5 text-sky-400" />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-2 text-xs">
+              <span className="font-mono text-text-muted">
+                <MapPin className="mr-1 inline h-3.5 w-3.5 text-accent" />
                 {measurements[hoveredTraceIndex].gps.latitude.toFixed(5)},{' '}
                 {measurements[hoveredTraceIndex].gps.longitude.toFixed(5)}
               </span>
-              <span className="font-mono font-semibold text-sky-400">
+              <span className="font-mono font-semibold text-accent">
                 RSRP: {measurements[hoveredTraceIndex].radio.rsrp} dBm
               </span>
               <span className="font-mono text-amber-400">
                 RSRQ: {measurements[hoveredTraceIndex].radio.rsrq} dB
               </span>
-              <span className="font-mono text-slate-300">
+              <span className="font-mono text-text-muted">
                 {measurements[hoveredTraceIndex].radio.technology} · PCI{' '}
                 {measurements[hoveredTraceIndex].radio.pci} · Cell{' '}
                 {measurements[hoveredTraceIndex].radio.cellId}
@@ -1263,26 +1263,26 @@ export function AnalyticsView({
       {activeTab === 'SITES' && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Handovers</div>
-              <div className="mt-1 font-mono text-2xl font-bold text-sky-400">
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Handovers</div>
+              <div className="mt-1 font-mono text-2xl font-bold text-accent">
                 {snapshot.mobilityStats.handovers}
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Ping-Pong (&lt;30s)</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Ping-Pong (&lt;30s)</div>
               <div className="mt-1 font-mono text-2xl font-bold text-amber-400">
                 {snapshot.mobilityStats.pingPong}
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Distinct Cells</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Distinct Cells</div>
               <div className="mt-1 font-mono text-2xl font-bold text-emerald-400">
                 {snapshot.mobilityStats.distinctCells}
               </div>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3">
-              <div className="text-[11px] uppercase text-slate-400">Missed Handovers</div>
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <div className="text-[11px] uppercase text-text-muted">Missed Handovers</div>
               <div className="mt-1 font-mono text-2xl font-bold text-rose-400">
                 {snapshot.mobilityStats.missedHandovers}
               </div>
@@ -1290,14 +1290,14 @@ export function AnalyticsView({
           </div>
 
           {/* Detected Cell Sites Table */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-100">
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <h3 className="mb-3 text-sm font-semibold text-text">
               Detected Serving Cell Sites ({snapshot.cellSites.length})
             </h3>
-            <div className="rf-table-container rounded-lg border border-slate-800">
+            <div className="rf-table-container rounded-lg border border-border">
               <table className="rf-data-table w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                  <tr className="border-b border-border text-[11px] uppercase text-text-muted">
                     <th className="px-3 py-2">Cell ID</th>
                     <th className="px-3 py-2">PCI</th>
                     <th className="px-3 py-2">Technology</th>
@@ -1307,19 +1307,19 @@ export function AnalyticsView({
                     <th className="px-3 py-2">Avg RSRP</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-border">
                   {snapshot.cellSites.map((site) => (
-                    <tr key={site.cellId} className="hover:bg-slate-950/60">
-                      <th className="px-3 py-2 font-mono font-semibold text-sky-400">
+                    <tr key={site.cellId} className="hover:bg-surface-elevated">
+                      <th className="px-3 py-2 font-mono font-semibold text-accent">
                         {site.cellId}
                       </th>
-                      <td className="px-3 py-2 font-mono text-slate-200">{site.pci}</td>
-                      <td className="px-3 py-2 text-slate-200">{site.technology}</td>
-                      <td className="px-3 py-2 text-slate-300">
+                      <td className="px-3 py-2 font-mono text-text">{site.pci}</td>
+                      <td className="px-3 py-2 text-text">{site.technology}</td>
+                      <td className="px-3 py-2 text-text-muted">
                         {getBandFrequencyLabel(site.band, site.technology === 'NR_5G')}
                       </td>
-                      <td className="px-3 py-2 font-mono text-slate-400">{site.earfcn}</td>
-                      <td className="px-3 py-2 font-mono text-slate-200">{site.count}</td>
+                      <td className="px-3 py-2 font-mono text-text-muted">{site.earfcn}</td>
+                      <td className="px-3 py-2 font-mono text-text">{site.count}</td>
                       <td className="px-3 py-2 font-mono font-semibold text-emerald-400">
                         {site.avgRsrp} dBm
                       </td>
@@ -1332,10 +1332,10 @@ export function AnalyticsView({
 
           {/* Handover & Missed Handover Logs */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <div className="mb-2 flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 text-sky-400" />
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                <RefreshCw className="h-4 w-4 text-accent" />
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-text">
                   Handover Event Log ({snapshot.mobilityStats.handoverEvents.length})
                 </h4>
               </div>
@@ -1343,14 +1343,14 @@ export function AnalyticsView({
                 {snapshot.mobilityStats.handoverEvents.map((ho) => (
                   <div
                     key={ho.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs"
+                    className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated px-3 py-2 text-xs"
                   >
                     <div>
-                      <span className="font-mono font-semibold text-slate-200">
+                      <span className="font-mono font-semibold text-text">
                         Cell {ho.previousCellId} (PCI {ho.previousPci}) → Cell {ho.newCellId} (PCI{' '}
                         {ho.newPci})
                       </span>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-text-muted">
                         {formatTimeShort(ho.measurement.timestampMs)} ·{' '}
                         {ho.measurement.radio.rsrp} dBm
                       </div>
@@ -1365,10 +1365,10 @@ export function AnalyticsView({
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <div className="mb-2 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-rose-400" />
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-text">
                   Missed Handover Candidates ({snapshot.mobilityStats.missedHandoverEvents.length})
                 </h4>
               </div>
@@ -1376,14 +1376,14 @@ export function AnalyticsView({
                 {snapshot.mobilityStats.missedHandoverEvents.map((mho) => (
                   <div
                     key={mho.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs"
+                    className="flex items-center justify-between rounded-lg border border-border bg-surface-elevated px-3 py-2 text-xs"
                   >
                     <div>
                       <span className="font-mono font-semibold text-rose-300">
                         Serving PCI {mho.servingPci} ({mho.servingRsrp} dBm) vs Neighbor PCI{' '}
                         {mho.neighborPci} ({mho.neighborRsrp} dBm)
                       </span>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-text-muted">
                         {formatTimeShort(mho.measurement.timestampMs)} · Neighbor{' '}
                         {mho.neighborTechnology}
                       </div>
@@ -1404,14 +1404,14 @@ export function AnalyticsView({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Circular Route Score & Verdict */}
-            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-800 bg-slate-900/90 p-5">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-5">
               <svg viewBox="0 0 120 120" className="h-32 w-32">
                 <circle
                   cx="60"
                   cy="60"
                   r="50"
                   fill="none"
-                  stroke="#1e293b"
+                  stroke="var(--color-border)"
                   strokeWidth="10"
                 />
                 <circle
@@ -1429,14 +1429,14 @@ export function AnalyticsView({
                   x="60"
                   y="58"
                   textAnchor="middle"
-                  fill="#f8fafc"
+                  fill="var(--color-text)"
                   fontSize="24"
                   fontWeight="bold"
                   fontFamily="monospace"
                 >
                   {snapshot.diagnostic.score}
                 </text>
-                <text x="60" y="76" textAnchor="middle" fill="#94a3b8" fontSize="10">
+                <text x="60" y="76" textAnchor="middle" fill="var(--color-text-muted)" fontSize="10">
                   / 100
                 </text>
               </svg>
@@ -1450,19 +1450,19 @@ export function AnalyticsView({
             </div>
 
             {/* Interactive Threshold Sliders */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4 lg:col-span-2">
+            <div className="rounded-xl border border-border bg-surface p-4 lg:col-span-2">
               <div className="mb-3 flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
+                <Sliders className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-semibold text-text">
                   Diagnostic Threshold Configuration
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="block rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                <label className="block rounded-lg border border-border bg-surface-elevated p-3 text-xs">
+                  <div className="flex justify-between text-text-muted">
                     <span>Weak RSRP Threshold</span>
-                    <span className="font-mono font-bold text-sky-400">
+                    <span className="font-mono font-bold text-accent">
                       {thresholds.weakRsrp} dBm
                     </span>
                   </div>
@@ -1482,8 +1482,8 @@ export function AnalyticsView({
                   />
                 </label>
 
-                <label className="block rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                <label className="block rounded-lg border border-border bg-surface-elevated p-3 text-xs">
+                  <div className="flex justify-between text-text-muted">
                     <span>Poor RSRQ Threshold</span>
                     <span className="font-mono font-bold text-amber-400">
                       {thresholds.poorRsrq} dB
@@ -1505,8 +1505,8 @@ export function AnalyticsView({
                   />
                 </label>
 
-                <label className="block rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                <label className="block rounded-lg border border-border bg-surface-elevated p-3 text-xs">
+                  <div className="flex justify-between text-text-muted">
                     <span>Low Throughput Floor</span>
                     <span className="font-mono font-bold text-emerald-400">
                       {thresholds.lowThroughputMbps} Mbps
@@ -1528,8 +1528,8 @@ export function AnalyticsView({
                   />
                 </label>
 
-                <label className="block rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                <label className="block rounded-lg border border-border bg-surface-elevated p-3 text-xs">
+                  <div className="flex justify-between text-text-muted">
                     <span>High Loaded Latency Ceiling</span>
                     <span className="font-mono font-bold text-rose-400">
                       {thresholds.highLoadedLatencyMs} ms
@@ -1555,11 +1555,11 @@ export function AnalyticsView({
           </div>
 
           {/* Issue Filter Chips & Problem Zones */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+          <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-rose-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
+                <h3 className="text-sm font-semibold text-text">
                   Detected Problem Zones ({filteredIssues.length})
                 </h3>
               </div>
@@ -1572,8 +1572,8 @@ export function AnalyticsView({
                     onClick={() => setIssueFilter(opt.type)}
                     className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                       issueFilter === opt.type
-                        ? 'bg-sky-500 text-slate-950'
-                        : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                        ? 'bg-accent text-on-accent'
+                        : 'bg-surface-elevated text-text-muted hover:text-text'
                     }`}
                   >
                     {opt.label}
@@ -1592,17 +1592,17 @@ export function AnalyticsView({
                 {filteredIssues.map((issue) => (
                   <div
                     key={issue.id}
-                    className="rounded-lg border border-slate-800 bg-slate-950/80 p-3.5"
+                    className="rounded-lg border border-border bg-surface-elevated p-3.5"
                   >
                     <div className="flex items-center justify-between">
                       <span className="rounded bg-rose-500/20 px-2 py-0.5 font-mono text-xs font-bold text-rose-300">
                         {issue.type}
                       </span>
-                      <span className="font-mono text-xs text-slate-400">
+                      <span className="font-mono text-xs text-text-muted">
                         {issue.samples} samples · Cell {issue.cellId} (PCI {issue.pci})
                       </span>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-text-muted">
                       <div>Avg RSRP: {issue.averageRsrp} dBm</div>
                       <div>Avg RSRQ: {issue.averageRsrq} dB</div>
                       {issue.downloadMbps > 0 && (
@@ -1612,7 +1612,7 @@ export function AnalyticsView({
                         <div>Loaded Ping: {issue.loadedPingMs.toFixed(0)} ms</div>
                       )}
                     </div>
-                    <div className="mt-2 font-mono text-[11px] text-slate-400">
+                    <div className="mt-2 font-mono text-[11px] text-text-muted">
                       GPS: {issue.latitude.toFixed(5)}, {issue.longitude.toFixed(5)}
                     </div>
                   </div>
@@ -1627,17 +1627,17 @@ export function AnalyticsView({
       {activeTab === 'ADVANCED' && (
         <div className="space-y-4">
           {/* Moments to Investigate Counters + Export Button */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+          <div className="rounded-xl border border-border bg-surface p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-sky-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-semibold text-text">
                   Moments to Investigate — Multi-Layer RF & Transport Correlation
                 </h3>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1">
+                <div className="flex items-center gap-2 bg-surface-elevated border border-border rounded-lg px-2.5 py-1">
                   <Filter className="h-3.5 w-3.5 text-amber-400" />
                   <RfToggleSwitch
                     id="anomalies-only-toggle"
@@ -1652,7 +1652,7 @@ export function AnalyticsView({
                 <button
                   type="button"
                   onClick={handleExportAdvanced}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-sky-400"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent hover:opacity-90"
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span>Export advanced data</span>
@@ -1661,35 +1661,35 @@ export function AnalyticsView({
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                <div className="text-[11px] uppercase text-slate-400">Weak-Signal Samples</div>
+              <div className="rounded-lg border border-border bg-surface-elevated p-3">
+                <div className="text-[11px] uppercase text-text-muted">Weak-Signal Samples</div>
                 <div className="mt-1 font-mono text-xl font-bold text-rose-400">
                   {momentsToInvestigate.weakSignalCount}
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                <div className="text-[11px] uppercase text-slate-400">High-Ping Probes</div>
+              <div className="rounded-lg border border-border bg-surface-elevated p-3">
+                <div className="text-[11px] uppercase text-text-muted">High-Ping Probes</div>
                 <div className="mt-1 font-mono text-xl font-bold text-amber-400">
                   {momentsToInvestigate.highPingProbeCount}
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                <div className="text-[11px] uppercase text-slate-400">Measurement Pauses</div>
+              <div className="rounded-lg border border-border bg-surface-elevated p-3">
+                <div className="text-[11px] uppercase text-text-muted">Measurement Pauses</div>
                 <div className="mt-1 font-mono text-xl font-bold text-purple-400">
                   {momentsToInvestigate.pauseCount}
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
-                <div className="text-[11px] uppercase text-slate-400">Cell Changes</div>
-                <div className="mt-1 font-mono text-xl font-bold text-sky-400">
+              <div className="rounded-lg border border-border bg-surface-elevated p-3">
+                <div className="text-[11px] uppercase text-text-muted">Cell Changes</div>
+                <div className="mt-1 font-mono text-xl font-bold text-accent">
                   {momentsToInvestigate.cellChangeCount}
                 </div>
               </div>
             </div>
 
             {/* Sub-View Switcher (MAP | TIMELINE | CELLS) & Metric Selector */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
-              <div className="inline-flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+              <div className="inline-flex rounded-lg border border-border bg-surface-elevated p-0.5">
                 {(['MAP', 'TIMELINE', 'CELLS'] as AdvancedViewMode[]).map((mode) => (
                   <button
                     key={mode}
@@ -1697,8 +1697,8 @@ export function AnalyticsView({
                     onClick={() => setAdvancedViewMode(mode)}
                     className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
                       advancedViewMode === mode
-                        ? 'bg-sky-500 text-slate-950'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-accent text-on-accent'
+                        : 'text-text-muted hover:text-text'
                     }`}
                   >
                     {mode}
@@ -1707,7 +1707,7 @@ export function AnalyticsView({
               </div>
 
               <div className="inline-flex items-center gap-1.5">
-                <span className="text-xs text-slate-400">Correlate Metric:</span>
+                <span className="text-xs text-text-muted">Correlate Metric:</span>
                 {(['RSRP', 'PING', 'JITTER'] as AdvancedMetricType[]).map((m) => (
                   <button
                     key={m}
@@ -1715,8 +1715,8 @@ export function AnalyticsView({
                     onClick={() => setAdvancedMetric(m)}
                     className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
                       advancedMetric === m
-                        ? 'bg-purple-500 text-slate-950'
-                        : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                        ? 'bg-purple-500 text-white font-semibold'
+                        : 'bg-surface-elevated text-text-muted hover:text-text'
                     }`}
                   >
                     {m}
@@ -1728,13 +1728,13 @@ export function AnalyticsView({
 
           {/* Sub-view 1: MAP Correlated Route View */}
           {advancedViewMode === 'MAP' && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
                 <span>
                   Correlated Spatial View ({advancedMetric}) · Handovers, Pauses & Light Probes overlaid
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-1 text-sky-400">
+                  <span className="inline-flex items-center gap-1 text-accent">
                     <Zap className="h-3.5 w-3.5" /> Light Probe
                   </span>
                   <span className="inline-flex items-center gap-1 text-purple-400">
@@ -1748,7 +1748,7 @@ export function AnalyticsView({
 
               <svg
                 viewBox="0 0 760 280"
-                className="h-64 w-full rounded-lg border border-slate-800 bg-slate-950 p-2"
+                className="h-64 w-full rounded-lg border border-border bg-surface-elevated p-2"
               >
                 {correlatedTimeline.map((item) => {
                   const x =
@@ -1791,7 +1791,7 @@ export function AnalyticsView({
 
           {/* Sub-view 2: TIMELINE Chronological Event Correlation */}
           {advancedViewMode === 'TIMELINE' && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
                 {correlatedTimeline.map((item) => (
                   <div
@@ -1799,23 +1799,23 @@ export function AnalyticsView({
                     className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
                       item.isAnomaly
                         ? 'border-rose-500/40 bg-rose-950/20'
-                        : 'border-slate-800 bg-slate-950/70'
+                        : 'border-border bg-surface-elevated'
                     }`}
                   >
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-slate-400">
+                        <span className="font-mono text-[11px] text-text-muted">
                           {formatTimeShort(item.timestampMs)}
                         </span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-300">
+                        <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-300">
                           {item.category}
                         </span>
-                        <span className="font-semibold text-slate-100">{item.title}</span>
+                        <span className="font-semibold text-text">{item.title}</span>
                       </div>
-                      <div className="text-slate-400">{item.detail}</div>
+                      <div className="text-text-muted">{item.detail}</div>
                     </div>
 
-                    <div className="font-mono text-xs text-slate-300">
+                    <div className="font-mono text-xs text-text-muted">
                       {advancedMetric === 'RSRP' && item.rsrp !== null && `${item.rsrp} dBm`}
                       {advancedMetric === 'PING' &&
                         item.pingMs !== null &&
@@ -1832,17 +1832,17 @@ export function AnalyticsView({
 
           {/* Sub-view 3: CELLS Per-Cell Performance Matrix */}
           {advancedViewMode === 'CELLS' && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <div className="mb-3 flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-sky-400" />
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                <Cpu className="h-4 w-4 text-accent" />
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-text">
                   Per-Cell Correlated Performance Matrix
                 </h4>
               </div>
-              <div className="rf-table-container rounded-lg border border-slate-800">
+              <div className="rf-table-container rounded-lg border border-border">
                 <table className="rf-data-table w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                    <tr className="border-b border-border text-[11px] uppercase text-text-muted">
                       <th className="px-3 py-2">Cell ID</th>
                       <th className="px-3 py-2">PCI / Tech</th>
                       <th className="px-3 py-2">Band</th>
@@ -1853,28 +1853,28 @@ export function AnalyticsView({
                       <th className="px-3 py-2">Handovers</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-border">
                     {cellPerformanceMatrix
                       .filter((c) => !anomaliesOnly || c.hasAnomaly)
                       .map((cell) => (
-                        <tr key={cell.cellId} className="hover:bg-slate-950/60">
-                          <th className="px-3 py-2 font-mono font-semibold text-sky-400">
+                        <tr key={cell.cellId} className="hover:bg-surface-elevated">
+                          <th className="px-3 py-2 font-mono font-semibold text-accent">
                             {cell.cellId}
                           </th>
-                          <td className="px-3 py-2 text-slate-200">
+                          <td className="px-3 py-2 text-text">
                             PCI {cell.pci} · {cell.technology}
                           </td>
-                          <td className="px-3 py-2 text-slate-300">{cell.freqLabel}</td>
+                          <td className="px-3 py-2 text-text-muted">{cell.freqLabel}</td>
                           <td className="px-3 py-2 font-mono font-semibold text-emerald-400">
                             {cell.avgRsrp} dBm
                           </td>
-                          <td className="px-3 py-2 font-mono text-slate-200">
+                          <td className="px-3 py-2 font-mono text-text">
                             {cell.avgPing !== null ? `${cell.avgPing} ms` : '—'}
                           </td>
-                          <td className="px-3 py-2 font-mono text-slate-300">
+                          <td className="px-3 py-2 font-mono text-text-muted">
                             {cell.avgJitter !== null ? `${cell.avgJitter} ms` : '—'}
                           </td>
-                          <td className="px-3 py-2 font-mono text-sky-400">
+                          <td className="px-3 py-2 font-mono text-accent">
                             {cell.avgDlMbps !== null ? `${cell.avgDlMbps} Mbps` : '—'}
                           </td>
                           <td className="px-3 py-2 font-mono text-amber-400">

@@ -248,7 +248,7 @@ export function CampaignListView({
           <button
             type="button"
             onClick={onUndoDelete}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-warning text-slate-950 hover:bg-amber-300 transition"
           >
             <Undo2 className="w-3.5 h-3.5" />
             <span>{t.undoDelete}</span>
@@ -257,37 +257,37 @@ export function CampaignListView({
       )}
 
       {/* Search & Global Actions Bar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface border border-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
           <button
             type="button"
             onClick={toggleSelectAll}
-            className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium bg-slate-950 border border-slate-800 text-slate-300 hover:text-white"
+            className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium bg-surface-elevated border border-border text-text-muted hover:text-text"
             aria-label="Select All Campaigns"
           >
             {selectedIds.length > 0 && selectedIds.length === filteredCampaigns.length ? (
-              <CheckSquare className="w-4 h-4 text-cyan-400" />
+              <CheckSquare className="w-4 h-4 text-accent" />
             ) : (
-              <Square className="w-4 h-4 text-slate-500" />
+              <Square className="w-4 h-4 text-text-muted" />
             )}
             <span>All</span>
           </button>
 
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.searchCampaigns}
               aria-label={t.searchCampaigns}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-8 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-surface-elevated border border-border rounded-lg pl-9 pr-8 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                 aria-label="Clear search"
               >
                 <X className="w-4 h-4" />
@@ -310,7 +310,7 @@ export function CampaignListView({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-cyan-500/20 text-accent border border-accent/40 hover:bg-cyan-500/30 transition"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>{t.importCsv}</span>
@@ -319,17 +319,17 @@ export function CampaignListView({
           <button
             type="button"
             onClick={handleImportSampleCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-elevated text-text border border-border hover:bg-surface-elevated transition"
             title="Generate and import a sample 5G NR CSV route log"
           >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <Sparkles className="w-3.5 h-3.5 text-accent" />
             <span>Sample CSV</span>
           </button>
 
           <button
             type="button"
             onClick={onResetDemoData}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-800/80 text-slate-300 border border-slate-700 hover:bg-slate-800 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-elevated text-text-muted border border-border hover:bg-surface-elevated transition"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Demo Routes</span>
@@ -370,7 +370,7 @@ export function CampaignListView({
             <button
               type="button"
               onClick={handleBatchExportCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-on-accent hover:bg-cyan-400 transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Batch {t.exportCsv}</span>
@@ -403,7 +403,7 @@ export function CampaignListView({
             <button
               type="button"
               onClick={() => setConfirmDeleteIds(null)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text hover:bg-surface-elevated"
             >
               Cancel
             </button>
@@ -421,10 +421,10 @@ export function CampaignListView({
 
       {/* Campaign Cards Grid */}
       {filteredCampaigns.length === 0 ? (
-        <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-10 text-center space-y-2">
-          <FolderOpen className="w-10 h-10 text-slate-600 mx-auto" />
-          <div className="text-base font-semibold text-slate-300">No Matching Campaigns</div>
-          <p className="text-xs text-slate-500">
+        <div className="bg-surface border border-border rounded-xl p-10 text-center space-y-2">
+          <FolderOpen className="w-10 h-10 text-text-muted mx-auto" />
+          <div className="text-base font-semibold text-text-muted">No Matching Campaigns</div>
+          <p className="text-xs text-text-muted">
             Try clearing your search filter, importing a CSV log, or resetting demo routes.
           </p>
         </div>
@@ -466,8 +466,8 @@ export function CampaignListView({
                 onClick={() => onSelectCampaign(campaign.id)}
                 className={`rounded-xl border p-4 transition cursor-pointer ${
                   isSelected
-                    ? 'bg-slate-900/95 border-cyan-500/70 shadow-lg shadow-cyan-950/30'
-                    : 'bg-slate-900/75 border-slate-800 hover:border-slate-700'
+                    ? 'bg-surface border-accent/70 shadow-lg shadow-accent/10'
+                    : 'bg-surface border-border hover:border-border'
                 }`}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -480,10 +480,10 @@ export function CampaignListView({
                         toggleSelectOne(campaign.id);
                       }}
                       aria-label={`Select ${campaign.name}`}
-                      className="mt-1 text-slate-400 hover:text-cyan-400"
+                      className="mt-1 text-text-muted hover:text-accent"
                     >
                       {isChecked ? (
-                        <CheckSquare className="w-4 h-4 text-cyan-400" />
+                        <CheckSquare className="w-4 h-4 text-accent" />
                       ) : (
                         <Square className="w-4 h-4" />
                       )}
@@ -491,11 +491,11 @@ export function CampaignListView({
 
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-slate-100">
+                        <h3 className="text-base font-bold text-text">
                           {campaign.name}
                         </h3>
 
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-800 text-cyan-300 border border-slate-700">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-surface-elevated text-accent border border-border">
                           {getPresetLabel(campaign.preset, t)}
                         </span>
 
@@ -508,18 +508,18 @@ export function CampaignListView({
                       </div>
 
                       {/* Metadata row */}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
                         <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          <Clock className="w-3.5 h-3.5 text-text-muted" />
                           {new Date(campaign.startTime).toLocaleString()} ·{' '}
                           {formatDuration(campaign.startTime, campaign.endTime)}
                         </span>
                         <span className="inline-flex items-center gap-1">
-                          <Route className="w-3.5 h-3.5 text-slate-500" />
+                          <Route className="w-3.5 h-3.5 text-text-muted" />
                           {formatDistance(campaign.distanceMeters)}
                         </span>
                         <span className="inline-flex items-center gap-1">
-                          <Activity className="w-3.5 h-3.5 text-slate-500" />
+                          <Activity className="w-3.5 h-3.5 text-text-muted" />
                           {measurements.length || campaign.measurementCount} pts
                         </span>
                         <span className="inline-flex items-center gap-1 text-amber-300">
@@ -546,25 +546,25 @@ export function CampaignListView({
                         </div>
                       </div>
 
-                      <div className="bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-mono">
-                        <div className="text-slate-400">
+                      <div className="bg-surface-elevated border border-border rounded-lg px-2.5 py-1.5 text-xs font-mono">
+                        <div className="text-text-muted">
                           Min: <span className="text-rose-300">{stats.minRsrp}</span> dBm
                         </div>
-                        <div className="text-slate-400">
+                        <div className="text-text-muted">
                           Max: <span className="text-emerald-300">{stats.maxRsrp}</span> dBm
                         </div>
                       </div>
 
                       {campaign.speedTestStatus === 'SUCCESS' && (
-                        <div className="bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs">
-                          <div className="flex items-center gap-1 text-cyan-300 font-mono font-semibold">
+                        <div className="bg-surface-elevated border border-border rounded-lg px-2.5 py-1.5 text-xs">
+                          <div className="flex items-center gap-1 text-accent font-mono font-semibold">
                             <Wifi className="w-3 h-3" />
                             <span>
                               {campaign.speedDownloadMbps.toFixed(1)} /{' '}
                               {campaign.speedUploadMbps.toFixed(1)} Mbps
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono">
+                          <div className="text-[11px] text-text-muted font-mono">
                             Ping {campaign.speedPingMs.toFixed(0)} ms
                           </div>
                         </div>
@@ -572,10 +572,10 @@ export function CampaignListView({
                     </div>
 
                     {/* Mini SVG RSRP Sparkline */}
-                    <div className="bg-slate-950/90 border border-slate-800 rounded-lg px-2.5 py-1.5">
-                      <div className="text-[10px] text-slate-500 mb-0.5 flex justify-between">
+                    <div className="bg-surface-elevated border border-border rounded-lg px-2.5 py-1.5">
+                      <div className="text-[10px] text-text-muted mb-0.5 flex justify-between">
                         <span>RSRP Trace</span>
-                        <span className="font-mono text-slate-400">
+                        <span className="font-mono text-text-muted">
                           Cov {stats.coveragePercent}%
                         </span>
                       </div>
@@ -591,7 +591,7 @@ export function CampaignListView({
                           y1={23}
                           x2={220}
                           y2={23}
-                          stroke="#1e293b"
+                          stroke="var(--color-border)"
                           strokeDasharray="2 2"
                         />
                         <polyline
@@ -607,14 +607,14 @@ export function CampaignListView({
 
                 {/* Bottom Action Toolbar */}
                 <div
-                  className="mt-3 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2"
+                  className="mt-3 pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onOpenMapForCampaign(campaign.id)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/20 text-accent border border-accent/40 hover:bg-cyan-500/30 transition"
                     >
                       <MapPin className="w-3.5 h-3.5" />
                       <span>{t.navMap}</span>
@@ -641,7 +641,7 @@ export function CampaignListView({
                           'text/csv;charset=utf-8;'
                         );
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700 transition"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text hover:bg-surface-elevated border border-border transition"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
                       <span>{t.exportCsv}</span>
@@ -657,9 +657,9 @@ export function CampaignListView({
                           'application/vnd.google-earth.kml+xml'
                         );
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700 transition"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text hover:bg-surface-elevated border border-border transition"
                     >
-                      <Globe className="w-3.5 h-3.5 text-sky-400" />
+                      <Globe className="w-3.5 h-3.5 text-accent" />
                       <span>{t.exportKml}</span>
                     </button>
 
@@ -673,7 +673,7 @@ export function CampaignListView({
                           'application/geo+json'
                         );
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700 transition"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text hover:bg-surface-elevated border border-border transition"
                     >
                       <FileCode2 className="w-3.5 h-3.5 text-amber-400" />
                       <span>{t.exportGeoJson}</span>
@@ -682,7 +682,7 @@ export function CampaignListView({
                     <button
                       type="button"
                       onClick={() => handlePrintPdf(campaign)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700 transition"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text hover:bg-surface-elevated border border-border transition"
                     >
                       <Printer className="w-3.5 h-3.5 text-purple-400" />
                       <span>{t.exportPdf}</span>
@@ -709,23 +709,23 @@ export function CampaignListView({
         <div
           role="dialog"
           aria-label="Engineering Drive Test Report"
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-surface-elevated backdrop-blur-sm flex items-center justify-center p-4"
         >
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-cyan-400" />
+                <FileText className="w-5 h-5 text-accent" />
                 <div>
-                  <h3 className="text-base font-bold text-slate-100">
+                  <h3 className="text-base font-bold text-text">
                     RF Engineering Drive Test Report
                   </h3>
-                  <p className="text-xs text-slate-400">{pdfPreviewCampaign.name}</p>
+                  <p className="text-xs text-text-muted">{pdfPreviewCampaign.name}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setPdfPreviewCampaign(null)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-text-muted hover:text-text p-1"
                 aria-label="Close Report Preview"
               >
                 <X className="w-5 h-5" />
@@ -739,48 +739,48 @@ export function CampaignListView({
               return (
                 <div className="space-y-4 text-xs">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                      <div className="text-slate-400">Average RSRP</div>
-                      <div className="text-base font-mono font-bold text-cyan-300 mt-0.5">
+                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
+                      <div className="text-text-muted">Average RSRP</div>
+                      <div className="text-base font-mono font-bold text-accent mt-0.5">
                         {st.avgRsrp} dBm
                       </div>
                     </div>
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                      <div className="text-slate-400">Average RSRQ / SINR</div>
-                      <div className="text-base font-mono font-bold text-slate-100 mt-0.5">
+                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
+                      <div className="text-text-muted">Average RSRQ / SINR</div>
+                      <div className="text-base font-mono font-bold text-text mt-0.5">
                         {st.avgRsrq} dB / {st.avgSinr} dB
                       </div>
                     </div>
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                      <div className="text-slate-400">Coverage (&ge; -105 dBm)</div>
+                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
+                      <div className="text-text-muted">Coverage (&ge; -105 dBm)</div>
                       <div className="text-base font-mono font-bold text-emerald-400 mt-0.5">
                         {st.coveragePercent}%
                       </div>
                     </div>
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
-                      <div className="text-slate-400">Handovers / Cells</div>
+                    <div className="bg-surface-elevated border border-border rounded-lg p-3">
+                      <div className="text-text-muted">Handovers / Cells</div>
                       <div className="text-base font-mono font-bold text-amber-300 mt-0.5">
                         {mob.handovers} HO / {mob.distinctCells} Cells
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 space-y-1 text-slate-300">
+                  <div className="bg-surface-elevated border border-border rounded-lg p-3 space-y-1 text-text-muted">
                     <div>
-                      <span className="text-slate-500">Route Profile:</span>{' '}
+                      <span className="text-text-muted">Route Profile:</span>{' '}
                       {getPresetLabel(pdfPreviewCampaign.preset, t)}
                     </div>
                     <div>
-                      <span className="text-slate-500">Distance & Samples:</span>{' '}
+                      <span className="text-text-muted">Distance & Samples:</span>{' '}
                       {formatDistance(pdfPreviewCampaign.distanceMeters)} ({pts.length} samples)
                     </div>
                     <div>
-                      <span className="text-slate-500">Min / Max RSRP:</span> {st.minRsrp} dBm /{' '}
+                      <span className="text-text-muted">Min / Max RSRP:</span> {st.minRsrp} dBm /{' '}
                       {st.maxRsrp} dBm
                     </div>
                     {pdfPreviewCampaign.speedTestStatus === 'SUCCESS' && (
                       <div>
-                        <span className="text-slate-500">Active Throughput:</span> DL{' '}
+                        <span className="text-text-muted">Active Throughput:</span> DL{' '}
                         {pdfPreviewCampaign.speedDownloadMbps.toFixed(1)} Mbps · UL{' '}
                         {pdfPreviewCampaign.speedUploadMbps.toFixed(1)} Mbps · Ping{' '}
                         {pdfPreviewCampaign.speedPingMs.toFixed(0)} ms
@@ -791,11 +791,11 @@ export function CampaignListView({
               );
             })()}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setPdfPreviewCampaign(null)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-elevated text-text-muted hover:bg-surface-elevated"
               >
                 Close
               </button>
@@ -808,7 +808,7 @@ export function CampaignListView({
                     // Ignore in headless environment
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-accent text-on-accent hover:bg-cyan-400"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print Now</span>
