@@ -33,6 +33,37 @@ export const DEFAULT_SIM_CARDS: SimInfo[] = [
   },
 ];
 
+export const BLANK_RADIO_INFO: RadioInfo = {
+  technology: 'UNKNOWN',
+  operatorName: 'STANDBY (NO SIGNAL)',
+  mcc: '---',
+  mnc: '--',
+  simSlot: 0,
+  cellId: 0,
+  lac: 0,
+  pci: 0,
+  band: 0,
+  earfcn: 0,
+  dlFrequencyKhz: 0,
+  dlBandwidthKhz: 0,
+  rssi: -120,
+  rsrp: -140,
+  rsrq: -20,
+  sinr: -20,
+  signalLevel: 0,
+  cqi: 0,
+  timingAdvance: 0,
+  csiRsrp: -140,
+  csiRsrq: -20,
+  csiSinr: -20,
+  nrStatus: 'NONE',
+  aggregatedBands: [],
+  aggregatedNrBands: [],
+  isRegistered: false,
+  connectionState: 'DISCONNECTED',
+  neighborCells: [],
+};
+
 export function getCadenceIntervalMs(cadence: MeasurementCadence): number {
   switch (cadence) {
     case 'ECO':

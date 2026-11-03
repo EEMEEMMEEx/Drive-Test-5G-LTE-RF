@@ -50,6 +50,7 @@ export interface CampaignListViewProps {
   lastDeletedName: string | null;
   onImportCampaignCsv: (name: string, csvText: string) => void;
   onResetDemoData: () => void;
+  onClearAllData?: () => void;
   t: TranslationDictionary;
 }
 
@@ -135,11 +136,13 @@ export function CampaignListView({
   lastDeletedName,
   onImportCampaignCsv,
   onResetDemoData,
+  onClearAllData,
   t,
 }: CampaignListViewProps) {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[] | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState<boolean>(false);
   const [pdfPreviewCampaign, setPdfPreviewCampaign] = useState<Campaign | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -331,6 +334,29 @@ export function CampaignListView({
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Demo Routes</span>
           </button>
+
+          {onClearAllData && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmClearAll) {
+                  onClearAllData();
+                  setConfirmClearAll(false);
+                } else {
+                  setConfirmClearAll(true);
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition ${
+                confirmClearAll
+                  ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+                  : 'bg-rose-500/10 text-rose-300 border-rose-500/30 hover:bg-rose-500/20'
+              }`}
+              title="ล้างข้อมูลแคมเปญและการวัดทั้งหมด (Clear all campaigns & measurements)"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{confirmClearAll ? 'Confirm Clear All?' : t.clearAllData}</span>
+            </button>
+          )}
         </div>
       </div>
 

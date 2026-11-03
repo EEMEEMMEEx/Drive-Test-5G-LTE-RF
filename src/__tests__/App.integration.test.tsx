@@ -75,4 +75,29 @@ describe('App End-to-End UI Integration', () => {
     fireEvent.change(langSelect, { target: { value: 'th' } });
     expect(screen.getByText('มอนิเตอร์สด')).toBeInTheDocument();
   });
-});
+
+  it('clears live telemetry and clears all database campaigns', () => {
+    render(<App />);
+
+    // Clear live telemetry in dashboard
+    const clearTelemetryBtn = screen.getByRole('button', { name: /Clear Live Telemetry/i });
+    fireEvent.click(clearTelemetryBtn);
+    expect(screen.getByText(/--- dBm/i)).toBeInTheDocument();
+    expect(screen.getByText(/STANDBY \/ NO SIGNAL/i)).toBeInTheDocument();
+
+    // Navigate to Campaigns and clear all data
+    fireEvent.click(screen.getByRole('button', { name: /Campaigns/i }));
+    const clearAllBtn = screen.getByRole('button', { name: /Clear All Data/i });
+    fireEvent.click(clearAllBtn);
+    // Click confirmation
+    const confirmBtn = screen.getByRole('button', { name: /Confirm Clear All\?/i });
+    fireEvent.click(confirmBtn);
+
+    expect(screen.getByText(/No Matching Campaigns/i)).toBeInTheDocument();
+
+    // Reset demo routes back
+    const resetBtn = screen.getByRole('button', { name: /Reset Demo Routes/i });
+    fireEvent.click(resetBtn);
+    expect(screen.getByText(/Sukhumvit_5G_SA_Post_Optimization/i)).toBeInTheDocument();
+  });
+  });

@@ -14,6 +14,7 @@ import {
   Play,
   Radio,
   RefreshCw,
+  RotateCcw,
   ShieldAlert,
   Signal,
   Smartphone,
@@ -76,6 +77,8 @@ export interface DriveTestDashboardProps {
   onSwitchToLiveMap: () => void;
   useRealBrowserGps: boolean;
   onToggleRealBrowserGps: (useReal: boolean) => void;
+  isTelemetryCleared?: boolean;
+  onClearTelemetry?: () => void;
   t: TranslationDictionary;
 }
 
@@ -118,6 +121,8 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     onSwitchToLiveMap,
     useRealBrowserGps,
     onToggleRealBrowserGps,
+    isTelemetryCleared,
+    onClearTelemetry,
     t,
   } = props;
 
@@ -208,7 +213,8 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
-  const rsrpPercent = Math.max(0, Math.min(100, ((currentRadio.rsrp + 135) / 80) * 100));
+  const isStandby = currentRadio.technology === 'UNKNOWN' || Boolean(isTelemetryCleared && !isRunning);
+  const rsrpPercent = isStandby ? 0 : Math.max(0, Math.min(100, ((currentRadio.rsrp + 135) / 80) * 100));
   const rsrpQualityColor =
     currentRadio.rsrp >= -90
       ? 'text-success'
@@ -219,7 +225,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
       : 'text-danger';
 
   const isWeakSignalAlertActive =
-    alertThresholdRsrp !== null && currentRadio.rsrp < alertThresholdRsrp;
+    !isStandby && alertThresholdRsrp !== null && currentRadio.rsrp < alertThresholdRsrp;
 
   const totalCaBandwidthMhz = Math.round(
     currentRadio.aggregatedBands.reduce((acc, b) => acc + b.dlBandwidthKhz, 0) / 1000
@@ -338,7 +344,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
           <div className="flex items-center gap-2.5">
             <ShieldAlert className="w-5 h-5 shrink-0" />
             <span className="text-sm font-semibold">
-              {t.weakSignalAlert}: RSRP at {currentRadio.rsrp} dBm (below threshold {alertThresholdRsrp} dBm) on Cell {currentRadio.cellId} (PCI {currentRadio.pci})
+              {t.weakSignalAlert}: RSRP at {isStandby ? '--- dBm' : `${currentRadio.rsrp} dBm`} (below threshold {alertThresholdRsrp} dBm) on Cell {currentRadio.cellId} (PCI {currentRadio.pci})
             </span>
           </div>
           <span className="text-xs font-mono uppercase px-2 py-0.5 rounded bg-danger/20">
@@ -506,6 +512,17 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
               >
                 Quick Start ({selectedPreset.replace('_', ' ')})
               </button>
+              {onClearTelemetry && (
+                <button
+                  type="button"
+                  onClick={onClearTelemetry}
+                  className="px-3 py-2 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text-muted hover:text-text hover:border-accent flex items-center gap-1.5"
+                  title="ล้างค่ามาตรวัดสัญญาณ RF ชั่วคราว / เข้าสู่โหมดสแตนด์บายว่าง (Reset RF gauge to standby)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-accent" />
+                  <span>{t.clearTelemetry}</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -582,7 +599,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
                 textAnchor="middle"
                 className="fill-current text-text font-mono text-3xl font-bold"
               >
-                {currentRadio.rsrp} dBm
+                {isStandby ? '--- dBm' : `${currentRadio.rsrp} dBm`}
               </text>
               <text
                 x="110"
@@ -590,7 +607,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
                 textAnchor="middle"
                 className="fill-current text-text-muted font-sans text-xs"
               >
-                RSRP · Level {currentRadio.signalLevel}/4
+                {isStandby ? 'STANDBY / NO SIGNAL' : `RSRP · Level ${currentRadio.signalLevel}/4`}
               </text>
             </svg>
 

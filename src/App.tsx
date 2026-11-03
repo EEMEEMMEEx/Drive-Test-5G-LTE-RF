@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { APP_VERSION } from './version';
 import { TRANSLATIONS, type SupportedLocale } from './i18n/translations';
-import { loadDatabaseState, resetDatabaseToSeed, saveDatabaseState } from './db/database';
+import { clearDatabaseState, loadDatabaseState, resetDatabaseToSeed, saveDatabaseState } from './db/database';
 import type { SeedDatabaseState } from './db/seedData';
 import type {
   Campaign,
@@ -30,6 +30,7 @@ import type {
   SpeedTestResult,
 } from './types/drivetest';
 import {
+  BLANK_RADIO_INFO,
   DEFAULT_SIM_CARDS,
   generateLightProbeSample,
   generateSimulatedMeasurement,
@@ -120,6 +121,7 @@ export function App() {
 
   // Live idle/standby sample so gauge works even before starting a campaign
   const [standbyTick, setStandbyTick] = useState(0);
+  const [isTelemetryCleared, setIsTelemetryCleared] = useState(false);
   const liveSample = useMemo(
     () =>
       generateSimulatedMeasurement({
@@ -223,6 +225,7 @@ export function App() {
     const intervalMs = getCadenceIntervalMs(cadence);
     const timer = window.setInterval(() => {
       const nextStep = stepRef.current + 1;
+      setIsTelemetryCleared(false);
       const now = Date.now();
       setStepIndex(nextStep);
       setElapsedMs((prev) => prev + intervalMs);
@@ -314,6 +317,7 @@ export function App() {
 
   const handleStartCampaign = useCallback(
     (name: string, preset: CampaignPreset, alertThreshold: number | null) => {
+      setIsTelemetryCleared(false);
       const now = Date.now();
       const newId =
         db.campaigns.reduce((max, c) => (c.id > max ? c.id : max), 0) + 1;
@@ -374,7 +378,8 @@ export function App() {
     setIsPaused((prev) => {
       const nextPaused = !prev;
       if (nextPaused && activeCampaignId !== null) {
-        const now = Date.now();
+        setIsTelemetryCleared(false);
+      const now = Date.now();
         setDb((old) => ({
           ...old,
           sessionEvents: [
@@ -474,6 +479,7 @@ export function App() {
     }, 500);
 
     window.setTimeout(() => {
+      setIsTelemetryCleared(false);
       const now = Date.now();
       const targetId = activeCampaignId ?? selectedCampaignId;
       const result: SpeedTestResult = {
@@ -617,7 +623,19 @@ export function App() {
   const t = TRANSLATIONS[locale];
   const latestMeasurement =
     currentMeasurements[currentMeasurements.length - 1] ?? liveSample;
-  const displayRadio = isRunning ? latestMeasurement.radio : liveSample.radio;
+  const handleClearAllData = useCallback(() => {
+    const empty = clearDatabaseState();
+    setDb(empty);
+    setSelectedCampaignId(0);
+    setDeletedBackup(null);
+    setIsTelemetryCleared(true);
+  }, []);
+
+  const displayRadio = isRunning
+    ? latestMeasurement.radio
+    : isTelemetryCleared
+    ? BLANK_RADIO_INFO
+    : liveSample.radio;
   const displayGps = isRunning ? latestMeasurement.gps : liveSample.gps;
 
   return (
@@ -769,6 +787,8 @@ export function App() {
             onSwitchToLiveMap={() => setActiveTab('MAP')}
             useRealBrowserGps={useRealBrowserGps}
             onToggleRealBrowserGps={setUseRealBrowserGps}
+            isTelemetryCleared={isTelemetryCleared}
+            onClearTelemetry={() => setIsTelemetryCleared(true)}
             t={t}
           />
         )}
@@ -808,6 +828,7 @@ export function App() {
             lastDeletedName={deletedBackup?.name ?? null}
             onImportCampaignCsv={handleImportCampaignCsv}
             onResetDemoData={handleResetDemoData}
+            onClearAllData={handleClearAllData}
             t={t}
           />
         )}
