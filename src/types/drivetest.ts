@@ -18,15 +18,36 @@ export type SessionEventType = 'PAUSE' | 'LIGHT_PROBE';
 export type MapColorMode = 'BY_RSRP' | 'BY_RSRQ' | 'BY_SINR' | 'BY_TECHNOLOGY' | 'BY_SPEED';
 export type SignalPalette = 'CLASSIC' | 'THERMIQUE' | 'VIRIDIS' | 'OCEAN';
 export type MapBaseType =
-  | 'NORMAL'
+  | 'GOOGLE_HYBRID'
+  | 'GOOGLE_SATELLITE'
+  | 'GOOGLE_ROADMAP'
+  | 'GOOGLE_TERRAIN'
   | 'SATELLITE'
   | 'TERRAIN'
-  | 'HYBRID'
-  | 'GOOGLE_ROADMAP'
-  | 'GOOGLE_SATELLITE'
-  | 'GOOGLE_HYBRID'
-  | 'GOOGLE_TERRAIN'
-  | 'CARTO_DARK';
+  | 'HYBRID';
+
+export const DEFAULT_MAP_TYPE: MapBaseType = 'GOOGLE_HYBRID';
+
+export const VALID_MAP_TYPES: readonly MapBaseType[] = [
+  'GOOGLE_HYBRID',
+  'GOOGLE_SATELLITE',
+  'GOOGLE_ROADMAP',
+  'GOOGLE_TERRAIN',
+  'SATELLITE',
+  'TERRAIN',
+  'HYBRID',
+] as const;
+
+export function isValidMapType(val: unknown): val is MapBaseType {
+  return typeof val === 'string' && VALID_MAP_TYPES.includes(val as MapBaseType);
+}
+
+export function sanitizeMapType(val: unknown, fallback: MapBaseType = DEFAULT_MAP_TYPE): MapBaseType {
+  if (isValidMapType(val)) {
+    return val;
+  }
+  return fallback;
+}
 
 export type DiagnosticIssueType =
   | 'WEAK_SIGNAL'
@@ -49,6 +70,8 @@ export type AdvancedViewMode = 'MAP' | 'TIMELINE' | 'CELLS';
 export type AdvancedMetricType = 'RSRP' | 'PING' | 'JITTER';
 export type ComparisonMetric = 'RSRP' | 'RSRQ' | 'SINR';
 export type ComparisonError = 'NOT_ENOUGH_DATA' | 'NO_OVERLAP' | 'METRIC_UNAVAILABLE' | null;
+
+export type MainNavTab = 'DASHBOARD' | 'MAP' | 'CAMPAIGNS' | 'ANALYTICS';
 
 export interface SimInfo {
   subscriptionId: number;
@@ -344,7 +367,6 @@ export interface AnalyticsSnapshot {
 
 export interface MapOptions {
   colorMode: MapColorMode;
-  darkMap: boolean;
   mapType: MapBaseType;
   signalPalette: SignalPalette;
   showCurrentCell: boolean;

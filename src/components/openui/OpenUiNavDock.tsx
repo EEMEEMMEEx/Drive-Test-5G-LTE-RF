@@ -36,7 +36,8 @@ export function OpenUiNavDock<T extends string>({
             type="button"
             onClick={() => onSelect(item.id)}
             aria-label={item.label}
-            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+            aria-current={isActive ? 'page' : undefined}
+            className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
               isActive
                 ? 'text-accent font-bold scale-105'
                 : 'text-text-muted hover:text-text'
