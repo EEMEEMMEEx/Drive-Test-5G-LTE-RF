@@ -24,7 +24,7 @@ export function OpenUiNavDock<T extends string>({
   return (
     <nav
       aria-label="Mobile Bottom Navigation"
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border shadow-lg px-2 py-1.5 flex items-center justify-around ${className}`}
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border shadow-lg px-2 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around ${className}`}
     >
       {items.map((item) => {
         const Icon = item.icon;
