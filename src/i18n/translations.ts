@@ -138,7 +138,7 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     tabAdvanced: 'Advanced Correlation',
     compareCampaigns: 'Campaign Comparison',
     widgetsPreview: 'Widgets HUD',
-    replayTutorial: 'Interactive Guide',
+    replayTutorial: 'Interactive Guide · Replay tour',
   },
   th: {
     appTitle: 'RF Field Suite',
@@ -207,7 +207,7 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     tabAdvanced: 'วิเคราะห์เชิงลึก',
     compareCampaigns: 'เปรียบเทียบแคมเปญ',
     widgetsPreview: 'วิดเจ็ตหน้าจอหลัก',
-    replayTutorial: 'คู่มือแนะนำ',
+    replayTutorial: 'คู่มือแนะนำ · เล่นทัวร์ซ้ำ',
   },
 };
 
