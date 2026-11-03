@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import App, { setTourCompleted } from '../App';
 
 describe('App End-to-End UI Integration', () => {
@@ -129,23 +129,40 @@ describe('App End-to-End UI Integration', () => {
     const drawer = screen.getByRole('dialog', { name: /Mobile Navigation Menu/i });
     expect(drawer).toBeInTheDocument();
 
-    // Navigate to Route Map from inside mobile drawer
-    const mapButtons = screen.getAllByRole('button', { name: /Route Map/i });
-    fireEvent.click(mapButtons[mapButtons.length - 1]);
-    expect(screen.getByText(/Map Layer Controls/i)).toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: /Mobile Navigation Menu/i })).not.toBeInTheDocument();
+    // Verify Navigation block is removed from the drawer
+    expect(within(drawer).queryByText(/^Navigation$/i)).not.toBeInTheDocument();
+    expect(within(drawer).queryByText(/Real-time RF Telemetry/i)).not.toBeInTheDocument();
 
-    // Reopen menu and test closing with Escape key
-    fireEvent.click(menuBtn);
-    expect(screen.getByRole('dialog', { name: /Mobile Navigation Menu/i })).toBeInTheDocument();
+    // Verify Tools & Guide are present in drawer
+    expect(within(drawer).getByText(/Tools & Guide/i)).toBeInTheDocument();
+    expect(within(drawer).getByText(/Widgets HUD/i)).toBeInTheDocument();
+
+    // Test closing with Escape key
     fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
     expect(screen.queryByRole('dialog', { name: /Mobile Navigation Menu/i })).not.toBeInTheDocument();
 
-    // Test mobile bottom navigation dock
+    // Test mobile bottom navigation dock - allows switching between all 4 main pages
     const bottomNav = screen.getByLabelText('Mobile Bottom Navigation');
     expect(bottomNav).toBeInTheDocument();
-    const campaignsDockBtn = screen.getByRole('button', { name: /^Logs$/i });
+
+    // 1. Switch to Route Map via bottom dock
+    const mapDockBtn = within(bottomNav).getByRole('button', { name: /^Map$/i });
+    fireEvent.click(mapDockBtn);
+    expect(screen.getByText(/Map Layer Controls/i)).toBeInTheDocument();
+
+    // 2. Switch to Campaigns via bottom dock
+    const campaignsDockBtn = within(bottomNav).getByRole('button', { name: /^Logs$/i });
     fireEvent.click(campaignsDockBtn);
     expect(screen.getByPlaceholderText(/Filter campaigns/i)).toBeInTheDocument();
+
+    // 3. Switch to Analytics via bottom dock
+    const analyticsDockBtn = within(bottomNav).getByRole('button', { name: /^Analytics$/i });
+    fireEvent.click(analyticsDockBtn);
+    expect(screen.getByRole('tab', { name: /CDF/i })).toBeInTheDocument();
+
+    // 4. Return to Live Monitor via bottom dock
+    const liveDockBtn = within(bottomNav).getByRole('button', { name: /^Live$/i });
+    fireEvent.click(liveDockBtn);
+    expect(screen.getByText(/RF Signal Telemetry/i)).toBeInTheDocument();
   });
 });
