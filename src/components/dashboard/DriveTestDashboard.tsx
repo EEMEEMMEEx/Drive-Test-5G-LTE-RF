@@ -36,6 +36,7 @@ import type {
   SpeedTestStatus,
 } from '../../types/drivetest';
 import type { TranslationDictionary } from '../../i18n/translations';
+import { RfToggleSwitch } from '../common/RfToggleSwitch';
 import { getBandFrequencyLabel } from '../../services/rfAnalyticsEngine';
 
 export interface DriveTestDashboardProps {
@@ -640,20 +641,17 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
 
           {/* Weak Signal Threshold Quick Control */}
           <div className="pt-3 border-t border-border flex items-center justify-between gap-2 text-xs">
-            <label htmlFor="dashboard-alert-toggle" className="flex items-center gap-2 text-text-muted cursor-pointer">
-              <input
-                id="dashboard-alert-toggle"
-                type="checkbox"
-                checked={alertThresholdRsrp !== null}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setEnableAlert(checked);
-                  onChangeAlertThreshold(checked ? thresholdInput : null);
-                }}
-                className="rounded border-border-input"
-              />
-              {t.weakSignalAlert}
-            </label>
+            <RfToggleSwitch
+              id="dashboard-alert-toggle"
+              checked={alertThresholdRsrp !== null}
+              onChange={(checked) => {
+                setEnableAlert(checked);
+                onChangeAlertThreshold(checked ? thresholdInput : null);
+              }}
+              label={t.weakSignalAlert}
+              size="sm"
+              variant="accent"
+            />
             <div className="flex items-center gap-1.5">
               <input
                 type="number"
@@ -749,13 +747,14 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
                   {t.gpsTelemetry}
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => onToggleRealBrowserGps(!useRealBrowserGps)}
-                className="text-xs px-2.5 py-1 rounded bg-surface-elevated border border-border text-text-muted hover:text-text"
-              >
-                Source: {useRealBrowserGps ? 'Browser Geolocation' : 'RF Route Sim'}
-              </button>
+              <RfToggleSwitch
+                id="browser-gps-toggle"
+                checked={useRealBrowserGps}
+                onChange={onToggleRealBrowserGps}
+                label={useRealBrowserGps ? 'Browser GPS' : 'Simulated GPS'}
+                size="sm"
+                variant="accent"
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-2.5 text-xs">
@@ -854,15 +853,14 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
 
             {/* Light Network Probe Toggle */}
             <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs">
-              <label htmlFor="light-probe-toggle" className="flex items-center gap-2 text-text-muted cursor-pointer">
-                <input
-                  id="light-probe-toggle"
-                  type="checkbox"
-                  checked={lightProbeEnabled}
-                  onChange={(e) => onToggleLightProbe(e.target.checked)}
-                />
-                {t.lightProbeTitle}
-              </label>
+              <RfToggleSwitch
+                id="light-probe-toggle"
+                checked={lightProbeEnabled}
+                onChange={onToggleLightProbe}
+                label={t.lightProbeTitle}
+                size="sm"
+                variant="accent"
+              />
               <span className="font-mono text-text">
                 {lastLightProbe
                   ? `Ping ${lastLightProbe.pingMs} ms · Jitter ${lastLightProbe.jitterMs} ms`
