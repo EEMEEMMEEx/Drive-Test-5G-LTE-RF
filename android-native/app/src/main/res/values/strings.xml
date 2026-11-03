@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Drive Test 5G LTE RF</string>
+    <string name="nav_dashboard">Live Monitor</string>
+    <string name="nav_map">Route Map</string>
+    <string name="nav_campaigns">Campaigns</string>
+    <string name="nav_analytics">Analytics</string>
+    <string name="start_test">Start Drive Test</string>
+    <string name="stop_test">Stop Drive Test</string>
+    <string name="serving_cell">Serving Cell</string>
+    <string name="neighbor_cells">Neighboring Cells</string>
+    <string name="hud_mode">HUD Mode</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="export_pdf">Export PDF Report</string>
+    <string name="route_score">Route Quality Score</string>
+    <string name="sim_slot">SIM Slot</string>
+</resources>

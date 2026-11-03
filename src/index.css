@@ -71,6 +71,58 @@ dialog::backdrop {
 }
 
 
+
+/* Leaflet custom controls & theme adaptation for Dark and Light modes */
+.leaflet-bar {
+  border: 1px solid var(--color-border) !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-bar a {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--color-surface-elevated) !important;
+  color: var(--color-accent) !important;
+}
+
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+
+.leaflet-control-attribution {
+  background: var(--color-surface) !important;
+  color: var(--color-text-muted) !important;
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  border-top-left-radius: 8px !important;
+  border-top: 1px solid var(--color-border) !important;
+  border-left: 1px solid var(--color-border) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-accent) !important;
+  text-decoration: none !important;
+}
+
+/* Mobile: Clear bottom navigation bar + device safe area */
+@media (max-width: 767px) {
+  .rf-map-canvas .leaflet-bottom {
+    margin-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 /* Printable A4 PDF Report Architecture */
 @page {
   size: A4 portrait;

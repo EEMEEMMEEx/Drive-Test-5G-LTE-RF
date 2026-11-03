@@ -1,9 +1,13 @@
-# RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics (`v1.0.0`)
+# RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics (`v1.9.3`)
 
-A local-first web application replicating the full capabilities, UI screens, data schema, and RF engineering analytics of **GSM Drive Test: 5G LTE RF (`com.drivetest.app` v1.8.0)**, built following the [replica-skill](https://github.com/Jakeschincariol/replica-skill) clean-room methodology.
+A local-first web application replicating the full capabilities, UI screens, data schema, and RF engineering analytics of **GSM Drive Test: 5G LTE RF (`com.drivetest.app` v1.8.0)**, built following the [replica-skill](https://github.com/Jakeschincariol/replica-skill) clean-room methodology, complete with PWA offline-first support and Android Capacitor/Native runtime.
 
 ## Key Features
 
+- **PWA & Android Native Runtime (v1.9.3):**
+  - **PWA Offline-First:** Service worker precaching, Web App Manifest, offline map tile caching (`stale-while-revalidate` / `network-first`), and standalone install prompt.
+  - **Capacitor Android Wrapper:** Bridge plugin (`DriveTestPlugin.java`) with foreground service (`DriveTestForegroundService.java`) for real cellular telephony radio metrics and GNSS location tracking on device.
+  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose replica with foreground service, GPS tracker, and SQLite repository.
 - **Screen S01 — Live Drive Test Dashboard (`DriveTestDashboard`):**
   - Real-time semi-circular RSRP gauge (`-135` to `-55 dBm`) with live RSRQ, SINR, RSSI, CSI-RSRP, CQI (`1..15`), and Timing Advance (`TA`).
   - Serving Cell & **5G NR (`SA` / `NSA`) + LTE Carrier Aggregation (`CA`)** component monitor (`Band`, `EARFCN`, `DL Frequency`, `Bandwidth`, `PCI`, `Cell ID`, `TAC/LAC`, `PLMN`).
