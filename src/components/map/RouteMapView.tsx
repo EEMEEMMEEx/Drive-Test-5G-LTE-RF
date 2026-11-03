@@ -434,6 +434,11 @@ export function RouteMapView({
               onChange={(e) => onSelectCampaign(Number(e.target.value))}
               className="bg-transparent text-sm font-medium text-slate-100 focus:outline-none"
             >
+              {campaigns.length === 0 && (
+                <option value={0} className="bg-slate-900 text-slate-400">
+                  No Campaigns Available
+                </option>
+              )}
               {campaigns.map((c) => (
                 <option key={c.id} value={c.id} className="bg-slate-900 text-slate-100">
                   {c.name} ({c.measurementCount} pts)
