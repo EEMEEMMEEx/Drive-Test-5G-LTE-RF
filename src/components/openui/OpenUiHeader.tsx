@@ -61,16 +61,13 @@ export const OpenUiHeader: React.FC<OpenUiHeaderProps> = ({
   }, [isMobileMenuOpen]);
 
   const navItems = [
-    { id: 'DASHBOARD' as const, label: t.navDashboard, icon: Activity, desc: 'Real-time RF Telemetry & Drive Control' },
-    { id: 'MAP' as const, label: t.navMap, icon: Compass, desc: 'GPS Trajectory & Sector Site Mapping' },
-    { id: 'CAMPAIGNS' as const, label: t.navCampaigns, icon: FolderKanban, desc: 'Drive Session Logs & Acceptance Reports' },
-    { id: 'ANALYTICS' as const, label: t.navAnalytics, icon: BarChart3, desc: 'CDF Curves, Diagnostics & RF Correlation' },
+    { id: 'DASHBOARD' as const, label: t.navDashboard, icon: Activity },
+    { id: 'MAP' as const, label: t.navMap, icon: Compass },
+    { id: 'CAMPAIGNS' as const, label: t.navCampaigns, icon: FolderKanban },
+    { id: 'ANALYTICS' as const, label: t.navAnalytics, icon: BarChart3 },
   ];
 
-  const handleMobileNavSelect = (id: MainNavTab) => {
-    onSelectTab(id);
-    setIsMobileMenuOpen(false);
-  };
+
 
   return (
     <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-border shadow-xs">
@@ -219,62 +216,8 @@ export const OpenUiHeader: React.FC<OpenUiHeaderProps> = ({
           aria-label="Mobile Navigation Menu"
           className="md:hidden border-t border-border bg-surface/98 backdrop-blur-xl px-4 py-4 space-y-4 shadow-2xl animate-in slide-in-from-top-2 duration-200"
         >
-          {/* Mobile Primary Navigation Links */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted px-1">
-              Navigation
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                const isLive = item.id === 'DASHBOARD' && isRunning;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleMobileNavSelect(item.id)}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between min-h-[48px] transition-all ${
-                      isActive
-                        ? 'bg-accent text-on-accent font-bold shadow-sm border border-accent'
-                        : 'bg-surface-elevated text-text hover:bg-surface border border-border'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-lg ${
-                          isActive ? 'bg-on-accent/15 text-on-accent' : 'bg-surface text-accent'
-                        }`}
-                      >
-                        <Icon className="w-5 h-5 shrink-0" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold">{item.label}</div>
-                        <div
-                          className={`text-[11px] ${
-                            isActive ? 'text-on-accent/80' : 'text-text-muted'
-                          }`}
-                        >
-                          {item.desc}
-                        </div>
-                      </div>
-                    </div>
-                    {isLive && (
-                      <span className="flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full bg-danger/20 text-danger border border-danger/40">
-                        <span className="w-2 h-2 rounded-full bg-danger animate-ping" />
-                        REC
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Mobile Quick Actions & Utilities */}
-          <div className="pt-2 border-t border-border/80 space-y-2">
+          <div className="space-y-2">
             <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted px-1">
               Tools & Guide
             </p>
