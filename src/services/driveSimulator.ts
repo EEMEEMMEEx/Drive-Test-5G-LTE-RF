@@ -9,6 +9,7 @@ import type {
   NeighborCell,
   NrStatus,
   RadioInfo,
+  RatSelectionMode,
   SimInfo,
 } from '../types/drivetest';
 
@@ -326,6 +327,7 @@ export function generateSimulatedMeasurement(params: {
   timestampMs: number;
   overrideGps?: Partial<GpsInfo>;
   rsrpOffsetDb?: number;
+  ratMode?: RatSelectionMode;
 }): Measurement {
   const {
     campaignId,
@@ -335,9 +337,43 @@ export function generateSimulatedMeasurement(params: {
     timestampMs,
     overrideGps,
     rsrpOffsetDb = 0,
+    ratMode = 'AUTO',
   } = params;
 
-  const sectors = PRESET_SECTORS[preset] ?? PRESET_SECTORS.URBAN_ROUTE;
+  let sectors = PRESET_SECTORS[preset] ?? PRESET_SECTORS.URBAN_ROUTE;
+
+  if (ratMode === 'NR_5G_ONLY') {
+    const nrOnly = sectors.filter((s) => s.technology === 'NR_5G');
+    if (nrOnly.length > 0) {
+      sectors = nrOnly;
+    } else {
+      sectors = sectors.map((s) => ({
+        ...s,
+        technology: 'NR_5G',
+        nrStatus: 'SA',
+        band: 78,
+        earfcn: 632000,
+        dlFrequencyKhz: 3500000,
+        dlBandwidthKhz: 100000,
+      }));
+    }
+  } else if (ratMode === 'LTE_4G_ONLY') {
+    const lteOnly = sectors.filter((s) => s.technology === 'LTE_4G');
+    if (lteOnly.length > 0) {
+      sectors = lteOnly;
+    } else {
+      sectors = sectors.map((s) => ({
+        ...s,
+        technology: 'LTE_4G',
+        nrStatus: 'NONE',
+        band: 3,
+        earfcn: 1650,
+        dlFrequencyKhz: 1800000,
+        dlBandwidthKhz: 20000,
+        caBands: s.caBands.filter((ca) => !ca.isNr),
+      }));
+    }
+  }
   // Transition across sectors with occasional ping-pong around step 8-10
   let sectorIdx = Math.floor(stepIndex / 6) % sectors.length;
   if (stepIndex === 9 && sectors.length > 1) {

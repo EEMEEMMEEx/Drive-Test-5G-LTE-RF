@@ -2,6 +2,7 @@ export type CellularTechnology = 'GSM_2G' | 'WCDMA_3G' | 'LTE_4G' | 'NR_5G' | 'U
 export type NrStatus = 'SA' | 'NSA' | 'NONE' | 'UNKNOWN';
 export type ConnectionState = 'CONNECTED' | 'IDLE' | 'DISCONNECTED';
 export type MeasurementCadence = 'ECO' | 'STANDARD' | 'PRECISE';
+export type RatSelectionMode = 'AUTO' | 'NR_5G_ONLY' | 'LTE_4G_ONLY';
 export type CampaignPreset = 'SITE_AUDIT' | 'URBAN_ROUTE' | 'HIGHWAY' | 'INDOOR';
 export type SpeedTestStatus =
   | 'NOT_RUN'
@@ -134,6 +135,7 @@ export interface Campaign {
   speedTestLat: number;
   speedTestLon: number;
   alertThresholdRsrp: number | null;
+  ratMode?: RatSelectionMode;
 }
 
 export interface SpeedTestResult {
@@ -197,6 +199,7 @@ export interface CampaignFinishedSummary {
   minRsrp: number;
   maxRsrp: number;
   handoverCount: number;
+  ratMode?: RatSelectionMode;
 }
 
 export interface SignalStats {
