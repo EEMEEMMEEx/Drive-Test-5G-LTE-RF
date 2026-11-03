@@ -242,7 +242,9 @@ export function RouteMapView({
 
     try {
       const initialCenter: [number, number] =
-        sortedMeasurements.length > 0
+        currentLocation && currentLocation.isValid
+          ? [currentLocation.latitude, currentLocation.longitude]
+          : sortedMeasurements.length > 0
           ? [
               sortedMeasurements[sortedMeasurements.length - 1].gps.latitude,
               sortedMeasurements[sortedMeasurements.length - 1].gps.longitude,
@@ -252,9 +254,11 @@ export function RouteMapView({
       const map = L.map(container, {
         center: initialCenter,
         zoom: 15,
-        zoomControl: true,
+        zoomControl: false,
         preferCanvas: false,
       });
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
 
       const tileCfg = TILE_URLS[activeMapType] ?? TILE_URLS[DEFAULT_MAP_TYPE];
       const tileLayer = L.tileLayer(tileCfg.url, {
@@ -321,6 +325,41 @@ export function RouteMapView({
 
     try {
       group.clearLayers();
+
+      // Always draw live current GPS location indicator of the phone
+      if (currentLocation && currentLocation.isValid) {
+        const liveGpsMarker = L.circleMarker(
+          [currentLocation.latitude, currentLocation.longitude],
+          {
+            radius: options.dotSize + 4,
+            color: '#ffffff',
+            weight: 3,
+            fillColor: '#38bdf8',
+            fillOpacity: 1,
+          }
+        );
+        liveGpsMarker.bindTooltip(
+          `My Phone GPS: ${currentLocation.latitude.toFixed(5)}, ${currentLocation.longitude.toFixed(5)} (±${currentLocation.accuracy.toFixed(0)}m)`,
+          { direction: 'top' }
+        );
+        liveGpsMarker.addTo(group);
+      }
+
+      // Always start & follow the phone's GPS pin when Follow GPS is active
+      if (options.followMyPosition) {
+        const target =
+          currentLocation && currentLocation.isValid
+            ? ([currentLocation.latitude, currentLocation.longitude] as [number, number])
+            : sortedMeasurements.length > 0
+            ? ([
+                sortedMeasurements[sortedMeasurements.length - 1].gps.latitude,
+                sortedMeasurements[sortedMeasurements.length - 1].gps.longitude,
+              ] as [number, number])
+            : null;
+        if (target) {
+          map.panTo(target);
+        }
+      }
 
       if (sortedMeasurements.length === 0) return;
 
@@ -422,17 +461,6 @@ export function RouteMapView({
           mhoMarker.on('click', () => setSelectedPointId(mho.measurement.id));
           mhoMarker.addTo(group);
         }
-      }
-
-      // Follow position or center on latest point
-      if (options.followMyPosition) {
-        const target = currentLocation
-          ? ([currentLocation.latitude, currentLocation.longitude] as [number, number])
-          : ([
-              sortedMeasurements[sortedMeasurements.length - 1].gps.latitude,
-              sortedMeasurements[sortedMeasurements.length - 1].gps.longitude,
-            ] as [number, number]);
-        map.panTo(target);
       }
     } catch {
       // Safe fallback in headless tests
@@ -559,7 +587,20 @@ export function RouteMapView({
           {/* Follow GPS Toggle */}
           <button
             type="button"
-            onClick={() => updateOption('followMyPosition', !options.followMyPosition)}
+            onClick={() => {
+              const nextFollow = !options.followMyPosition;
+              updateOption('followMyPosition', nextFollow);
+              if (currentLocation && mapInstanceRef.current) {
+                try {
+                  mapInstanceRef.current.panTo([
+                    currentLocation.latitude,
+                    currentLocation.longitude,
+                  ]);
+                } catch {
+                  // ignore in headless tests
+                }
+              }
+            }}
             className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border shrink-0 transition-all ${
               options.followMyPosition
                 ? 'bg-accent/15 text-accent border-accent/40 shadow-xs'
@@ -851,11 +892,11 @@ export function RouteMapView({
       )}
 
       {/* Main Map Layout: Left (Google Map + Vector Trace) & Right (Inspector) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* Left Column (8 cols): Map Canvas & Vector Trace */}
-        <div className="lg:col-span-8 space-y-4">
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-5 items-start">
+        {/* Left Column (8 cols on desktop): Map Canvas & Vector Trace */}
+        <div className="w-full lg:col-span-7 xl:col-span-8 space-y-4 sm:space-y-5">
           {/* Leaflet / Google Map Canvas Card */}
-          <div className="relative rounded-2xl overflow-hidden border border-border bg-surface shadow-sm h-[480px] sm:h-[540px] lg:h-[580px]">
+          <div className="relative rounded-2xl overflow-hidden border border-border bg-surface shadow-sm h-[380px] sm:h-[480px] lg:h-[560px] xl:h-[600px] rf-map-canvas">
             <div
               ref={mapContainerRef}
               className="w-full h-full transition-transform duration-300"
@@ -864,23 +905,26 @@ export function RouteMapView({
               }}
             />
 
-            {/* Floating Glassmorphic Route Summary Ribbon */}
-            <div className="absolute top-3 left-3 z-[400] flex flex-wrap items-center gap-2 bg-surface/90 backdrop-blur-md border border-border/80 shadow-md rounded-xl px-3.5 py-2 text-xs">
-              <div className="flex items-center gap-1.5">
+            {/* Floating Glassmorphic Route Summary Ribbon - Responsive, never overlapped by zoom buttons */}
+            <div
+              data-testid="route-stats-overlay"
+              className="absolute top-3 left-3 right-3 sm:right-auto z-[400] flex flex-wrap items-center gap-x-2.5 gap-y-1.5 bg-surface/95 backdrop-blur-md border border-border/80 shadow-md rounded-xl px-3 py-2 text-xs text-text max-w-[calc(100%-1.5rem)] sm:max-w-xl transition-all"
+            >
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-text-muted font-medium">Samples:</span>
                 <span className="font-mono font-bold text-text">
                   {sortedMeasurements.length}
                 </span>
               </div>
-              <span className="text-border">|</span>
-              <div className="flex items-center gap-1.5">
+              <span className="hidden sm:inline text-border">|</span>
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-text-muted font-medium">Avg RSRP:</span>
                 <span className="font-mono font-bold text-accent">
                   {signalStats.avgRsrp} dBm
                 </span>
               </div>
-              <span className="text-border">|</span>
-              <div className="flex items-center gap-1.5">
+              <span className="hidden sm:inline text-border">|</span>
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-text-muted font-medium">Handovers:</span>
                 <span className="font-mono font-bold text-amber-500">
                   {mobility.handovers}
@@ -888,8 +932,8 @@ export function RouteMapView({
               </div>
               {mobility.missedHandovers > 0 && (
                 <>
-                  <span className="text-border">|</span>
-                  <div className="flex items-center gap-1.5 text-rose-500 font-semibold">
+                  <span className="hidden sm:inline text-border">|</span>
+                  <div className="flex items-center gap-1.5 text-rose-500 font-semibold shrink-0">
                     <span>Missed HO: {mobility.missedHandovers}</span>
                   </div>
                 </>
@@ -1081,8 +1125,8 @@ export function RouteMapView({
           </OpenUiCard>
         </div>
 
-        {/* Right Column (4 cols): Selected Point Inspector Card */}
-        <div className="lg:col-span-4">
+        {/* Right Column (4-5 cols on desktop): Selected Point Inspector Card */}
+        <div className="w-full lg:col-span-5 xl:col-span-4 lg:sticky lg:top-20 space-y-4">
           <OpenUiCard
             title="Point Telemetry Inspector"
             subtitle={
@@ -1272,32 +1316,35 @@ export function RouteMapView({
                   </div>
                 )}
 
-                {/* Point Stepper Controls */}
-                <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                {/* Point Stepper Controls - Touch Friendly */}
+                <div className="pt-2.5 border-t border-border flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => stepToAdjacentSample(-1)}
                     disabled={selectedMeasurementIndex <= 0}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    aria-label="Previous sample"
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition shadow-xs"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <ArrowLeft className="w-4 h-4" />
                     <span>Prev</span>
                   </button>
 
-                  <div className="text-center">
-                    <div className="text-[11px] font-mono text-text-muted">
+                  <div className="text-center px-2">
+                    <div className="text-xs font-mono font-semibold text-text">
                       #{selectedMeasurementIndex + 1} / {sortedMeasurements.length}
                     </div>
+                    <div className="text-[10px] text-text-muted">Sample Index</div>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => stepToAdjacentSample(1)}
                     disabled={selectedMeasurementIndex >= sortedMeasurements.length - 1}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    aria-label="Next sample"
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-semibold bg-surface-elevated border border-border text-text hover:border-accent disabled:opacity-40 disabled:cursor-not-allowed transition shadow-xs"
                   >
                     <span>Next</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>

@@ -1,10 +1,10 @@
 {
-  "name": "rf-field-suite-web",
-  "version": "1.8.0",
+  "name": "sigpath-5g-web",
+  "version": "1.9.3",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -12,6 +12,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.16.0",
     "react": "^19.1.0",
@@ -30,6 +33,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "vite": "^6.3.2",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^3.1.2"
   }
 }
