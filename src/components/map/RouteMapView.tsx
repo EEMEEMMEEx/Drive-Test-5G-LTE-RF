@@ -226,6 +226,20 @@ export function RouteMapView({
     );
   }, [mobility.missedHandoverEvents, selectedMeasurement]);
 
+  const activeLayersCount = useMemo(() => {
+    let count = 0;
+    if (options.showCurrentCell) count++;
+    if (options.showNeighborCells) count++;
+    if (options.showHandovers) count++;
+    if (options.showMissedHandovers) count++;
+    return count;
+  }, [
+    options.showCurrentCell,
+    options.showNeighborCells,
+    options.showHandovers,
+    options.showMissedHandovers,
+  ]);
+
   // Initialize Leaflet map safely (guarded for jsdom environments)
   useEffect(() => {
     const container = mapContainerRef.current;
@@ -501,14 +515,15 @@ export function RouteMapView({
 
   return (
     <div className="space-y-4">
-      {/* Top HUD Toolbar wrapped in OpenUiCard */}
+      {/* Top HUD Toolbar wrapped in OpenUiCard with Mobile-First Responsive Layout */}
       <OpenUiCard
         className="shadow-sm"
-        bodyClassName="!p-3 sm:!p-4 flex flex-wrap items-center justify-between gap-3"
+        bodyClassName="!p-3 sm:!p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Primary Controls Row: Campaign Selector, Live Status, and Primary GPS/Orientation Toggles */}
+        <div className="flex items-center justify-between md:justify-start gap-2 sm:gap-2.5 w-full md:w-auto">
           {/* Campaign Selector */}
-          <div className="flex items-center gap-2 bg-surface-elevated border border-border/80 rounded-xl px-3 py-1.5 shadow-xs">
+          <div className="flex items-center gap-2 bg-surface-elevated border border-border/80 rounded-xl px-2.5 py-1.5 sm:px-3 shadow-xs flex-1 md:flex-initial min-w-0 max-w-[200px] sm:max-w-xs">
             <MapPin className="w-4 h-4 text-accent shrink-0" />
             <label htmlFor="map-campaign-select" className="sr-only">
               {t.campaignName}
@@ -518,15 +533,15 @@ export function RouteMapView({
               aria-label={t.campaignName}
               value={selectedCampaignId}
               onChange={(e) => onSelectCampaign(Number(e.target.value))}
-              className="bg-transparent text-xs sm:text-sm font-semibold text-text focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent text-xs sm:text-sm font-semibold text-text focus:outline-none cursor-pointer w-full truncate"
             >
               {campaigns.length === 0 && (
-                <option value={0} className="bg-surface text-text-muted">
+                <option value={0} className="bg-surface-elevated text-text-muted">
                   No Campaigns Available
                 </option>
               )}
               {campaigns.map((c) => (
-                <option key={c.id} value={c.id} className="bg-surface text-text font-medium">
+                <option key={c.id} value={c.id} className="bg-surface-elevated text-text font-semibold">
                   {c.name} ({c.measurementCount} pts)
                 </option>
               ))}
@@ -535,108 +550,136 @@ export function RouteMapView({
 
           {/* Live Status Badge */}
           <div
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold border shrink-0 transition-all ${
               isRunning
                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30 animate-pulse'
                 : 'bg-surface-elevated text-text-muted border-border/80'
             }`}
           >
             <Radio className={`w-3.5 h-3.5 ${isRunning ? 'text-emerald-500' : 'text-text-muted'}`} />
-            <span>{isRunning ? 'LIVE TRACKING' : 'REPLAY MODE'}</span>
+            <span className="hidden sm:inline">{isRunning ? 'LIVE TRACKING' : 'REPLAY MODE'}</span>
+            <span className="sm:hidden">{isRunning ? 'LIVE' : 'REPLAY'}</span>
           </div>
 
-          {/* Follow My Position Toggle */}
+          {/* Follow GPS Toggle */}
           <button
             type="button"
             onClick={() => updateOption('followMyPosition', !options.followMyPosition)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border shrink-0 transition-all ${
               options.followMyPosition
                 ? 'bg-accent/15 text-accent border-accent/40 shadow-xs'
                 : 'bg-surface-elevated text-text-muted border-border/80 hover:text-text'
             }`}
             title="Follow My Position"
+            aria-label="Follow GPS"
           >
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>Follow GPS</span>
+            <Crosshair className="w-4 h-4" />
+            <span className="hidden lg:inline">Follow GPS</span>
           </button>
 
           {/* Orientation Toggle: Heading Up vs North Up */}
           <button
             type="button"
             onClick={() => updateOption('headingUp', !options.headingUp)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center justify-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border shrink-0 transition-all ${
               options.headingUp
                 ? 'bg-accent/15 text-accent border-accent/40 shadow-xs'
                 : 'bg-surface-elevated text-text-muted border-border/80 hover:text-text'
             }`}
             title="Toggle Orientation (Heading Up / North Up)"
+            aria-label="Toggle Orientation"
           >
-            <Compass className="w-3.5 h-3.5" />
-            <span>{options.headingUp ? `Heading Up (${Math.round(latestBearing)}°)` : 'North Up'}</span>
-          </button>
-        </div>
-
-        {/* Right Controls: Map Engine Chips, Dark Toggle, Drawer Toggle, Analytics */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Map Base Engine Chips */}
-          <OpenUiChips
-            items={MAP_TYPE_CHIPS}
-            selectedId={options.mapType}
-            onChange={(id) => updateOption('mapType', id)}
-            size="sm"
-            ariaLabel="Map Layer Engine"
-          />
-
-          {/* Dark / Light Base Map Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              const nextDark = !options.darkMap;
-              onUpdateOptions({
-                ...options,
-                darkMap: nextDark,
-                mapType: nextDark ? 'CARTO_DARK' : 'GOOGLE_HYBRID',
-              });
-            }}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated text-text border border-border/80 hover:border-accent/40 transition-all"
-            aria-label="Toggle Dark Map"
-          >
-            {options.darkMap ? (
-              <>
-                <Moon className="w-3.5 h-3.5 text-accent" />
-                <span className="hidden sm:inline">Dark</span>
-              </>
-            ) : (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Light</span>
-              </>
-            )}
+            <Compass className="w-4 h-4" />
+            <span className="hidden lg:inline">
+              {options.headingUp ? `Heading (${Math.round(latestBearing)}°)` : 'North Up'}
+            </span>
+            <span className="lg:hidden text-[11px] font-mono">
+              {options.headingUp ? `${Math.round(latestBearing)}°` : 'N'}
+            </span>
           </button>
 
-          {/* Map Layer Options Drawer Button */}
-          <button
-            type="button"
-            onClick={() => setDrawerOpen((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-              drawerOpen
-                ? 'bg-accent text-on-accent border-accent shadow-sm'
-                : 'bg-surface-elevated text-text border-border/80 hover:border-accent/40'
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{t.mapOptions}</span>
-          </button>
-
-          {/* Navigate to Analytics */}
+          {/* Mobile Quick Analytics Button */}
           <button
             type="button"
             onClick={onNavigateToAnalytics}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-all"
+            className="md:hidden inline-flex items-center justify-center min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs shrink-0 transition-all"
+            title={t.navAnalytics}
+            aria-label={t.navAnalytics}
           >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>{t.navAnalytics}</span>
+            <BarChart3 className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Secondary Controls: Map Engine Chips, Dark Toggle, Drawer Toggle, Desktop Analytics */}
+        <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto pt-2 md:pt-0 border-t border-border/60 md:border-t-0">
+          {/* Map Base Engine Chips - Horizontally swipeable on mobile, compact on desktop */}
+          <div className="overflow-x-auto no-scrollbar py-0.5 max-w-[calc(100vw-130px)] md:max-w-none">
+            <OpenUiChips
+              items={MAP_TYPE_CHIPS}
+              selectedId={options.mapType}
+              onChange={(id) => updateOption('mapType', id)}
+              size="sm"
+              ariaLabel="Map Layer Engine"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Dark / Light Base Map Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextDark = !options.darkMap;
+                onUpdateOptions({
+                  ...options,
+                  darkMap: nextDark,
+                  mapType: nextDark ? 'CARTO_DARK' : 'GOOGLE_HYBRID',
+                });
+              }}
+              className="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-surface-elevated text-text border border-border/80 hover:border-accent/40 transition-all"
+              aria-label="Toggle Dark Map"
+              title={options.darkMap ? 'Switch to Light Map' : 'Switch to Dark Map'}
+            >
+              {options.darkMap ? (
+                <Moon className="w-3.5 h-3.5 text-accent" />
+              ) : (
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+              )}
+            </button>
+
+            {/* Map Layer Options Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen((prev) => !prev)}
+              aria-label={t.mapOptions}
+              className={`inline-flex items-center gap-1.5 min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                drawerOpen
+                  ? 'bg-accent text-on-accent border-accent shadow-sm'
+                  : 'bg-surface-elevated text-text border-border/80 hover:border-accent/40'
+              }`}
+              title={t.mapOptions}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">{t.mapOptions}</span>
+              <span className="sm:hidden">Layers</span>
+              {activeLayersCount > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  drawerOpen ? 'bg-on-accent/25 text-on-accent' : 'bg-accent/20 text-accent'
+                }`}>
+                  {activeLayersCount}
+                </span>
+              )}
+            </button>
+
+            {/* Desktop Analytics Button */}
+            <button
+              type="button"
+              onClick={onNavigateToAnalytics}
+              className="hidden md:inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-all"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>{t.navAnalytics}</span>
+            </button>
+          </div>
         </div>
       </OpenUiCard>
 
