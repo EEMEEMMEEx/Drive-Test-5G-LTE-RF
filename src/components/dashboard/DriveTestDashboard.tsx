@@ -37,6 +37,9 @@ import type {
 } from '../../types/drivetest';
 import type { TranslationDictionary } from '../../i18n/translations';
 import { RfToggleSwitch } from '../common/RfToggleSwitch';
+import { OpenUiCard } from '../openui/OpenUiCard';
+import { OpenUiMetric } from '../openui/OpenUiMetric';
+import { OpenUiChips } from '../openui/OpenUiChips';
 import { getBandFrequencyLabel } from '../../services/rfAnalyticsEngine';
 
 export interface DriveTestDashboardProps {
@@ -414,233 +417,228 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
         </div>
       )}
 
-      {/* Top Campaign Control Bar */}
-      <div className="bg-surface border border-border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-accent" />
-            <label htmlFor="sim-select" className="text-xs font-medium text-text-muted">
-              {t.simSelector}:
-            </label>
-            <select
-              id="sim-select"
-              value={selectedSim.subscriptionId}
-              onChange={(e) => {
-                const found = availableSims.find((s) => s.subscriptionId === Number(e.target.value));
-                if (found) onSelectSim(found);
-              }}
-              className="bg-surface-elevated border border-border-input rounded-lg px-2.5 py-1.5 text-xs font-medium text-text focus:outline-none focus:ring-2 focus:ring-accent"
+      {/* OpenUI Quick Action & Session Control Bar */}
+      <OpenUiCard className="mb-5 shadow-sm" bodyClassName="p-3 sm:p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
+          {/* SIM Selector & Cadence Chips */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2 bg-surface-elevated border border-border rounded-xl px-2.5 py-1.5">
+              <Smartphone className="w-4 h-4 text-accent shrink-0" />
+              <label htmlFor="sim-select" className="text-xs font-medium text-text-muted shrink-0">
+                {t.simSelector}:
+              </label>
+              <select
+                id="sim-select"
+                value={selectedSim.subscriptionId}
+                onChange={(e) => {
+                  const found = availableSims.find((s) => s.subscriptionId === Number(e.target.value));
+                  if (found) onSelectSim(found);
+                }}
+                className="bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
+              >
+                {availableSims.map((sim) => (
+                  <option key={sim.subscriptionId} value={sim.subscriptionId} className="bg-surface text-text">
+                    {sim.displayName} ({sim.mcc}-{sim.mnc})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <OpenUiChips
+              size="sm"
+              selectedId={cadence}
+              onChange={onChangeCadence}
+              items={[
+                { id: 'ECO', label: t.cadenceEco },
+                { id: 'STANDARD', label: t.cadenceStandard },
+                { id: 'PRECISE', label: t.cadencePrecise },
+              ]}
+              ariaLabel="Measurement Cadence"
+            />
+
+            <button
+              type="button"
+              onClick={() => setIsCarMode(true)}
+              className="px-3 py-1.5 rounded-xl bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent hover:text-accent flex items-center gap-1.5 transition-all"
             >
-              {availableSims.map((sim) => (
-                <option key={sim.subscriptionId} value={sim.subscriptionId}>
-                  {sim.displayName} ({sim.mcc}-{sim.mnc})
-                </option>
-              ))}
-            </select>
+              <Car className="w-4 h-4 text-accent" />
+              <span>{t.carMode}</span>
+            </button>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-surface-elevated border border-border rounded-lg p-1">
-            {(['ECO', 'STANDARD', 'PRECISE'] as MeasurementCadence[]).map((cad) => (
-              <button
-                key={cad}
-                type="button"
-                onClick={() => onChangeCadence(cad)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                  cadence === cad
-                    ? 'bg-accent text-on-accent font-semibold'
-                    : 'text-text-muted hover:text-text'
-                }`}
-              >
-                {cad === 'ECO'
-                  ? t.cadenceEco
-                  : cad === 'STANDARD'
-                  ? t.cadenceStandard
-                  : t.cadencePrecise}
-              </button>
-            ))}
+          {/* Drive Test Session Action Group */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {isRunning && (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border text-xs font-mono">
+                <span className="inline-flex items-center gap-1.5 text-success font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  {isPaused ? 'PAUSED' : 'RECORDING'}
+                </span>
+                <span className="text-text-muted">|</span>
+                <span>{formatDuration(elapsedMs)}</span>
+                <span className="text-text-muted">|</span>
+                <span className="text-accent">{measurementCount} pts</span>
+                <span className="text-text-muted">|</span>
+                <span>{(distanceMeters / 1000).toFixed(2)} km</span>
+                <span className="text-text-muted">|</span>
+                <span className="text-warning">{handoverCount} HO</span>
+              </div>
+            )}
+
+            {!isRunning ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-tutorial="start-btn"
+                  onClick={openStartModal}
+                  className="px-4 py-2 rounded-xl bg-accent text-on-accent text-xs font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(56,189,248,0.35)] hover:opacity-95 transition-all"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>{t.startDriveTest}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onStartCampaign(
+                      `${newCampaignName}_${Date.now().toString().slice(-3)}`,
+                      selectedPreset,
+                      alertThresholdRsrp
+                    )
+                  }
+                  className="px-3 py-2 rounded-xl bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent transition-all"
+                >
+                  Quick Start ({selectedPreset.replace('_', ' ')})
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onPauseResumeCampaign}
+                  className="px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-xs font-semibold flex items-center gap-1.5 hover:border-accent transition-all"
+                >
+                  {isPaused ? <Play className="w-4 h-4 text-success fill-current" /> : <Pause className="w-4 h-4 text-warning fill-current" />}
+                  <span>{isPaused ? t.resumeDriveTest : t.pauseDriveTest}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openStopModal}
+                  className="px-4 py-2 rounded-xl bg-danger text-on-accent text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(248,113,113,0.3)] hover:opacity-95 transition-all"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                  <span>{t.stopDriveTest}</span>
+                </button>
+              </div>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsCarMode(true)}
-            className="px-3 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent flex items-center gap-1.5"
-          >
-            <Car className="w-4 h-4 text-accent" />
-            {t.carMode}
-          </button>
         </div>
+      </OpenUiCard>
 
-        {/* Recording Status & Start/Stop Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          {isRunning && (
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-surface-elevated border border-border text-xs font-mono">
-              <span className="inline-flex items-center gap-1.5 text-success font-semibold">
-                <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                {isPaused ? 'PAUSED' : 'RECORDING'}
-              </span>
-              <span>{formatDuration(elapsedMs)}</span>
-              <span>{measurementCount} pts</span>
-              <span>{(distanceMeters / 1000).toFixed(2)} km</span>
-              <span>{handoverCount} HO</span>
-            </div>
-          )}
-
-          {!isRunning ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                data-tutorial="start-btn"
-                onClick={openStartModal}
-                className="px-4 py-2 rounded-lg bg-accent text-on-accent text-xs font-bold flex items-center gap-2 hover:opacity-95 transition"
-              >
-                <Play className="w-4 h-4" />
-                {t.startDriveTest}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onStartCampaign(
-                    `${newCampaignName}_${Date.now().toString().slice(-3)}`,
-                    selectedPreset,
-                    alertThresholdRsrp
-                  )
-                }
-                className="px-3 py-2 rounded-lg bg-surface-elevated border border-border text-xs font-medium text-text hover:border-accent"
-              >
-                Quick Start ({selectedPreset.replace('_', ' ')})
-              </button>
-
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onPauseResumeCampaign}
-                className="px-3.5 py-2 rounded-lg bg-surface-elevated border border-border text-xs font-semibold flex items-center gap-1.5 hover:border-accent"
-              >
-                {isPaused ? <Play className="w-4 h-4 text-success" /> : <Pause className="w-4 h-4 text-warning" />}
-                {isPaused ? t.resumeDriveTest : t.pauseDriveTest}
-              </button>
-              <button
-                type="button"
-                onClick={openStopModal}
-                className="px-4 py-2 rounded-lg bg-danger text-on-accent text-xs font-bold flex items-center gap-1.5 hover:opacity-90"
-              >
-                <Square className="w-4 h-4" />
-                {t.stopDriveTest}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main 3-Column RF Engineering Dashboard Grid */}
+      {/* Main 2-Column Responsive OpenUI RF Engineering Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Column 1: Real-time RF Signal Gauge & Metrics (4 cols) */}
-        <section
-          data-tutorial="rf-gauge"
-          className="lg:col-span-4 bg-surface border border-border rounded-xl p-5 flex flex-col justify-between rf-containment-panel"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-accent" />
-              <h2 className="text-sm font-bold uppercase tracking-wider text-text">
-                RF Signal Telemetry
-              </h2>
-            </div>
+        {/* Column 1: Real-time RF Signal Gauge & Metrics */}
+        <OpenUiCard
+          dataTutorial="rf-gauge"
+          title="RF Signal Telemetry"
+          icon={<Gauge className="w-4 h-4" />}
+          badge={
             <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-accent/15 text-accent border border-accent/40">
               {currentRadio.technology.replace('_', ' ')} · {currentRadio.nrStatus}
             </span>
-          </div>
+          }
+          className="lg:col-span-7 rf-containment-panel"
+        >
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* SVG Semi-Circular RF Gauge */}
+            <div className="flex flex-col items-center shrink-0">
+              <svg viewBox="0 0 220 130" className="w-56 h-32 overflow-visible">
+                <defs>
+                  <linearGradient id="rsrpGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#f87171" />
+                    <stop offset="45%" stopColor="#fbbf24" />
+                    <stop offset="75%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#4ade80" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 20 110 A 90 90 0 0 1 200 110"
+                  fill="none"
+                  stroke="var(--color-surface-elevated)"
+                  strokeWidth="16"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M 20 110 A 90 90 0 0 1 200 110"
+                  fill="none"
+                  stroke="url(#rsrpGaugeGrad)"
+                  strokeWidth="16"
+                  strokeLinecap="round"
+                  strokeDasharray="283"
+                  strokeDashoffset={283 - (283 * rsrpPercent) / 100}
+                />
+                <text
+                  x="110"
+                  y="88"
+                  textAnchor="middle"
+                  className="fill-current text-text font-mono text-3xl font-bold"
+                >
+                  {isStandby ? '--- dBm' : `${currentRadio.rsrp} dBm`}
+                </text>
+                <text
+                  x="110"
+                  y="110"
+                  textAnchor="middle"
+                  className="fill-current text-text-muted font-sans text-xs"
+                >
+                  {isStandby ? 'STANDBY / NO SIGNAL' : `RSRP · Level ${currentRadio.signalLevel}/4`}
+                </text>
+              </svg>
+            </div>
 
-          {/* SVG Semi-Circular RF Gauge */}
-          <div className="my-4 flex flex-col items-center">
-            <svg viewBox="0 0 220 130" className="w-56 h-32 overflow-visible">
-              <defs>
-                <linearGradient id="rsrpGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f87171" />
-                  <stop offset="45%" stopColor="#fbbf24" />
-                  <stop offset="75%" stopColor="#38bdf8" />
-                  <stop offset="100%" stopColor="#4ade80" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 20 110 A 90 90 0 0 1 200 110"
-                fill="none"
-                stroke="#1c273b"
-                strokeWidth="16"
-                strokeLinecap="round"
+            {/* OpenUI Metric Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full">
+              <OpenUiMetric
+                label="RSRQ"
+                value={currentRadio.rsrq}
+                unit="dB"
+                size="sm"
               />
-              <path
-                d="M 20 110 A 90 90 0 0 1 200 110"
-                fill="none"
-                stroke="url(#rsrpGaugeGrad)"
-                strokeWidth="16"
-                strokeLinecap="round"
-                strokeDasharray="283"
-                strokeDashoffset={283 - (283 * rsrpPercent) / 100}
+              <OpenUiMetric
+                label="SINR"
+                value={currentRadio.sinr.toFixed(1)}
+                unit="dB"
+                variant="accent"
+                size="sm"
               />
-              <text
-                x="110"
-                y="88"
-                textAnchor="middle"
-                className="fill-current text-text font-mono text-3xl font-bold"
-              >
-                {isStandby ? '--- dBm' : `${currentRadio.rsrp} dBm`}
-              </text>
-              <text
-                x="110"
-                y="110"
-                textAnchor="middle"
-                className="fill-current text-text-muted font-sans text-xs"
-              >
-                {isStandby ? 'STANDBY / NO SIGNAL' : `RSRP · Level ${currentRadio.signalLevel}/4`}
-              </text>
-            </svg>
-
-            {/* Primary RF Metric Grid */}
-            <div className="grid grid-cols-3 gap-2.5 w-full mt-2">
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">RSRQ</div>
-                <div className="text-base font-mono font-bold text-text mt-0.5">
-                  {currentRadio.rsrq} <span className="text-xs font-normal">dB</span>
-                </div>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">SINR</div>
-                <div className="text-base font-mono font-bold text-accent mt-0.5">
-                  {currentRadio.sinr.toFixed(1)} <span className="text-xs font-normal">dB</span>
-                </div>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">RSSI</div>
-                <div className="text-base font-mono font-bold text-text mt-0.5">
-                  {currentRadio.rssi} <span className="text-xs font-normal">dBm</span>
-                </div>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">CSI-RSRP</div>
-                <div className="text-sm font-mono font-semibold text-text mt-0.5">
-                  {currentRadio.csiRsrp} dBm
-                </div>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">CQI</div>
-                <div className="text-sm font-mono font-semibold text-text mt-0.5">
-                  {currentRadio.cqi} / 15
-                </div>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5 text-center">
-                <div className="text-[11px] text-text-muted uppercase">Timing Adv</div>
-                <div className="text-sm font-mono font-semibold text-text mt-0.5">
-                  TA {currentRadio.timingAdvance}
-                </div>
-              </div>
+              <OpenUiMetric
+                label="RSSI"
+                value={currentRadio.rssi}
+                unit="dBm"
+                size="sm"
+              />
+              <OpenUiMetric
+                label="CSI-RSRP"
+                value={currentRadio.csiRsrp}
+                unit="dBm"
+                size="sm"
+              />
+              <OpenUiMetric
+                label="CQI"
+                value={`${currentRadio.cqi} / 15`}
+                size="sm"
+              />
+              <OpenUiMetric
+                label="Timing Adv"
+                value={`TA ${currentRadio.timingAdvance}`}
+                size="sm"
+              />
             </div>
           </div>
 
           {/* Weak Signal Threshold Quick Control */}
-          <div className="pt-3 border-t border-border flex items-center justify-between gap-2 text-xs">
+          <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-2 text-xs">
             <RfToggleSwitch
               id="dashboard-alert-toggle"
               checked={alertThresholdRsrp !== null}
@@ -664,294 +662,274 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
                   setThresholdInput(val);
                   if (alertThresholdRsrp !== null) onChangeAlertThreshold(val);
                 }}
-                className="w-20 bg-surface-elevated border border-border-input rounded px-2 py-1 font-mono text-xs text-text"
+                className="w-20 bg-surface-elevated border border-border-input rounded-lg px-2 py-1 font-mono text-xs text-text"
               />
               <span className="text-text-muted font-mono">dBm</span>
             </div>
           </div>
-        </section>
+        </OpenUiCard>
 
-        {/* Column 2: Serving Cell, Carrier Aggregation & GPS Telemetry (4 cols) */}
-        <section className="lg:col-span-4 space-y-5 rf-containment-panel">
-          {/* Serving Cell & Carrier Aggregation Card */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Radio className="w-5 h-5 text-accent" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-text">
-                  {t.servingCell}
-                </h2>
-              </div>
-              <span className="text-xs font-mono text-success">
-                {currentRadio.connectionState}
+        {/* Column 2: Serving Cell & Carrier Aggregation */}
+        <OpenUiCard
+          title={t.servingCell}
+          icon={<Radio className="w-4 h-4" />}
+          badge={
+            <span className="text-xs font-mono font-bold text-success px-2 py-0.5 rounded-full bg-success/15 border border-success/30">
+              {currentRadio.connectionState}
+            </span>
+          }
+          className="lg:col-span-5 rf-containment-panel"
+        >
+          <div className="grid grid-cols-2 gap-2.5">
+            <OpenUiMetric
+              label="Operator (PLMN)"
+              value={`${currentRadio.operatorName}`}
+              subValue={`MCC ${currentRadio.mcc} · MNC ${currentRadio.mnc}`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Cell ID / TAC"
+              value={`${currentRadio.cellId}`}
+              subValue={`TAC / LAC ${currentRadio.lac}`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="PCI / Band"
+              value={`PCI ${currentRadio.pci}`}
+              subValue={getBandFrequencyLabel(currentRadio.band, currentRadio.technology === 'NR_5G', currentRadio.dlFrequencyKhz)}
+              variant="accent"
+              size="sm"
+            />
+            <OpenUiMetric
+              label="EARFCN / BW"
+              value={`${currentRadio.earfcn}`}
+              subValue={`${Math.round(currentRadio.dlBandwidthKhz / 1000)} MHz BW`}
+              size="sm"
+            />
+          </div>
+
+          {/* Carrier Aggregation Snapshot */}
+          <div className="mt-3.5 pt-3 border-t border-border">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="font-semibold text-text-muted flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-accent" />
+                {t.carrierAggregation}
+              </span>
+              <span className="font-mono text-accent font-semibold">
+                {currentRadio.aggregatedBands.length} CC · {totalCaBandwidthMhz} MHz total
               </span>
             </div>
-
-            <div className="grid grid-cols-2 gap-2.5 text-xs">
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Operator (PLMN)</span>
-                <span className="font-mono font-bold text-sm text-text">
-                  {currentRadio.operatorName} ({currentRadio.mcc}-{currentRadio.mnc})
+            <div className="flex flex-wrap gap-1.5">
+              {currentRadio.aggregatedBands.map((cc, idx) => (
+                <span
+                  key={`${cc.band}_${idx}`}
+                  className="px-2.5 py-1 rounded-lg bg-surface-elevated border border-border font-mono text-xs text-text shadow-sm"
+                >
+                  {cc.isNr ? `n${cc.band}` : `B${cc.band}`} ({Math.round(cc.dlFrequencyKhz / 1000)} MHz · {Math.round(cc.dlBandwidthKhz / 1000)} MHz BW)
                 </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Cell ID / TAC</span>
-                <span className="font-mono font-bold text-sm text-text">
-                  {currentRadio.cellId} / {currentRadio.lac}
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">PCI / Band</span>
-                <span className="font-mono font-bold text-sm text-accent">
-                  PCI {currentRadio.pci} · {getBandFrequencyLabel(currentRadio.band, currentRadio.technology === 'NR_5G', currentRadio.dlFrequencyKhz)}
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">EARFCN / BW</span>
-                <span className="font-mono font-bold text-sm text-text">
-                  {currentRadio.earfcn} · {Math.round(currentRadio.dlBandwidthKhz / 1000)} MHz
-                </span>
-              </div>
-            </div>
-
-            {/* Carrier Aggregation Snapshot */}
-            <div className="mt-3 pt-3 border-t border-border">
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-semibold text-text-muted flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-accent" />
-                  {t.carrierAggregation}
-                </span>
-                <span className="font-mono text-accent font-semibold">
-                  {currentRadio.aggregatedBands.length} components · {totalCaBandwidthMhz} MHz total
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {currentRadio.aggregatedBands.map((cc, idx) => (
-                  <span
-                    key={`${cc.band}_${idx}`}
-                    className="px-2.5 py-1 rounded bg-surface-elevated border border-border font-mono text-xs text-text"
-                  >
-                    {cc.isNr ? `n${cc.band}` : `B${cc.band}`} ({Math.round(cc.dlFrequencyKhz / 1000)} MHz · {Math.round(cc.dlBandwidthKhz / 1000)} MHz BW)
-                  </span>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
+        </OpenUiCard>
 
-          {/* GNSS / GPS Telemetry Card */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-accent" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-text">
-                  {t.gpsTelemetry}
-                </h2>
-              </div>
-              <RfToggleSwitch
-                id="browser-gps-toggle"
-                checked={useRealBrowserGps}
-                onChange={onToggleRealBrowserGps}
-                label={useRealBrowserGps ? 'Browser GPS' : 'Simulated GPS'}
-                size="sm"
-                variant="accent"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5 text-xs">
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Latitude</span>
-                <span className="font-mono font-semibold text-text">
-                  {currentGps.latitude.toFixed(6)}°
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Longitude</span>
-                <span className="font-mono font-semibold text-text">
-                  {currentGps.longitude.toFixed(6)}°
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Speed</span>
-                <span className="font-mono font-semibold text-accent">
-                  {(currentGps.speed * 3.6).toFixed(1)} km/h
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Altitude</span>
-                <span className="font-mono font-semibold text-text">
-                  {currentGps.altitude.toFixed(1)} m
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Bearing</span>
-                <span className="font-mono font-semibold text-text">
-                  {currentGps.bearing}°
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Accuracy</span>
-                <span className="font-mono font-semibold text-success">
-                  ±{currentGps.accuracy.toFixed(1)} m
-                </span>
-              </div>
-            </div>
+        {/* GNSS / GPS Telemetry Card */}
+        <OpenUiCard
+          title={t.gpsTelemetry}
+          icon={<MapPin className="w-4 h-4" />}
+          actions={
+            <RfToggleSwitch
+              id="browser-gps-toggle"
+              checked={useRealBrowserGps}
+              onChange={onToggleRealBrowserGps}
+              label={useRealBrowserGps ? 'Browser GPS' : 'Simulated GPS'}
+              size="sm"
+              variant="accent"
+            />
+          }
+          className="lg:col-span-6"
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <OpenUiMetric
+              label="Latitude"
+              value={`${currentGps.latitude.toFixed(6)}°`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Longitude"
+              value={`${currentGps.longitude.toFixed(6)}°`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Speed"
+              value={(currentGps.speed * 3.6).toFixed(1)}
+              unit="km/h"
+              variant="accent"
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Altitude"
+              value={currentGps.altitude.toFixed(1)}
+              unit="m"
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Bearing"
+              value={`${currentGps.bearing}°`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Accuracy"
+              value={`±${currentGps.accuracy.toFixed(1)}`}
+              unit="m"
+              variant="success"
+              size="sm"
+            />
           </div>
-        </section>
+        </OpenUiCard>
 
-        {/* Column 3: Speed Test, Light Network Probe & Neighbor Cells (4 cols) */}
-        <section className="lg:col-span-4 space-y-5 rf-containment-panel">
-          {/* Active Speed Test & Light Network Probe Card */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-accent" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-text">
-                  {t.speedTestTitle}
-                </h2>
-              </div>
-              <button
-                type="button"
-                disabled={isSpeedTestRunning}
-                onClick={onRunSpeedTest}
-                className="px-3 py-1.5 rounded-lg bg-accent text-on-accent text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSpeedTestRunning ? 'animate-spin' : ''}`} />
-                {isSpeedTestRunning && speedTestProgress
-                  ? `${speedTestProgress.phase}…`
-                  : t.runSpeedTest}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 text-xs">
-              <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                <span className="text-text-muted block">Download</span>
-                <span className="text-xl font-mono font-bold text-success">
-                  {(speedTestProgress?.downloadMbps ?? lastSpeedDownloadMbps).toFixed(1)}{' '}
-                  <span className="text-xs font-normal">Mbps</span>
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-3">
-                <span className="text-text-muted block">Upload</span>
-                <span className="text-xl font-mono font-bold text-accent">
-                  {(speedTestProgress?.uploadMbps ?? lastSpeedUploadMbps).toFixed(1)}{' '}
-                  <span className="text-xs font-normal">Mbps</span>
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Unloaded Ping / Jitter</span>
-                <span className="font-mono font-semibold text-text">
-                  {(speedTestProgress?.pingMs ?? lastSpeedPingMs).toFixed(0)} ms / {lastSpeedJitterMs.toFixed(1)} ms
-                </span>
-              </div>
-              <div className="bg-surface-elevated border border-border rounded-lg p-2.5">
-                <span className="text-text-muted block">Loaded Latency</span>
-                <span className="font-mono font-semibold text-warning">
-                  {(speedTestProgress?.loadedPingMs ?? lastSpeedPingMs * 2.1).toFixed(0)} ms
-                </span>
-              </div>
-            </div>
-
-            {/* Light Network Probe Toggle */}
-            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs">
-              <RfToggleSwitch
-                id="light-probe-toggle"
-                checked={lightProbeEnabled}
-                onChange={onToggleLightProbe}
-                label={t.lightProbeTitle}
-                size="sm"
-                variant="accent"
-              />
-              <span className="font-mono text-text">
-                {lastLightProbe
-                  ? `Ping ${lastLightProbe.pingMs} ms · Jitter ${lastLightProbe.jitterMs} ms`
-                  : 'Standby'}
-              </span>
-            </div>
+        {/* Active Speed Test & Light Network Probe Card */}
+        <OpenUiCard
+          title={t.speedTestTitle}
+          icon={<Zap className="w-4 h-4" />}
+          actions={
+            <button
+              type="button"
+              disabled={isSpeedTestRunning}
+              onClick={onRunSpeedTest}
+              className="px-3 py-1.5 rounded-xl bg-accent text-on-accent text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 shadow-sm hover:opacity-95 transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSpeedTestRunning ? 'animate-spin' : ''}`} />
+              {isSpeedTestRunning && speedTestProgress
+                ? `${speedTestProgress.phase}…`
+                : t.runSpeedTest}
+            </button>
+          }
+          className="lg:col-span-6"
+        >
+          <div className="grid grid-cols-2 gap-2.5">
+            <OpenUiMetric
+              label="Download"
+              value={(speedTestProgress?.downloadMbps ?? lastSpeedDownloadMbps).toFixed(1)}
+              unit="Mbps"
+              variant="success"
+              size="lg"
+            />
+            <OpenUiMetric
+              label="Upload"
+              value={(speedTestProgress?.uploadMbps ?? lastSpeedUploadMbps).toFixed(1)}
+              unit="Mbps"
+              variant="accent"
+              size="lg"
+            />
+            <OpenUiMetric
+              label="Unloaded Ping / Jitter"
+              value={`${(speedTestProgress?.pingMs ?? lastSpeedPingMs).toFixed(0)} ms`}
+              subValue={`Jitter ${lastSpeedJitterMs.toFixed(1)} ms`}
+              size="sm"
+            />
+            <OpenUiMetric
+              label="Loaded Latency"
+              value={`${(speedTestProgress?.loadedPingMs ?? lastSpeedPingMs * 2.1).toFixed(0)} ms`}
+              variant="warning"
+              size="sm"
+            />
           </div>
 
-          {/* Neighboring Cells Table */}
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Signal className="w-5 h-5 text-accent" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-text">
-                  {t.neighborCells} ({currentRadio.neighborCells.length})
-                </h2>
-              </div>
-            </div>
-
-            <div className="rf-table-container">
-              <table className="w-full text-left text-xs rf-data-table">
-                <thead>
-                  <tr className="border-b border-border text-text-muted">
-                    <th className="py-2 px-2">PCI</th>
-                    <th className="py-2 px-2">Tech</th>
-                    <th className="py-2 px-2">EARFCN</th>
-                    <th className="py-2 px-2">RSRP</th>
-                    <th className="py-2 px-2">RSRQ</th>
-                    <th className="py-2 px-2">Delta</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border font-mono">
-                  {currentRadio.neighborCells.map((n) => {
-                    const delta = n.rsrp - currentRadio.rsrp;
-                    return (
-                      <tr key={`${n.pci}_${n.earfcn}`}>
-                        <th className="py-2 px-2 font-bold text-accent">PCI {n.pci}</th>
-                        <td className="py-2 px-2">{n.technology.replace('_', ' ')}</td>
-                        <td className="py-2 px-2">{n.earfcn}</td>
-                        <td className="py-2 px-2 font-semibold">{n.rsrp} dBm</td>
-                        <td className="py-2 px-2">{n.rsrq} dB</td>
-                        <td
-                          className={`py-2 px-2 font-bold ${
-                            delta >= 6 ? 'text-warning' : 'text-text-muted'
-                          }`}
-                        >
-                          {delta > 0 ? `+${delta}` : delta} dB
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          {/* Light Network Probe Toggle */}
+          <div className="mt-3.5 pt-3 border-t border-border flex items-center justify-between text-xs">
+            <RfToggleSwitch
+              id="light-probe-toggle"
+              checked={lightProbeEnabled}
+              onChange={onToggleLightProbe}
+              label={t.lightProbeTitle}
+              size="sm"
+              variant="accent"
+            />
+            <span className="font-mono text-text text-xs bg-surface-elevated px-2.5 py-1 rounded-lg border border-border">
+              {lastLightProbe
+                ? `Ping ${lastLightProbe.pingMs} ms · Jitter ${lastLightProbe.jitterMs} ms`
+                : 'Standby'}
+            </span>
           </div>
-        </section>
+        </OpenUiCard>
+
+        {/* Neighboring Cells Table */}
+        <OpenUiCard
+          title={`${t.neighborCells} (${currentRadio.neighborCells.length})`}
+          icon={<Signal className="w-4 h-4" />}
+          className="lg:col-span-7"
+        >
+          <div className="rf-table-container">
+            <table className="w-full text-left text-xs rf-data-table">
+              <thead>
+                <tr className="border-b border-border text-text-muted">
+                  <th className="py-2 px-2">PCI</th>
+                  <th className="py-2 px-2">Tech</th>
+                  <th className="py-2 px-2">EARFCN</th>
+                  <th className="py-2 px-2">RSRP</th>
+                  <th className="py-2 px-2">RSRQ</th>
+                  <th className="py-2 px-2">Delta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border font-mono">
+                {currentRadio.neighborCells.map((n) => {
+                  const delta = n.rsrp - currentRadio.rsrp;
+                  return (
+                    <tr key={`${n.pci}_${n.earfcn}`}>
+                      <th className="py-2 px-2 font-bold text-accent">PCI {n.pci}</th>
+                      <td className="py-2 px-2">{n.technology.replace('_', ' ')}</td>
+                      <td className="py-2 px-2">{n.earfcn}</td>
+                      <td className="py-2 px-2 font-semibold">{n.rsrp} dBm</td>
+                      <td className="py-2 px-2">{n.rsrq} dB</td>
+                      <td
+                        className={`py-2 px-2 font-bold ${
+                          delta >= 6 ? 'text-warning' : 'text-text-muted'
+                        }`}
+                      >
+                        {delta > 0 ? `+${delta}` : delta} dB
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </OpenUiCard>
+
+        {/* Live Rolling RSRP Strip Chart */}
+        <OpenUiCard
+          title={`Live RSRP Stream (Last ${recentMeasurements.length} Samples)`}
+          icon={<Activity className="w-4 h-4" />}
+          badge={
+            <span className="text-xs font-mono text-text-muted">
+              Range: -130 dBm to -60 dBm
+            </span>
+          }
+          className="lg:col-span-5"
+        >
+          <div className="h-32 w-full">
+            <svg viewBox="0 0 600 90" className="w-full h-full overflow-visible">
+              <line x1="0" y1="20" x2="600" y2="20" stroke="var(--color-border)" strokeDasharray="4 4" />
+              <line x1="0" y1="55" x2="600" y2="55" stroke="var(--color-border)" strokeDasharray="4 4" />
+              {recentMeasurements.length > 1 && (
+                <polyline
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth="2.5"
+                  points={recentMeasurements
+                    .slice(-40)
+                    .map((m, idx, arr) => {
+                      const x = (idx / Math.max(1, arr.length - 1)) * 590 + 5;
+                      const y = 85 - Math.max(0, Math.min(1, (m.radio.rsrp + 130) / 70)) * 75;
+                      return `${x.toFixed(1)},${y.toFixed(1)}`;
+                    })
+                    .join(' ')}
+                />
+              )}
+            </svg>
+          </div>
+        </OpenUiCard>
       </div>
-
-      {/* Live Rolling RSRP Strip Chart */}
-      <section className="bg-surface border border-border rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-text-muted">
-            <Activity className="w-4 h-4 text-accent" />
-            Live RSRP Stream (Last {recentMeasurements.length} Samples)
-          </div>
-          <span className="text-xs font-mono text-text-muted">
-            Range: -130 dBm to -60 dBm
-          </span>
-        </div>
-        <div className="h-24 w-full">
-          <svg viewBox="0 0 600 90" className="w-full h-full overflow-visible">
-            <line x1="0" y1="20" x2="600" y2="20" stroke="#26344d" strokeDasharray="4 4" />
-            <line x1="0" y1="55" x2="600" y2="55" stroke="#26344d" strokeDasharray="4 4" />
-            {recentMeasurements.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="2.5"
-                points={recentMeasurements
-                  .slice(-40)
-                  .map((m, idx, arr) => {
-                    const x = (idx / Math.max(1, arr.length - 1)) * 590 + 5;
-                    const y = 85 - Math.max(0, Math.min(1, (m.radio.rsrp + 130) / 70)) * 75;
-                    return `${x.toFixed(1)},${y.toFixed(1)}`;
-                  })
-                  .join(' ')}
-              />
-            )}
-          </svg>
-        </div>
-      </section>
 
       {/* Start Campaign Modal Dialog (using modern-web-guidance <dialog closedby="any">) */}
       <dialog

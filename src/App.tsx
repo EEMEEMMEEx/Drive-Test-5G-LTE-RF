@@ -50,6 +50,7 @@ import { CampaignListView } from './components/campaigns/CampaignListView';
 import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { WidgetsPreviewModal } from './components/widgets/WidgetsPreviewModal';
 import { SpotlightTutorial } from './components/tutorial/SpotlightTutorial';
+import { OpenUiNavDock } from './components/openui/OpenUiNavDock';
 
 export type MainNavTab = 'DASHBOARD' | 'MAP' | 'CAMPAIGNS' | 'ANALYTICS';
 
@@ -654,7 +655,7 @@ export function App() {
           </div>
 
           {/* Primary Screen Navigation Tabs */}
-          <nav aria-label="Main navigation" className="flex items-center gap-1 bg-surface-elevated border border-border rounded-xl p-1">
+          <nav aria-label="Main navigation" className="hidden md:flex items-center gap-1 bg-surface-elevated border border-border rounded-xl p-1">
             {(
               [
                 { id: 'DASHBOARD', label: t.navDashboard, icon: Activity },
@@ -732,7 +733,7 @@ export function App() {
       </header>
 
       {/* Main Screen Workspace */}
-      <main className="max-w-7xl mx-auto px-4 py-5">
+      <main className="max-w-7xl mx-auto px-4 py-5 pb-24 md:pb-6">
         {activeTab === 'DASHBOARD' && (
           <DriveTestDashboard
             isRunning={isRunning}
@@ -858,6 +859,18 @@ export function App() {
       />
 
       {/* 5-Step Spotlight Tutorial Modal */}
+      {/* OpenUI Mobile Bottom Navigation Dock */}
+      <OpenUiNavDock
+        items={[
+          { id: 'DASHBOARD', label: 'Live', icon: Activity, badge: isRunning },
+          { id: 'MAP', label: 'Map', icon: Compass },
+          { id: 'CAMPAIGNS', label: 'Logs', icon: FolderKanban },
+          { id: 'ANALYTICS', label: 'Analytics', icon: BarChart3 },
+        ]}
+        activeId={activeTab}
+        onSelect={(tab) => setActiveTab(tab as MainNavTab)}
+      />
+
       <SpotlightTutorial
         isOpen={isTutorialOpen}
         onClose={() => setIsTutorialOpen(false)}
