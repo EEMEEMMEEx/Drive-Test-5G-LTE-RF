@@ -48,6 +48,12 @@ import {
   detectMobilityEvents,
   haversineDistanceMeters,
 } from './services/rfAnalyticsEngine';
+import {
+  isNativeAndroid,
+  DriveTestRadio,
+  convertNativeSnapshotToMeasurement,
+  type NativeRadioMetrics,
+} from './services/nativeRadioService';
 import { parseImportedMeasurementsCsv } from './services/exportService';
 import { DriveTestDashboard } from './components/dashboard/DriveTestDashboard';
 import { RouteMapView } from './components/map/RouteMapView';
@@ -146,7 +152,7 @@ export function App() {
   const [alertThresholdRsrp, setAlertThresholdRsrp] = useState<number | null>(-110);
   const [lightProbeEnabled, setLightProbeEnabled] = useState(true);
   const [lastLightProbe, setLastLightProbe] = useState<LightNetworkProbe | null>(null);
-  const [useRealBrowserGps, setUseRealBrowserGps] = useState(false);
+  const [useRealBrowserGps, setUseRealBrowserGps] = useState(true);
   const [browserGpsOverride, setBrowserGpsOverride] = useState<Partial<GpsInfo> | undefined>(
     undefined
   );
@@ -210,30 +216,70 @@ export function App() {
 
   // Live idle/standby sample so gauge works even before starting a campaign
   const [standbyTick, setStandbyTick] = useState(0);
-  const liveSample = useMemo(
-    () =>
-      generateSimulatedMeasurement({
-        campaignId: activeCampaignId ?? selectedCampaignId,
-        stepIndex: isRunning ? stepIndex : standbyTick,
-        preset: activePreset,
-        sim: selectedSim,
-        timestampMs: Date.now(),
-        overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
-        ratMode,
-      }),
-    [
-      activeCampaignId,
-      selectedCampaignId,
-      isRunning,
-      stepIndex,
-      standbyTick,
-      activePreset,
-      selectedSim,
-      useRealBrowserGps,
-      browserGpsOverride,
+  const [nativeLiveSample, setNativeLiveSample] = useState<Measurement | null>(null);
+
+  // Sync with native Android SIMs and live telemetry
+  useEffect(() => {
+    if (!isNativeAndroid()) return;
+
+    DriveTestRadio.getSimSlots()
+      .then((res) => {
+        if (res.slots && res.slots.length > 0) {
+          const first = res.slots[0];
+          setSelectedSim({
+            subscriptionId: first.subscriptionId,
+            slotIndex: first.slotIndex,
+            displayName: first.displayName || `SIM ${first.slotIndex + 1} (${first.carrierName})`,
+            carrierName: first.carrierName || 'Cellular',
+            mcc: '520',
+            mnc: '03',
+            isActive: true,
+          });
+        }
+      })
+      .catch(() => {});
+
+    let handleRef: { remove: () => Promise<void> } | null = null;
+    DriveTestRadio.addListener('radioUpdate', (metrics: NativeRadioMetrics) => {
+      const sample = convertNativeSnapshotToMeasurement(metrics, selectedSim.slotIndex);
+      setNativeLiveSample(sample);
+    })
+      .then((h) => {
+        handleRef = h;
+      })
+      .catch(() => {});
+
+    return () => {
+      handleRef?.remove();
+    };
+  }, [selectedSim.slotIndex]);
+
+  const liveSample = useMemo(() => {
+    if (isNativeAndroid() && nativeLiveSample) {
+      return nativeLiveSample;
+    }
+    return generateSimulatedMeasurement({
+      campaignId: activeCampaignId ?? selectedCampaignId,
+      stepIndex: isRunning ? stepIndex : standbyTick,
+      preset: activePreset,
+      sim: selectedSim,
+      timestampMs: Date.now(),
+      overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
       ratMode,
-    ]
-  );
+    });
+  }, [
+    activeCampaignId,
+    selectedCampaignId,
+    isRunning,
+    stepIndex,
+    standbyTick,
+    activePreset,
+    selectedSim,
+    useRealBrowserGps,
+    browserGpsOverride,
+    ratMode,
+    nativeLiveSample,
+  ]);
 
   // Persist DB changes
   useEffect(() => {
@@ -246,22 +292,35 @@ export function App() {
       setBrowserGpsOverride(undefined);
       return;
     }
+
+    const applyPosition = (pos: GeolocationPosition) => {
+      setBrowserGpsOverride({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        altitude: pos.coords.altitude ?? 12,
+        speed: pos.coords.speed ?? 0,
+        accuracy: pos.coords.accuracy ?? 5,
+        bearing: pos.coords.heading ?? 0,
+        isValid: true,
+      });
+    };
+
+    try {
+      navigator.geolocation.getCurrentPosition(applyPosition, () => {}, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 2000,
+      });
+    } catch {
+      // ignore in headless test environments
+    }
+
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setBrowserGpsOverride({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          altitude: pos.coords.altitude ?? 12,
-          speed: pos.coords.speed ?? 0,
-          accuracy: pos.coords.accuracy ?? 5,
-          bearing: pos.coords.heading ?? 0,
-          isValid: true,
-        });
-      },
+      applyPosition,
       () => {
         setBrowserGpsOverride(undefined);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [useRealBrowserGps]);
@@ -407,6 +466,9 @@ export function App() {
 
   const handleStartCampaign = useCallback(
     (name: string, preset: CampaignPreset, alertThreshold: number | null) => {
+      if (isNativeAndroid()) {
+        DriveTestRadio.startMonitoring().catch(() => {});
+      }
       const now = Date.now();
       const newId =
         db.campaigns.reduce((max, c) => (c.id > max ? c.id : max), 0) + 1;
@@ -496,6 +558,9 @@ export function App() {
   }, [activeCampaignId, liveSample]);
 
   const handleStopCampaign = useCallback(() => {
+    if (isNativeAndroid()) {
+      DriveTestRadio.stopMonitoring().catch(() => {});
+    }
     if (activeCampaignId === null) {
       setIsRunning(false);
       return;
@@ -720,7 +785,7 @@ export function App() {
   }, []);
 
   const displayRadio = isRunning ? latestMeasurement.radio : BLANK_RADIO_INFO;
-  const displayGps = isRunning ? latestMeasurement.gps : liveSample.gps;
+  const displayGps = liveSample.gps;
 
   return (
     <div className={lightTheme ? 'light-theme min-h-screen bg-bg text-text' : 'min-h-screen bg-bg text-text'}>
@@ -742,7 +807,7 @@ export function App() {
       />
 
       {/* Main Screen Workspace */}
-      <main className="max-w-7xl mx-auto px-4 py-5 pb-24 md:pb-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-8">
         {activeTab === 'DASHBOARD' && (
           <DriveTestDashboard
             isRunning={isRunning}

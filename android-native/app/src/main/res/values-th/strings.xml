@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Drive Test 5G LTE RF</string>
+    <string name="nav_dashboard">มอนิเตอร์สด</string>
+    <string name="nav_map">แผนที่เส้นทาง</string>
+    <string name="nav_campaigns">ประวัติการขับทดสอบ</string>
+    <string name="nav_analytics">การวิเคราะห์ RF</string>
+    <string name="start_test">เริ่มการขับทดสอบ</string>
+    <string name="stop_test">หยุดการขับทดสอบ</string>
+    <string name="serving_cell">เซลล์ที่ให้บริการ (Serving Cell)</string>
+    <string name="neighbor_cells">เซลล์ข้างเคียง (Neighbors)</string>
+    <string name="hud_mode">โหมด HUD สะท้อนกระจก</string>
+    <string name="export_csv">ส่งออก CSV</string>
+    <string name="export_pdf">ส่งออกรายงาน PDF</string>
+    <string name="route_score">คะแนนคุณภาพเส้นทาง</string>
+    <string name="sim_slot">สล็อตซิม</string>
+</resources>
