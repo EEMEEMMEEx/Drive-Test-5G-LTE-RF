@@ -23,6 +23,10 @@ export interface TranslationDictionary {
   cadenceEco: string;
   cadenceStandard: string;
   cadencePrecise: string;
+  ratSelector: string;
+  ratModeAuto: string;
+  ratMode5gOnly: string;
+  ratMode4gOnly: string;
   weakSignalAlert: string;
   rsrpThresholdLabel: string;
   servingCell: string;
@@ -90,6 +94,10 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     cadenceEco: 'Eco · 5 s',
     cadenceStandard: 'Standard · 2 s',
     cadencePrecise: 'Precise · 1 s',
+    ratSelector: 'RAT Lock',
+    ratModeAuto: 'Auto (5G/4G)',
+    ratMode5gOnly: '5G NR Only',
+    ratMode4gOnly: '4G LTE Only',
     weakSignalAlert: 'Weak Signal Alert',
     rsrpThresholdLabel: 'RSRP Alert Threshold (dBm)',
     servingCell: 'Serving Cell & Radio Parameters',
@@ -155,6 +163,10 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     cadenceEco: 'ประหยัด · 5 วินาที',
     cadenceStandard: 'มาตรฐาน · 2 วินาที',
     cadencePrecise: 'ละเอียด · 1 วินาที',
+    ratSelector: 'ล็อคเทคโนโลยี (RAT)',
+    ratModeAuto: 'อัตโนมัติ (5G/4G)',
+    ratMode5gOnly: 'เฉพาะ 5G NR',
+    ratMode4gOnly: 'เฉพาะ 4G LTE',
     weakSignalAlert: 'แจ้งเตือนสัญญาณอ่อน',
     rsrpThresholdLabel: 'เกณฑ์แจ้งเตือน RSRP (dBm)',
     servingCell: 'พารามิเตอร์สถานีฐานหลัก (Serving Cell)',
@@ -220,6 +232,10 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     cadenceEco: 'Éco · 5 s',
     cadenceStandard: 'Standard · 2 s',
     cadencePrecise: 'Précis · 1 s',
+    ratSelector: 'Verrouillage RAT',
+    ratModeAuto: 'Auto (5G/4G)',
+    ratMode5gOnly: '5G NR seul',
+    ratMode4gOnly: '4G LTE seul',
     weakSignalAlert: 'Alerte signal faible',
     rsrpThresholdLabel: 'Seuil RSRP (dBm)',
     servingCell: 'Cellule courante & Paramètres RF',
@@ -285,6 +301,10 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     cadenceEco: 'Eco · 5 s',
     cadenceStandard: 'Standard · 2 s',
     cadencePrecise: 'Präzise · 1 s',
+    ratSelector: 'RAT-Sperre',
+    ratModeAuto: 'Auto (5G/4G)',
+    ratMode5gOnly: 'Nur 5G NR',
+    ratMode4gOnly: 'Nur 4G LTE',
     weakSignalAlert: 'Warnung bei schwachem Signal',
     rsrpThresholdLabel: 'RSRP-Schwellenwert (dBm)',
     servingCell: 'Aktuelle Zelle & HF-Parameter',
@@ -350,6 +370,10 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     cadenceEco: 'Eco · 5 s',
     cadenceStandard: 'Estándar · 2 s',
     cadencePrecise: 'Preciso · 1 s',
+    ratSelector: 'Bloqueo RAT',
+    ratModeAuto: 'Auto (5G/4G)',
+    ratMode5gOnly: 'Solo 5G NR',
+    ratMode4gOnly: 'Solo 4G LTE',
     weakSignalAlert: 'Alerta de señal débil',
     rsrpThresholdLabel: 'Umbral RSRP (dBm)',
     servingCell: 'Celda servidora y Parámetros RF',

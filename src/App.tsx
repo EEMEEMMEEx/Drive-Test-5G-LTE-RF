@@ -25,6 +25,7 @@ import type {
   MapOptions,
   Measurement,
   MeasurementCadence,
+  RatSelectionMode,
   SimInfo,
   SpeedTestProgress,
   SpeedTestResult,
@@ -76,6 +77,7 @@ export function App() {
 
   const [selectedSim, setSelectedSim] = useState<SimInfo>(DEFAULT_SIM_CARDS[0]);
   const [cadence, setCadence] = useState<MeasurementCadence>('STANDARD');
+  const [ratMode, setRatMode] = useState<RatSelectionMode>('AUTO');
   const [alertThresholdRsrp, setAlertThresholdRsrp] = useState<number | null>(-110);
   const [lightProbeEnabled, setLightProbeEnabled] = useState(true);
   const [lastLightProbe, setLastLightProbe] = useState<LightNetworkProbe | null>(null);
@@ -131,6 +133,7 @@ export function App() {
         sim: selectedSim,
         timestampMs: Date.now(),
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
+        ratMode,
       }),
     [
       activeCampaignId,
@@ -142,6 +145,7 @@ export function App() {
       selectedSim,
       useRealBrowserGps,
       browserGpsOverride,
+      ratMode,
     ]
   );
 
@@ -236,6 +240,7 @@ export function App() {
         sim: selectedSim,
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
+        ratMode,
       });
 
       if (lightProbeEnabled) {
@@ -327,6 +332,7 @@ export function App() {
         sim: selectedSim,
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
+        ratMode,
       });
 
       const newCampaign: Campaign = {
@@ -347,6 +353,7 @@ export function App() {
         speedTestLat: firstMeasurement.gps.latitude,
         speedTestLon: firstMeasurement.gps.longitude,
         alertThresholdRsrp: alertThreshold,
+        ratMode: ratMode,
       };
 
       setDb((prev) => ({
@@ -369,7 +376,7 @@ export function App() {
       setIsRunning(true);
       setFinishedSummary(null);
     },
-    [db.campaigns, selectedSim, useRealBrowserGps, browserGpsOverride]
+    [db.campaigns, selectedSim, useRealBrowserGps, browserGpsOverride, ratMode]
   );
 
   const handlePauseResumeCampaign = useCallback(() => {
@@ -752,6 +759,8 @@ export function App() {
             onSelectSim={setSelectedSim}
             cadence={cadence}
             onChangeCadence={setCadence}
+            ratMode={ratMode}
+            onChangeRatMode={setRatMode}
             alertThresholdRsrp={alertThresholdRsrp}
             onChangeAlertThreshold={setAlertThresholdRsrp}
             lightProbeEnabled={lightProbeEnabled}

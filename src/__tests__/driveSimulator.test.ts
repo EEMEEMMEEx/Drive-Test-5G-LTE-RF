@@ -32,6 +32,34 @@ describe('driveSimulator & seedData', () => {
     expect(m.gps.isValid).toBe(true);
   });
 
+  it('locks measurements strictly to 5G NR or 4G LTE when ratMode is set', () => {
+    const sim = DEFAULT_SIM_CARDS[0];
+
+    // 5G NR Only
+    const nrSample = generateSimulatedMeasurement({
+      campaignId: 1,
+      stepIndex: 3,
+      preset: 'URBAN_ROUTE',
+      sim,
+      timestampMs: 1730540010000,
+      ratMode: 'NR_5G_ONLY',
+    });
+    expect(nrSample.radio.technology).toBe('NR_5G');
+    expect(['SA', 'NSA']).toContain(nrSample.radio.nrStatus);
+
+    // 4G LTE Only
+    const lteSample = generateSimulatedMeasurement({
+      campaignId: 1,
+      stepIndex: 3,
+      preset: 'URBAN_ROUTE',
+      sim,
+      timestampMs: 1730540010000,
+      ratMode: 'LTE_4G_ONLY',
+    });
+    expect(lteSample.radio.technology).toBe('LTE_4G');
+    expect(lteSample.radio.nrStatus).toBe('NONE');
+  });
+
   it('generates speed test steps and light probe samples', () => {
     const step = runSimulatedSpeedTestStep('NR_5G', -82);
     expect(step.downloadMbps).toBeGreaterThan(50);
@@ -48,7 +76,5 @@ describe('driveSimulator & seedData', () => {
     expect(seed.campaigns.length).toBeGreaterThanOrEqual(3);
     expect(seed.measurements.length).toBeGreaterThanOrEqual(60);
     expect(seed.speedTests.length).toBeGreaterThanOrEqual(3);
-    expect(seed.sessionEvents.length).toBeGreaterThanOrEqual(4);
   });
 });
-

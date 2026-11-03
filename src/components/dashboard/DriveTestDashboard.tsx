@@ -31,6 +31,7 @@ import type {
   Measurement,
   MeasurementCadence,
   RadioInfo,
+  RatSelectionMode,
   SimInfo,
   SpeedTestProgress,
   SpeedTestStatus,
@@ -59,6 +60,8 @@ export interface DriveTestDashboardProps {
   onSelectSim: (sim: SimInfo) => void;
   cadence: MeasurementCadence;
   onChangeCadence: (cadence: MeasurementCadence) => void;
+  ratMode: RatSelectionMode;
+  onChangeRatMode: (mode: RatSelectionMode) => void;
   alertThresholdRsrp: number | null;
   onChangeAlertThreshold: (threshold: number | null) => void;
   lightProbeEnabled: boolean;
@@ -102,6 +105,8 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     onSelectSim,
     cadence,
     onChangeCadence,
+    ratMode,
+    onChangeRatMode,
     alertThresholdRsrp,
     onChangeAlertThreshold,
     lightProbeEnabled,
@@ -456,6 +461,18 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
               ariaLabel="Measurement Cadence"
             />
 
+            <OpenUiChips
+              size="sm"
+              selectedId={ratMode}
+              onChange={onChangeRatMode}
+              items={[
+                { id: 'AUTO', label: t.ratModeAuto },
+                { id: 'NR_5G_ONLY', label: t.ratMode5gOnly },
+                { id: 'LTE_4G_ONLY', label: t.ratMode4gOnly },
+              ]}
+              ariaLabel={t.ratSelector}
+            />
+
             <button
               type="button"
               onClick={() => setIsCarMode(true)}
@@ -544,9 +561,16 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
           title="RF Signal Telemetry"
           icon={<Gauge className="w-4 h-4" />}
           badge={
-            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-accent/15 text-accent border border-accent/40">
-              {currentRadio.technology.replace('_', ' ')} · {currentRadio.nrStatus}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {ratMode !== 'AUTO' && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning/20 text-warning border border-warning/40">
+                  {ratMode === 'NR_5G_ONLY' ? '5G LOCKED' : '4G LOCKED'}
+                </span>
+              )}
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-accent/15 text-accent border border-accent/40">
+                {currentRadio.technology.replace('_', ' ')} · {currentRadio.nrStatus}
+              </span>
+            </div>
           }
           className="lg:col-span-7 rf-containment-panel"
         >
