@@ -723,9 +723,9 @@ export function App() {
               type="button"
               aria-label="Toggle color theme"
               onClick={() => setLightTheme((v) => !v)}
-              className="p-1.5 rounded-lg bg-surface-elevated border border-border text-text-muted hover:text-text"
+              className="p-1.5 rounded-lg bg-surface-elevated border border-border text-text-muted hover:text-accent hover:border-accent transition"
             >
-              {lightTheme ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+              {lightTheme ? <Moon className="w-4 h-4 text-accent" /> : <Sun className="w-4 h-4 text-warning" />}
             </button>
           </div>
         </div>

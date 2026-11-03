@@ -39,6 +39,7 @@ import {
   getTechnologyColor,
 } from '../../services/rfAnalyticsEngine';
 import type { TranslationDictionary } from '../../i18n/translations';
+import { RfToggleSwitch } from '../common/RfToggleSwitch';
 
 export interface RouteMapViewProps {
   campaigns: Campaign[];
@@ -465,7 +466,7 @@ export function RouteMapView({
             onClick={() => updateOption('followMyPosition', !options.followMyPosition)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
               options.followMyPosition
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
                 : 'bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-800'
             }`}
             title="Follow My Position"
@@ -480,7 +481,7 @@ export function RouteMapView({
             onClick={() => updateOption('headingUp', !options.headingUp)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
               options.headingUp
-                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/50'
+                ? 'bg-accent/20 text-accent border-accent/40 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
                 : 'bg-slate-800/70 text-slate-300 border-slate-700 hover:bg-slate-800'
             }`}
             title="Toggle Orientation (Heading Up / North Up)"
@@ -726,21 +727,21 @@ export function RouteMapView({
                   desc: string;
                 }[]
               ).map((layer) => (
-                <label
+                <div
                   key={layer.key}
-                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg hover:bg-slate-900/80 cursor-pointer"
+                  className="py-1.5 px-2 rounded-lg hover:bg-slate-900/80 transition"
                 >
-                  <div>
-                    <div className="text-xs font-medium text-slate-200">{layer.label}</div>
-                    <div className="text-[11px] text-slate-500">{layer.desc}</div>
-                  </div>
-                  <input
-                    type="checkbox"
+                  <RfToggleSwitch
+                    id={`map-layer-${layer.key}`}
                     checked={options[layer.key]}
-                    onChange={(e) => updateOption(layer.key, e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-500"
+                    onChange={(val) => updateOption(layer.key, val)}
+                    label={layer.label}
+                    description={layer.desc}
+                    size="sm"
+                    variant="accent"
+                    className="w-full"
                   />
-                </label>
+                </div>
               ))}
             </div>
           </div>

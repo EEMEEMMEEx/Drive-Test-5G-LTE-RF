@@ -49,6 +49,7 @@ import {
   triggerFileDownload,
 } from '../../services/exportService';
 import type { TranslationDictionary } from '../../i18n/translations';
+import { RfToggleSwitch } from '../common/RfToggleSwitch';
 
 export interface AnalyticsViewProps {
   campaigns: Campaign[];
@@ -1636,18 +1637,17 @@ export function AnalyticsView({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAnomaliesOnly((prev) => !prev)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                    anomaliesOnly
-                      ? 'border-amber-500/60 bg-amber-500/20 text-amber-300'
-                      : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600'
-                  }`}
-                >
-                  <Filter className="h-3.5 w-3.5" />
-                  <span>Anomalies only</span>
-                </button>
+                <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1">
+                  <Filter className="h-3.5 w-3.5 text-amber-400" />
+                  <RfToggleSwitch
+                    id="anomalies-only-toggle"
+                    checked={anomaliesOnly}
+                    onChange={setAnomaliesOnly}
+                    label="Anomalies only"
+                    size="sm"
+                    variant="warning"
+                  />
+                </div>
 
                 <button
                   type="button"
