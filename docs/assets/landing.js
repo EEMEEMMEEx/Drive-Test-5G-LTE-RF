@@ -300,14 +300,10 @@ async function resolveLatestGitHubRelease() {
     const releaseTagEl = document.getElementById('releaseTag');
     const releaseAssetNameEl = document.getElementById('releaseAssetName');
     const releaseAssetSizeEl = document.getElementById('releaseAssetSize');
-    const releaseNotesLinkEl = document.getElementById('releaseNotesLink');
 
     if (releaseTagEl) releaseTagEl.textContent = tag;
     if (releaseAssetNameEl) releaseAssetNameEl.textContent = assetName;
     if (releaseAssetSizeEl) releaseAssetSizeEl.textContent = sizeMb;
-    if (releaseNotesLinkEl && release.html_url) {
-      releaseNotesLinkEl.setAttribute('href', release.html_url);
-    }
   } catch {
     // Graceful static fallback to /releases/latest already present in HTML
   }
