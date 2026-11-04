@@ -17,6 +17,7 @@ import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.location.LocationCollector
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
+import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
@@ -48,11 +49,16 @@ class DriveTestForegroundService : Service() {
         super.onCreate()
         SessionRepository.initStorage(applicationContext)
         createNotificationChannel()
-        LiveAlertNotificationHelper.initMediaSession(
-            context = this,
-            onStop = { stop(this) },
-            onNewSession = { newSession(this) }
-        )
+
+        // Only initialize media session if user explicitly selected MEDIA style
+        if (_liveAlertStyle.value == LiveAlertStyle.MEDIA) {
+            LiveAlertNotificationHelper.initMediaSession(
+                context = this,
+                onStop = { stop(this) },
+                onNewSession = { newSession(this) }
+            )
+        }
+
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
         refreshAvailableSims(this)
@@ -169,6 +175,28 @@ class DriveTestForegroundService : Service() {
                     }
                 }
             }
+            ACTION_SET_LIVE_ALERT_STYLE -> {
+                val styleStr = intent.getStringExtra(EXTRA_LIVE_ALERT_STYLE)
+                if (styleStr != null) {
+                    try {
+                        val newStyle = LiveAlertStyle.valueOf(styleStr)
+                        _liveAlertStyle.value = newStyle
+                        if (newStyle == LiveAlertStyle.TELEMETRY) {
+                            LiveAlertNotificationHelper.releaseMediaSession()
+                        } else {
+                            LiveAlertNotificationHelper.initMediaSession(
+                                context = this,
+                                onStop = { stop(this) },
+                                onNewSession = { newSession(this) }
+                            )
+                        }
+                        updateNotification()
+                        Log.d(TAG, "Live alert style updated to ${newStyle.label}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Invalid live alert style: $styleStr", e)
+                    }
+                }
+            }
             ACTION_SET_SIM_SLOT -> {
                 val slot = intent.getIntExtra(EXTRA_SIM_SLOT, 0)
                 val subId = intent.getIntExtra(EXTRA_SUB_ID, -1)
@@ -276,7 +304,9 @@ class DriveTestForegroundService : Service() {
         locationCollector.stopTracking()
         SessionRepository.finishCurrentSession()
         _isRecording.value = false
-        LiveAlertNotificationHelper.updatePlaybackState(isRecording = false)
+        if (_liveAlertStyle.value == LiveAlertStyle.MEDIA) {
+            LiveAlertNotificationHelper.updatePlaybackState(isRecording = false)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
@@ -311,7 +341,8 @@ class DriveTestForegroundService : Service() {
             metrics = metrics,
             cadence = _measurementCadence.value,
             simDisplayName = simName,
-            lockMode = _ratLockMode.value
+            lockMode = _ratLockMode.value,
+            style = _liveAlertStyle.value
         )
     }
 
@@ -331,11 +362,13 @@ class DriveTestForegroundService : Service() {
         const val ACTION_NEW_SESSION = "com.drivetest.lte5g.action.NEW_SESSION"
         const val ACTION_SET_RAT_LOCK = "com.drivetest.lte5g.action.SET_RAT_LOCK"
         const val ACTION_SET_CADENCE = "com.drivetest.lte5g.action.SET_CADENCE"
+        const val ACTION_SET_LIVE_ALERT_STYLE = "com.drivetest.lte5g.action.SET_LIVE_ALERT_STYLE"
         const val ACTION_SET_SIM_SLOT = "com.drivetest.lte5g.action.SET_SIM_SLOT"
 
         const val EXTRA_RAT_LOCK = "EXTRA_RAT_LOCK"
         const val EXTRA_LOCK_TYPE = "EXTRA_LOCK_TYPE"
         const val EXTRA_CADENCE = "EXTRA_CADENCE"
+        const val EXTRA_LIVE_ALERT_STYLE = "EXTRA_LIVE_ALERT_STYLE"
         const val EXTRA_SESSION_NAME = "EXTRA_SESSION_NAME"
         const val EXTRA_SIM_SLOT = "EXTRA_SIM_SLOT"
         const val EXTRA_SUB_ID = "EXTRA_SUB_ID"
@@ -360,6 +393,10 @@ class DriveTestForegroundService : Service() {
 
         private val _measurementCadence = MutableStateFlow(MeasurementCadence.PRECISE)
         val measurementCadence: StateFlow<MeasurementCadence> = _measurementCadence.asStateFlow()
+
+        // Default to TELEMETRY mode (pure RF telemetry monitor, no media player elements)
+        private val _liveAlertStyle = MutableStateFlow(LiveAlertStyle.TELEMETRY)
+        val liveAlertStyle: StateFlow<LiveAlertStyle> = _liveAlertStyle.asStateFlow()
 
         private val _latestSample = MutableStateFlow<DriveTestSample?>(null)
         val latestSample: StateFlow<DriveTestSample?> = _latestSample.asStateFlow()
@@ -471,6 +508,19 @@ class DriveTestForegroundService : Service() {
                 putExtra(EXTRA_CADENCE, cadence.name)
             }
             context.startService(intent)
+        }
+
+        fun setLiveAlertStyle(context: Context, style: LiveAlertStyle) {
+            _liveAlertStyle.value = style
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_SET_LIVE_ALERT_STYLE
+                putExtra(EXTRA_LIVE_ALERT_STYLE, style.name)
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed sending setLiveAlertStyle", e)
+            }
         }
 
         fun setSimSlot(context: Context, slot: Int, subId: Int? = null, simName: String? = null) {

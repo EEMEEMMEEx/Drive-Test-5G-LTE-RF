@@ -24,6 +24,23 @@ enum class MeasurementCadence(
     PRECISE(1000L, "Precise (1 s)", "1.0 Hz", "ความละเอียดสูงสุด สำหรับ Fast Fading & Handover")
 }
 
+enum class LiveAlertStyle(
+    val label: String,
+    val shortDesc: String,
+    val fullDesc: String
+) {
+    TELEMETRY(
+        label = "RF Telemetry Monitor",
+        shortDesc = "แนะนำ • โหมดมืออาชีพ (ไม่มีปุ่มเพลง)",
+        fullDesc = "การ์ดแจ้งเตือนเทเลเมทรี RF พร้อม Signal Badge และเวลานับสด ไม่มีแถบเลื่อนเพลงและไม่มีปุ่มหูฟัง"
+    ),
+    MEDIA(
+        label = "Media Player Carousel",
+        shortDesc = "โหมดเครื่องเล่นเพลง (Spotify Style)",
+        fullDesc = "เชื่อมต่อระบบ Media Controls ของ Android สำหรับแสดงผลแบบเครื่องเล่นเพลง"
+    )
+}
+
 data class SimSlotInfo(
     val slotIndex: Int,
     val subscriptionId: Int,

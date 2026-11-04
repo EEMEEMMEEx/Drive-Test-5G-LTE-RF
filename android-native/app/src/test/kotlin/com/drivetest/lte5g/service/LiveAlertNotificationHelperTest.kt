@@ -1,6 +1,7 @@
 package com.drivetest.lte5g.service
 
 import com.drivetest.lte5g.model.CellMetrics
+import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.NrMetrics
@@ -161,5 +162,11 @@ class LiveAlertNotificationHelperTest {
         val metrics = CellMetrics(ratType = RatType.NR_NSA)
         // Must safely handle environment without crashing
         LiveAlertNotificationHelper.generateSignalArtwork(metrics, LiveAlertNotificationHelper.COLOR_EXCELLENT)
+    }
+
+    @Test
+    fun testLiveAlertStyles() {
+        assertEquals("RF Telemetry Monitor", LiveAlertStyle.TELEMETRY.label)
+        assertEquals("Media Player Carousel", LiveAlertStyle.MEDIA.label)
     }
 }

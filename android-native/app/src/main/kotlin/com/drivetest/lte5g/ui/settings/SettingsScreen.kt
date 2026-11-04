@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
@@ -49,6 +50,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
+    val liveAlertStyle by DriveTestForegroundService.liveAlertStyle.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -79,12 +81,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.8.1"
+    val currentVersionName = packageInfo?.versionName ?: "1.8.2"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 14
+        packageInfo?.longVersionCode?.toInt() ?: 15
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 13
+        packageInfo?.versionCode ?: 15
     }
 
     Column(
@@ -635,6 +637,88 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = cadence.description,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) Color(0xFFA5F3FC) else Color(0xFF94A3B8)
+                                )
+                            }
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF06B6D4)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Live Alerts Notification Style Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "LIVE ALERTS NOTIFICATION STYLE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF94A3B8)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LiveAlertStyle.values().forEach { style ->
+                    val isSelected = style == liveAlertStyle
+                    Surface(
+                        color = if (isSelected) Color(0xFF0C4A6E) else Color(0xFF1E293B),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) Color(0xFF06B6D4) else Color(0xFF334155),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                DriveTestForegroundService.setLiveAlertStyle(context, style)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = style.label,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else Color(0xFFE2E8F0)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        color = if (isSelected) Color(0xFF0284C7) else Color(0xFF0F172A),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = style.shortDesc,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = style.fullDesc,
                                     fontSize = 11.sp,
                                     color = if (isSelected) Color(0xFFA5F3FC) else Color(0xFF94A3B8)
                                 )
