@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#0E2448"/>
+      <stop offset="60%" stop-color="#070D1E"/>
+      <stop offset="100%" stop-color="#03060F"/>
+    </radialGradient>
+
+    <!-- Hexagon Border Gradient -->
+    <linearGradient id="hexStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+
+    <!-- Inner Hexagon Fill Gradient -->
+    <linearGradient id="innerHexGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#101D38"/>
+      <stop offset="100%" stop-color="#060C1B"/>
+    </linearGradient>
+
+    <!-- 5G Typography Metallic Gradient -->
+    <linearGradient id="text5gGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="45%" stop-color="#E2E8F0"/>
+      <stop offset="55%" stop-color="#94A3B8"/>
+      <stop offset="100%" stop-color="#CBD5E1"/>
+    </linearGradient>
+
+    <!-- Cyan Glow Filter -->
+    <filter id="cyanGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+
+    <!-- Soft Drop Shadow -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+
+  <!-- Base Canvas Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGlow)"/>
+
+  <!-- Subtle Background Circular Grid -->
+  <circle cx="256" cy="240" r="190" fill="none" stroke="#1E293B" stroke-width="1" stroke-dasharray="4,6" opacity="0.6"/>
+  <circle cx="256" cy="240" r="140" fill="none" stroke="#1E293B" stroke-width="1" stroke-dasharray="4,6" opacity="0.6"/>
+
+  <!-- Outer Hexagonal Shield (Glow & Main Frame) -->
+  <polygon points="256,42 432,144 432,348 256,450 80,348 80,144"
+           fill="none" stroke="url(#hexStroke)" stroke-width="8" stroke-linejoin="round"
+           filter="url(#dropShadow)"/>
+
+  <!-- Inner Hexagon Plate -->
+  <polygon points="256,58 418,152 418,340 256,434 94,340 94,152"
+           fill="url(#innerHexGrad)" stroke="#1E293B" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- RF Broadcast Waves (Emitting from Cell Mast Node) -->
+  <!-- Outer Arc (Carrier Blue) -->
+  <path d="M 176,128 A 100,100 0 0,1 336,128" fill="none" stroke="#3B82F6" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+  <path d="M 152,112 A 130,130 0 0,1 360,112" fill="none" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round" opacity="0.4" stroke-dasharray="8,6"/>
+
+  <!-- Mid Arc (5G Cyan Pulse) -->
+  <path d="M 198,146 A 70,70 0 0,1 314,146" fill="none" stroke="#00F2FE" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Inner Arc (RSRP Tier 1 Emerald Green) -->
+  <path d="M 222,164 A 40,40 0 0,1 290,164" fill="none" stroke="#10B981" stroke-width="6.5" stroke-linecap="round"/>
+
+  <!-- Central Cellular Transmission Mast (Tower) -->
+  <!-- Tower Structure -->
+  <polygon points="256,155 240,360 272,360" fill="#0B132B" stroke="#334155" stroke-width="2"/>
+  <!-- Cross Bracing on Tower -->
+  <line x1="244" y1="210" x2="268" y2="235" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <line x1="268" y1="210" x2="244" y2="235" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <line x1="242" y1="250" x2="270" y2="280" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <line x1="270" y1="250" x2="242" y2="280" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <line x1="240" y1="300" x2="272" y2="335" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <line x1="272" y1="300" x2="240" y2="335" stroke="#38BDF8" stroke-width="2.5" opacity="0.8"/>
+  <!-- Horizontal Tower Beams -->
+  <line x1="248" y1="185" x2="264" y2="185" stroke="#64748B" stroke-width="3"/>
+  <line x1="245" y1="210" x2="267" y2="210" stroke="#64748B" stroke-width="3"/>
+  <line x1="243" y1="250" x2="269" y2="250" stroke="#64748B" stroke-width="3"/>
+  <line x1="241" y1="300" x2="271" y2="300" stroke="#64748B" stroke-width="3"/>
+
+  <!-- Antenna Mast Needle at Top -->
+  <line x1="256" y1="125" x2="256" y2="155" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Mast Emitter Glowing Node (Pulse Point) -->
+  <circle cx="256" cy="122" r="10" fill="#00F2FE" filter="url(#cyanGlow)"/>
+  <circle cx="256" cy="122" r="6" fill="#FFFFFF"/>
+
+  <!-- Left: Stylized "5" (High-tech Aerodynamic Cut) -->
+  <g filter="url(#dropShadow)">
+    <path d="M 148,225
+             L 220,225
+             L 216,252
+             L 172,252
+             L 168,280
+             C 176,274 186,270 200,270
+             C 224,270 238,286 238,312
+             C 238,338 220,356 190,356
+             C 166,356 150,344 142,330
+             L 164,316
+             C 170,326 178,332 190,332
+             C 204,332 214,324 214,312
+             C 214,300 204,292 190,292
+             C 178,292 168,298 162,306
+             Z"
+          fill="url(#text5gGrad)" stroke="#0F172A" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Right: Stylized "G" (Orbital High-Speed Cut) -->
+  <g filter="url(#dropShadow)">
+    <path d="M 358,252
+             L 336,268
+             C 328,257 317,250 302,250
+             C 280,250 264,268 264,293
+             C 264,318 280,336 304,336
+             C 318,336 329,328 335,316
+             L 304,316
+             L 304,296
+             L 358,296
+             L 358,328
+             C 346,346 328,358 302,358
+             C 266,358 240,330 240,293
+             C 240,256 268,228 304,228
+             C 326,228 346,238 358,252
+             Z"
+          fill="url(#text5gGrad)" stroke="#0F172A" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Real-time Drive Test Telemetry Pulse Line (Across lower section) -->
+  <path d="M 112,390
+           L 180,390
+           L 194,374
+           L 208,406
+           L 222,382
+           L 236,396
+           L 248,390
+           L 256,368
+           L 264,412
+           L 276,380
+           L 290,400
+           L 304,374
+           L 318,390
+           L 400,390"
+        fill="none" stroke="#00F2FE" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"
+        filter="url(#cyanGlow)"/>
+
+  <!-- Drive Test Status Indicator Dot on Pulse -->
+  <circle cx="256" cy="368" r="5" fill="#10B981" filter="url(#cyanGlow)"/>
+  <circle cx="256" cy="368" r="2.5" fill="#FFFFFF"/>
+
+  <!-- Sub-Badge Typography: "DRIVE TEST • LTE / 5G NR" -->
+  <text x="256" y="426"
+        text-anchor="middle"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="12"
+        font-weight="800"
+        letter-spacing="2.5"
+        fill="#94A3B8">
+    DRIVE TEST • LTE / 5G
+  </text>
+</svg>

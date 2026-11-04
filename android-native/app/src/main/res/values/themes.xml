@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.DriveTest5GLTERF" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.DriveTestLTE5G" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>

@@ -30,6 +30,6 @@ plugins {
   id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "Drive Test 5G LTE RF"
+rootProject.name = "Drive Test LTE 5G"
 
 include(":app")
