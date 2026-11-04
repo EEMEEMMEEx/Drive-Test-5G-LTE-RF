@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.util.Log
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
@@ -350,56 +351,12 @@ object LiveAlertNotificationHelper {
             ?: "Serving Sector"
 
         // =========================================================================
-        // 1. Inflate RemoteViews matching `designs/dashboard.figcraft` exactly
-        // =========================================================================
-        val rvCollapsed = RemoteViews(context.packageName, R.layout.notification_live_collapsed).apply {
-            setTextViewText(R.id.tv_collapsed_badge, ratLabel)
-            setTextViewText(R.id.tv_collapsed_rsrp, rsrpStr)
-            setTextColor(R.id.tv_collapsed_rsrp, tierColor)
-            setTextViewText(R.id.tv_collapsed_quality, qualityLabel.uppercase(Locale.US))
-            setTextColor(R.id.tv_collapsed_quality, tierColor)
-            setTextViewText(R.id.tv_collapsed_speed, "🚗 $speedStr")
-            setTextViewText(R.id.tv_collapsed_points, "📍 $sampleCount pts")
-        }
-
-        val rvExpanded = RemoteViews(context.packageName, R.layout.notification_live_expanded).apply {
-            val ratShort = if (metrics?.ratType == RatType.NR_NSA || metrics?.ratType == RatType.NR_SA) "5G" else "LTE"
-            setTextViewText(R.id.tv_badge_rat, ratShort)
-            setTextViewText(R.id.tv_title, "Drive Test • RF Live Tracking")
-            setTextViewText(R.id.tv_subtitle, "$sessionName ($elapsedStr)")
-            setTextViewText(R.id.tv_cadence_chip, cadence.label)
-            setTextViewText(R.id.tv_timer_chip, elapsedStr)
-
-            setTextViewText(R.id.tv_hero_rsrp, rsrpStr)
-            setTextColor(R.id.tv_hero_rsrp, tierColor)
-            setTextViewText(R.id.tv_quality_pill, qualityLabel.uppercase(Locale.US))
-            setTextColor(R.id.tv_quality_pill, tierColor)
-            setTextViewText(R.id.tv_serving_sector, "Serving: $sector${if (!simDisplayName.isNullOrBlank()) " • $simDisplayName" else ""}")
-
-            setProgressBar(R.id.pb_route_progress, 100, (sampleCount % 100), false)
-            setTextViewText(R.id.tv_route_info, "🚗 $speedStr • $sampleCount pts")
-
-            setTextViewText(R.id.tv_grid_rsrq, if (rsrq != null) "$rsrq dB" else "--")
-            setTextViewText(R.id.tv_grid_sinr, if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--")
-            setTextViewText(R.id.tv_grid_pci, if (pci != null) "$pci" else "--")
-            setTextViewText(R.id.tv_grid_speed, speedStr)
-            setTextViewText(R.id.tv_grid_points, "$sampleCount")
-            setTextViewText(R.id.tv_grid_sim, simDisplayName ?: "SIM 1")
-
-            setOnClickPendingIntent(R.id.btn_stop, stopIntent)
-            setOnClickPendingIntent(R.id.btn_new_session, newSessionIntent)
-        }
-
-        // =========================================================================
-        // 2. Build Notification with Custom RemoteViews (Dark Card Styling)
+        // 1. Build Base Notification (Category: NAVIGATION)
         // =========================================================================
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle("$ratLabel · $rsrpStr ($qualityLabel)")
             .setContentText("📍 $sampleCount pts  |  🚗 $speedStr")
-            .setCustomContentView(rvCollapsed)
-            .setCustomBigContentView(rvExpanded)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setColorized(false) // CRITICAL: NEVER set colorized to prevent solid green background!
@@ -409,6 +366,81 @@ object LiveAlertNotificationHelper {
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
             .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
+
+        if (artworkBitmap != null) {
+            builder.setLargeIcon(artworkBitmap)
+        }
+
+        // =========================================================================
+        // 2. Safely Inflate RemoteViews matching `designs/dashboard.figcraft`
+        // =========================================================================
+        var customViewsApplied = false
+        try {
+            val rvCollapsed = RemoteViews(context.packageName, R.layout.notification_live_collapsed).apply {
+                setTextViewText(R.id.tv_collapsed_badge, ratLabel)
+                setTextViewText(R.id.tv_collapsed_rsrp, rsrpStr)
+                setTextColor(R.id.tv_collapsed_rsrp, tierColor)
+                setTextViewText(R.id.tv_collapsed_quality, qualityLabel.uppercase(Locale.US))
+                setTextColor(R.id.tv_collapsed_quality, tierColor)
+                setTextViewText(R.id.tv_collapsed_speed, "🚗 $speedStr")
+                setTextViewText(R.id.tv_collapsed_points, "📍 $sampleCount pts")
+            }
+
+            val rvExpanded = RemoteViews(context.packageName, R.layout.notification_live_expanded).apply {
+                val ratShort = if (metrics?.ratType == RatType.NR_NSA || metrics?.ratType == RatType.NR_SA) "5G" else "LTE"
+                setTextViewText(R.id.tv_badge_rat, ratShort)
+                setTextViewText(R.id.tv_title, "Drive Test • RF Live Tracking")
+                setTextViewText(R.id.tv_subtitle, "$sessionName ($elapsedStr)")
+                setTextViewText(R.id.tv_cadence_chip, cadence.label)
+                setTextViewText(R.id.tv_timer_chip, elapsedStr)
+
+                setTextViewText(R.id.tv_hero_rsrp, rsrpStr)
+                setTextColor(R.id.tv_hero_rsrp, tierColor)
+                setTextViewText(R.id.tv_quality_pill, qualityLabel.uppercase(Locale.US))
+                setTextColor(R.id.tv_quality_pill, tierColor)
+                setTextViewText(R.id.tv_serving_sector, "Serving: $sector${if (!simDisplayName.isNullOrBlank()) " • $simDisplayName" else ""}")
+
+                setProgressBar(R.id.pb_route_progress, 100, (sampleCount % 100), false)
+                setTextViewText(R.id.tv_route_info, "🚗 $speedStr • $sampleCount pts")
+
+                setTextViewText(R.id.tv_grid_rsrq, if (rsrq != null) "$rsrq dB" else "--")
+                setTextViewText(R.id.tv_grid_sinr, if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--")
+                setTextViewText(R.id.tv_grid_pci, if (pci != null) "$pci" else "--")
+                setTextViewText(R.id.tv_grid_speed, speedStr)
+                setTextViewText(R.id.tv_grid_points, "$sampleCount")
+                setTextViewText(R.id.tv_grid_sim, simDisplayName ?: "SIM 1")
+
+                setOnClickPendingIntent(R.id.btn_stop, stopIntent)
+                setOnClickPendingIntent(R.id.btn_new_session, newSessionIntent)
+            }
+
+            builder.setCustomContentView(rvCollapsed)
+            builder.setCustomBigContentView(rvExpanded)
+            builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            customViewsApplied = true
+        } catch (t: Throwable) {
+            Log.e("LiveAlertNotif", "Failed to apply custom RemoteViews, falling back to BigTextStyle", t)
+        }
+
+        if (!customViewsApplied) {
+            val detailLines = buildString {
+                append("🚗 Speed: $speedStr | 📍 Points: $sampleCount pts\n")
+                if (rsrq != null || sinr != null) {
+                    append("📶 RSRQ: ${if (rsrq != null) "$rsrq dB" else "--"} | SINR: ${if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--"}\n")
+                }
+                append("📡 Sector: $sector\n")
+                append("⏱️ Elapsed: $elapsedStr | ⚙️ Cadence: ${cadence.label}")
+                if (!simDisplayName.isNullOrBlank()) {
+                    append(" | 📱 SIM: $simDisplayName")
+                }
+            }
+            builder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle("$ratLabel · $rsrpStr ($qualityLabel)")
+                    .setSummaryText(sessionName)
+                    .bigText(detailLines)
+            )
+        }
 
         if (artworkBitmap != null) {
             builder.setLargeIcon(artworkBitmap)

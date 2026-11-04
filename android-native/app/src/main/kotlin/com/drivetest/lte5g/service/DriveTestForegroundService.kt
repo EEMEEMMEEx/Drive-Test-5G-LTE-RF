@@ -219,15 +219,38 @@ class DriveTestForegroundService : Service() {
         _isRecording.value = true
         _samplesList.value = session.samples
 
-        val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            val notification = buildNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground with live notification failed, trying safe fallback", e)
+            try {
+                val fallbackNotif = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_sys_upload)
+                    .setContentTitle("Drive Test Recording")
+                    .setContentText("Recording in progress...")
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .build()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        fallbackNotif,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, fallbackNotif)
+                }
+            } catch (fatal: Exception) {
+                Log.e(TAG, "Critical failure posting fallback foreground notification", fatal)
+            }
         }
 
         locationCollector.startTracking(intervalMs = _measurementCadence.value.intervalMs)
