@@ -144,6 +144,7 @@ class DriveTestForegroundService : Service() {
                             capability = _ratLockCapability.value,
                             connectedRat = curRat
                         )
+                        updateNotification()
                     } catch (e: Exception) {
                         Log.e(TAG, "Invalid lock mode string: $lockModeStr", e)
                     }
@@ -156,6 +157,7 @@ class DriveTestForegroundService : Service() {
                         val newCadence = MeasurementCadence.valueOf(cadenceStr)
                         _measurementCadence.value = newCadence
                         locationCollector.updateInterval(newCadence.intervalMs)
+                        updateNotification()
                         Log.d(TAG, "Measurement cadence updated to ${newCadence.label}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Invalid cadence string: $cadenceStr", e)
@@ -170,6 +172,7 @@ class DriveTestForegroundService : Service() {
                 if (::cellCollector.isInitialized) {
                     cellCollector.switchSim(slot, if (subId == -1) null else subId, simName)
                     _liveMetrics.value = cellCollector.currentMetrics.value
+                    updateNotification()
                 }
             }
         }
@@ -199,7 +202,7 @@ class DriveTestForegroundService : Service() {
         _isRecording.value = true
         _samplesList.value = session.samples
 
-        val notification = buildNotification("Drive Test: ${session.name}")
+        val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
@@ -256,18 +259,8 @@ class DriveTestForegroundService : Service() {
                     val currentSamples = SessionRepository.activeSession.value?.samples ?: emptyList()
                     _samplesList.value = currentSamples
 
-                    // Update notification
-                    val ratLabel = when {
-                        metrics.nr != null -> "5G NR (${metrics.nr.band?.let { "n$it" } ?: ""})"
-                        metrics.lte != null -> "LTE (${metrics.lte.band?.let { "B$it" } ?: ""})"
-                        else -> "Scanning"
-                    }
-                    val rsrpVal = metrics.nr?.ssRsrp ?: metrics.lte?.rsrp ?: "N/A"
-                    val content = "${session.name} | $ratLabel | $rsrpVal dBm | Pts: ${currentSamples.size}"
-                    updateNotification(content)
-                } else if (!passesFilter) {
-                    updateNotification("Searching for locked ${lockMode.name} signal...")
                 }
+                updateNotification()
             }
         }
     }
@@ -290,49 +283,35 @@ class DriveTestForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Drive Test Recording Channel",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows real-time drive test signal status and recording count"
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-        }
+        LiveAlertNotificationHelper.createNotificationChannel(this)
     }
 
-    private fun buildNotification(contentText: String): Notification {
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    private fun buildNotification(): Notification {
+        val session = SessionRepository.activeSession.value
+        val metrics = _liveMetrics.value
+        val loc = locationCollector.currentLocation.value
+        val speedKmh = loc?.let { it.speed * 3.6f }
+        val currentSamples = _samplesList.value
+        val currentSlot = _selectedSimSlot.value
+        val simName = _availableSims.value.firstOrNull { it.slotIndex == currentSlot }?.displayName
 
-        val stopIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, DriveTestForegroundService::class.java).apply { action = ACTION_STOP },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return LiveAlertNotificationHelper.buildLiveNotification(
+            context = this,
+            sessionName = session?.name ?: "Drive Test",
+            startTimeMillis = session?.startTime ?: System.currentTimeMillis(),
+            sampleCount = currentSamples.size,
+            speedKmh = speedKmh,
+            metrics = metrics,
+            cadence = _measurementCadence.value,
+            simDisplayName = simName,
+            lockMode = _ratLockMode.value
         )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("RF Drive Test — Recording")
-            .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
-            .setOngoing(true)
-            .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
-            .build()
     }
 
-    private fun updateNotification(contentText: String) {
+    private fun updateNotification() {
+        if (!_isRecording.value) return
         val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, buildNotification(contentText))
+        manager?.notify(NOTIFICATION_ID, buildNotification())
     }
 
     companion object {
