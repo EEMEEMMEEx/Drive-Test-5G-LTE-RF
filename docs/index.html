@@ -3,198 +3,915 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RF Field Suite — 5G/LTE Drive Test &amp; Route Diagnostics</title>
+    <title>RF Field Suite — 5G NR / LTE Drive Test &amp; Route Diagnostics</title>
     <meta
       name="description"
-      content="RF Field Suite — Drive Test & RF route diagnostics for 5G NR / LTE. GPS, route maps, campaign storage, analytics and PDF reports. PWA offline-first with Android runtime."
+      content="RF Field Suite — Professional 5G NR & LTE drive-test and RF route diagnostics instrument. Live RSRP/RSRQ/SINR telemetry, GPS route maps, 3D KMZ export, deep analytics, and PDF engineering reports."
     />
-    <meta name="theme-color" content="#0b0f17" />
-    <meta property="og:title" content="RF Field Suite — 5G/LTE Drive Test & Route Diagnostics" />
+    <meta name="theme-color" content="#03060f" />
+    <meta property="og:title" content="RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics" />
     <meta
       property="og:description"
-      content="Drive Test & RF route diagnostics for 5G NR / LTE — GPS, route maps, campaign storage, analytics and PDF reports."
+      content="Turn your phone into a professional 5G/LTE drive-test instrument — live RSRP/RSRQ/SINR telemetry, route maps, 3D KMZ export, and automated PDF reports."
     />
     <meta property="og:type" content="website" />
-    <link rel="icon" type="image/png" href="icons/favicon-32.png" sizes="32x32" />
+    <meta property="og:image" content="assets/images/feature_graphic.png" />
+    <link rel="icon" type="image/svg+xml" href="assets/images/logo.svg" />
+    <link rel="alternate icon" type="image/png" href="icons/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="assets/landing.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
 
+    <!-- Background Ambient Glow & Grid -->
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow-top" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow-mid" aria-hidden="true"></div>
+
+    <!-- Top Navigation -->
     <header class="site-header" id="top">
       <nav class="nav container" aria-label="Primary">
         <a class="brand" href="#top" aria-label="RF Field Suite home">
-          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 20h.01" />
-            <path d="M7 20v-4" />
-            <path d="M12 20v-8" />
-            <path d="M17 20V8" />
-            <path d="M22 4v16" />
-          </svg>
-          <span class="brand-text">RF&nbsp;Field&nbsp;Suite</span>
+          <img
+            class="brand-logo"
+            src="assets/images/logo.svg"
+            alt="RF Field Suite 5G logo"
+            width="40"
+            height="40"
+          />
+          <div class="brand-meta">
+            <span class="brand-text">RF Field Suite</span>
+            <span class="brand-tag">5G NR / LTE</span>
+          </div>
         </a>
-        <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Toggle navigation menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" />
+
+        <button
+          class="nav-toggle"
+          id="navToggle"
+          aria-expanded="false"
+          aria-controls="navMenu"
+          aria-label="Toggle navigation menu"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 6h16" />
+            <path d="M4 12h16" />
+            <path d="M4 18h16" />
           </svg>
         </button>
+
         <ul class="nav-menu" id="navMenu">
-          <li><a class="nav-link" href="#features">Features</a></li>
-          <li><a class="nav-link" href="#tech">Tech</a></li>
+          <li><a class="nav-link" href="#simulator">Simulator</a></li>
+          <li><a class="nav-link" href="#screens">Screens</a></li>
+          <li><a class="nav-link" href="#features">Capabilities</a></li>
           <li><a class="nav-link" href="#download">Download</a></li>
+          <li><a class="nav-link" href="#tech">Architecture</a></li>
           <li><a class="nav-link" href="#docs">Docs</a></li>
-          <li><a class="btn btn-primary nav-cta" href="https://sigpath-web.saweksoot.workers.dev/" target="_blank" rel="noopener">Open App</a></li>
+          <li class="nav-actions">
+            <a
+              class="btn btn-apk btn-sm"
+              data-apk-download
+              href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Download App</span>
+              <span class="apk-badge" data-apk-tag>v1.4.2</span>
+            </a>
+            <a
+              class="btn btn-outline-cyan btn-sm"
+              href="https://sigpath-web.saweksoot.workers.dev/"
+              target="_blank"
+              rel="noopener"
+            >
+              <span>Open Web App</span>
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+          </li>
         </ul>
       </nav>
     </header>
 
     <main id="main">
-      <!-- Hero -->
+      <!-- Hero Section -->
       <section class="hero">
-        <div class="container hero-inner">
-          <p class="hero-eyebrow">5G NR / LTE RF Engineering Tool</p>
-          <h1 class="hero-title">
-            Drive Test &amp; Route Diagnostics
-            <span class="hero-accent">for 5G / LTE networks</span>
-          </h1>
-          <p class="hero-sub">
-            RF Field Suite turns a phone into a professional drive-test instrument — live RSRP/RSRQ/SINR telemetry,
-            GPS route maps, campaign storage, deep analytics and automated PDF engineering reports.
-          </p>
-          <div class="hero-actions">
-            <a class="btn btn-primary btn-lg" href="https://sigpath-web.saweksoot.workers.dev/" target="_blank" rel="noopener">
-              Open Web App
-            </a>
-            <a class="btn btn-ghost btn-lg" href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF" target="_blank" rel="noopener">
-              View on GitHub
-            </a>
+        <div class="container hero-grid">
+          <div class="hero-content">
+            <div class="eyebrow-pill">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span>5G NR SA/NSA · LTE-A · RF ENGINEERING INSTRUMENT</span>
+            </div>
+
+            <h1 class="hero-title">
+              Professional 5G &amp; LTE
+              <span class="text-gradient">Drive Test &amp; Route Diagnostics</span>
+            </h1>
+
+            <p class="hero-sub">
+              Turn your Android phone into a field-grade cellular telemetry analyzer. Capture live
+              RSRP, RSRQ, SINR, and Carrier Aggregation metrics, plot multi-layer GPS route maps,
+              export 3D Google Earth KMZ traces, and generate automated PDF engineering reports.
+            </p>
+
+            <div class="hero-cta-group">
+              <a
+                class="btn btn-apk btn-lg"
+                data-apk-download
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg class="btn-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span class="btn-stack">
+                  <span class="btn-stack-main">Download App (APK)</span>
+                  <span class="btn-stack-sub" data-apk-meta>Latest Release · v1.4.2-android · 64.9 MB</span>
+                </span>
+              </a>
+
+              <a
+                class="btn btn-glass btn-lg"
+                href="https://sigpath-web.saweksoot.workers.dev/"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+                <span>Launch Web App</span>
+              </a>
+
+              <a
+                class="btn btn-ghost btn-lg"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+                  <path d="M9 18c-4.51 2-5-2-7-2" />
+                </svg>
+                <span>GitHub</span>
+              </a>
+            </div>
+
+            <div class="hero-metrics-strip" aria-label="Technical Highlights">
+              <div class="metric-chip">
+                <span class="metric-chip-val">5G SA / NSA</span>
+                <span class="metric-chip-lbl">NR + LTE CA</span>
+              </div>
+              <div class="metric-chip">
+                <span class="metric-chip-val">3D KMZ &amp; PDF</span>
+                <span class="metric-chip-lbl">23-Col CSV / KML</span>
+              </div>
+              <div class="metric-chip">
+                <span class="metric-chip-val">Dual-SIM</span>
+                <span class="metric-chip-lbl">Live Radio Service</span>
+              </div>
+              <div class="metric-chip">
+                <span class="metric-chip-val">100% Local</span>
+                <span class="metric-chip-lbl">Offline-First SQLite</span>
+              </div>
+            </div>
           </div>
-          <ul class="hero-badges" aria-label="Highlights">
-            <li>PWA · Installable</li>
-            <li>Offline-first</li>
-            <li>Android Runtime</li>
-            <li>Open Source</li>
-          </ul>
+
+          <div class="hero-visual">
+            <div class="showcase-card">
+              <div class="showcase-header">
+                <div class="window-dots" aria-hidden="true">
+                  <span class="dot dot-red"></span>
+                  <span class="dot dot-amber"></span>
+                  <span class="dot dot-emerald"></span>
+                </div>
+                <span class="showcase-title">FIGCRAFT MULTI-SCREEN SUITE · ANDROID &amp; PWA</span>
+                <span class="showcase-badge">LIVE TELEMETRY</span>
+              </div>
+
+              <div class="showcase-image-wrap">
+                <img
+                  src="assets/images/screens_overview.png"
+                  alt="RF Field Suite 4 screens overview: Dashboard, Route Map, Sessions Export, and OEM Settings"
+                  width="1828"
+                  height="915"
+                  class="showcase-img"
+                />
+              </div>
+
+              <div class="showcase-telemetry-bar">
+                <div class="tele-pill">
+                  <span class="tele-key">SERVING</span>
+                  <span class="tele-val text-cyan">5G NSA (B3+n78) · PCI 412</span>
+                </div>
+                <div class="tele-pill">
+                  <span class="tele-key">RSRP</span>
+                  <span class="tele-val text-emerald">-78 dBm</span>
+                </div>
+                <div class="tele-pill">
+                  <span class="tele-key">SINR</span>
+                  <span class="tele-val text-emerald">+24.2 dB</span>
+                </div>
+                <div class="tele-pill">
+                  <span class="tele-key">GNSS</span>
+                  <span class="tele-val">3D Fix · ±1.8m</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- Features -->
+      <!-- Interactive RF Signal Simulator Section -->
+      <section class="section" id="simulator">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-eyebrow">INTERACTIVE RF TELEMETRY ENGINE</span>
+            <h2 class="section-title">Live 5G/LTE Signal Gauge Simulator</h2>
+            <p class="section-sub">
+              Test how RF Field Suite classifies real-time cellular signal conditions, calculates carrier
+              quality metrics, and triggers automated route diagnostics.
+            </p>
+          </div>
+
+          <div class="simulator-panel">
+            <!-- Gauge Display -->
+            <div class="sim-gauge-card">
+              <div class="sim-gauge-top">
+                <span class="mono-tag">BAND n78 · 3500 MHz · 100 MHz BW</span>
+                <span class="quality-badge quality-excellent" id="simQualityBadge">EXCELLENT</span>
+              </div>
+
+              <div class="gauge-svg-wrap">
+                <svg class="rf-gauge-svg" viewBox="0 0 260 155" aria-label="RSRP Signal Gauge">
+                  <defs>
+                    <linearGradient id="gaugeTrackGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#ef4444" />
+                      <stop offset="38%" stop-color="#f59e0b" />
+                      <stop offset="70%" stop-color="#3b82f6" />
+                      <stop offset="100%" stop-color="#10b981" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Background Track -->
+                  <path
+                    d="M 25 135 A 105 105 0 0 1 235 135"
+                    fill="none"
+                    stroke="#16223b"
+                    stroke-width="18"
+                    stroke-linecap="round"
+                  />
+                  <!-- Active Value Arc -->
+                  <path
+                    id="simGaugeArc"
+                    d="M 25 135 A 105 105 0 0 1 235 135"
+                    fill="none"
+                    stroke="url(#gaugeTrackGrad)"
+                    stroke-width="18"
+                    stroke-linecap="round"
+                    stroke-dasharray="330"
+                    stroke-dashoffset="85"
+                  />
+                  <!-- Scale Labels -->
+                  <text x="16" y="152" fill="#64748b" font-size="10" font-family="monospace">-135</text>
+                  <text x="65" y="42" fill="#64748b" font-size="10" font-family="monospace">-105</text>
+                  <text x="172" y="42" fill="#64748b" font-size="10" font-family="monospace">-80</text>
+                  <text x="222" y="152" fill="#64748b" font-size="10" font-family="monospace">-50</text>
+                  <!-- Main Readout -->
+                  <text
+                    id="simRsrpValue"
+                    x="130"
+                    y="112"
+                    text-anchor="middle"
+                    fill="#10b981"
+                    font-size="36"
+                    font-weight="700"
+                    font-family="monospace"
+                  >
+                    -78
+                  </text>
+                  <text x="130" y="134" text-anchor="middle" fill="#94a3b8" font-size="12" font-family="monospace">
+                    dBm RSRP
+                  </text>
+                </svg>
+              </div>
+
+              <div class="sim-kpi-grid">
+                <div class="sim-kpi">
+                  <span class="sim-kpi-lbl">RSRQ</span>
+                  <span class="sim-kpi-val" id="simRsrqValue">-8.0 dB</span>
+                </div>
+                <div class="sim-kpi">
+                  <span class="sim-kpi-lbl">SINR</span>
+                  <span class="sim-kpi-val" id="simSinrValue">+24.0 dB</span>
+                </div>
+                <div class="sim-kpi">
+                  <span class="sim-kpi-lbl">CQI / MCS</span>
+                  <span class="sim-kpi-val" id="simCqiValue">15 · 256QAM</span>
+                </div>
+                <div class="sim-kpi">
+                  <span class="sim-kpi-lbl">EST. DL PEAK</span>
+                  <span class="sim-kpi-val" id="simDlValue">740 Mbps</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Controls & Diagnostics -->
+            <div class="sim-controls-card">
+              <div class="sim-slider-header">
+                <label for="rsrpSlider" class="sim-slider-label">Adjust Simulated RSRP Level</label>
+                <span class="sim-slider-readout" id="simSliderReadout">-78 dBm</span>
+              </div>
+
+              <input
+                type="range"
+                id="rsrpSlider"
+                class="rf-slider"
+                min="-135"
+                max="-50"
+                step="1"
+                value="-78"
+                aria-label="Simulated RSRP in dBm"
+              />
+
+              <div class="sim-scale-legend">
+                <span>-135 dBm (No Sync)</span>
+                <span>-110 dBm (Edge)</span>
+                <span>-90 dBm (Good)</span>
+                <span>-50 dBm (Near Site)</span>
+              </div>
+
+              <div class="sim-presets">
+                <span class="sim-presets-title">Quick Field Scenarios:</span>
+                <div class="sim-preset-buttons">
+                  <button type="button" class="preset-btn active" data-rsrp="-74">
+                    5G Line-of-Sight (-74 dBm)
+                  </button>
+                  <button type="button" class="preset-btn" data-rsrp="-89">
+                    Urban Macro (-89 dBm)
+                  </button>
+                  <button type="button" class="preset-btn" data-rsrp="-104">
+                    Indoor Penetration (-104 dBm)
+                  </button>
+                  <button type="button" class="preset-btn" data-rsrp="-119">
+                    Cell Edge / Handover (-119 dBm)
+                  </button>
+                </div>
+              </div>
+
+              <div class="sim-diagnostic-box">
+                <div class="sim-diag-header">
+                  <svg class="diag-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                  <span>Automated RF Diagnostic Engine</span>
+                </div>
+                <p id="simDiagnosticNote" class="sim-diag-text">
+                  Dominant serving sector with high SINR headroom. Ideal for 5G NR 256QAM modulation and
+                  4x4 MIMO spatial multiplexing with zero handover pressure.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4-Screen App Gallery Section (FigCraft) -->
+      <section class="section section-alt" id="screens">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-eyebrow">CRAFTED WITH FIGCRAFT &amp; VECTORCRAFT</span>
+            <h2 class="section-title">Four Integrated Field Engineering Screens</h2>
+            <p class="section-sub">
+              Designed from the ground up in FigCraft for one-handed field operation, high-contrast outdoor
+              legibility, and zero-latency telemetry logging.
+            </p>
+          </div>
+
+          <div class="screen-tabs" role="tablist" aria-label="App Screens">
+            <button
+              type="button"
+              class="screen-tab active"
+              role="tab"
+              aria-selected="true"
+              data-screen="dashboard"
+            >
+              <span class="tab-num">01</span>
+              <span class="tab-label">Live RF Dashboard</span>
+            </button>
+            <button
+              type="button"
+              class="screen-tab"
+              role="tab"
+              aria-selected="false"
+              data-screen="routemap"
+            >
+              <span class="tab-num">02</span>
+              <span class="tab-label">Route Map &amp; Sectors</span>
+            </button>
+            <button
+              type="button"
+              class="screen-tab"
+              role="tab"
+              aria-selected="false"
+              data-screen="sessions"
+            >
+              <span class="tab-num">03</span>
+              <span class="tab-label">Sessions &amp; 3D KMZ</span>
+            </button>
+            <button
+              type="button"
+              class="screen-tab"
+              role="tab"
+              aria-selected="false"
+              data-screen="settings"
+            >
+              <span class="tab-num">04</span>
+              <span class="tab-label">OEM Radio &amp; Settings</span>
+            </button>
+          </div>
+
+          <div class="screen-showcase-body">
+            <div class="phone-mockup-wrap">
+              <div class="phone-bezel">
+                <div class="phone-notch" aria-hidden="true"></div>
+                <img
+                  id="activeScreenImg"
+                  src="assets/images/screen_dashboard.png"
+                  alt="01 Live RF Dashboard screen capture"
+                  width="412"
+                  height="915"
+                  class="phone-screen-img"
+                />
+              </div>
+            </div>
+
+            <div class="screen-details-card">
+              <div class="screen-meta-row">
+                <span class="screen-badge" id="activeScreenBadge">SCREEN 01 · FIGCRAFT FRAME 412×915</span>
+              </div>
+              <h3 class="screen-detail-title" id="activeScreenTitle">
+                Live 5G/LTE Drive Test Dashboard
+              </h3>
+              <p class="screen-detail-desc" id="activeScreenDesc">
+                Real-time RSRP semi-circular gauge with live RSRQ, SINR, RSSI, CQI, and Timing Advance.
+                Includes RAT lock controls (Auto, LTE Lock, NR Lock), GPS sampling cadence chips, and
+                Serving + Neighbor cell component monitoring.
+              </p>
+
+              <ul class="screen-feature-list" id="activeScreenBullets">
+                <li>Real-time RSRP (-140 to -44 dBm), RSRQ, SINR, and RSSI telemetry cards</li>
+                <li>Serving Cell &amp; 5G NR (SA/NSA) + LTE Carrier Aggregation component breakdown</li>
+                <li>Instant RAT Lock bar (Auto · LTE Lock · NR Lock) and Cadence control (1s / 2s / 5s)</li>
+                <li>Neighboring cells monitor with PCI, EARFCN/NR-ARFCN, and RSRP delta</li>
+              </ul>
+
+              <div class="screen-tags" id="activeScreenTags">
+                <span class="tech-pill">TelephonyCallback API</span>
+                <span class="tech-pill">CellSignalStrengthNr</span>
+                <span class="tech-pill">CellIdentityLte</span>
+                <span class="tech-pill">GNSS 3D Fix</span>
+              </div>
+
+              <div class="screen-cta-row">
+                <a
+                  class="btn btn-apk"
+                  data-apk-download
+                  href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>Download Android APK</span>
+                </a>
+                <a
+                  class="btn btn-ghost"
+                  href="design/landing_page.figcraft"
+                  download
+                >
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                  </svg>
+                  <span>Download .figcraft File</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Engineering Capabilities Grid -->
       <section class="section" id="features">
         <div class="container">
-          <h2 class="section-title">Everything a field engineer needs</h2>
-          <p class="section-sub">Five integrated screens covering the full drive-test workflow — from live measurement to engineering report.</p>
+          <div class="section-header">
+            <span class="section-eyebrow">CORE CAPABILITIES</span>
+            <h2 class="section-title">Built for Cellular Network Optimization</h2>
+            <p class="section-sub">
+              Every tool required for site acceptance, cluster optimization, coverage verification, and
+              interference hunting.
+            </p>
+          </div>
+
           <div class="feature-grid">
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
-              </span>
-              <h3>Live Drive Test Dashboard</h3>
-              <p>Real-time RSRP gauge with RSRQ, SINR, RSSI, CQI and Timing Advance. Serving cell &amp; 5G NR (SA/NSA) + LTE CA component monitor, dual-SIM and sampling cadence control.</p>
+              <div class="card-icon-box icon-cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 20h.01" />
+                  <path d="M7 20v-4" />
+                  <path d="M12 20v-8" />
+                  <path d="M17 20V8" />
+                  <path d="M22 4v16" />
+                </svg>
+              </div>
+              <h3>5G NR SA/NSA &amp; LTE CA Telemetry</h3>
+              <p>
+                Simultaneous measurement of SS-RSRP, SS-RSRQ, SS-SINR, CSI metrics, PCI, TAC, Cell ID,
+                EARFCN/ARFCN, DL Bandwidth, and Timing Advance across primary and secondary cells.
+              </p>
             </article>
+
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7"/><path d="M9 7v13"/><path d="M15 7v13"/><path d="M20.553 17.276L15 20V7l4.553-2.276A1 1 0 0121 5.618v10.764a1 1 0 01-.447.894z"/></svg>
-              </span>
-              <h3>Interactive Route Map</h3>
-              <p>Leaflet map with 5 color modes (RSRP/RSRQ/SINR/tech/speed), 4 palettes, serving-sector lines, neighbor candidates, handover events and missed-handover detection.</p>
+              <div class="card-icon-box icon-emerald" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+                  <line x1="9" y1="3" x2="9" y2="18" />
+                  <line x1="15" y1="6" x2="15" y2="21" />
+                </svg>
+              </div>
+              <h3>Google Maps &amp; Leaflet Route Inspector</h3>
+              <p>
+                Color-coded breadcrumb trails across 5 modes (RSRP, RSRQ, SINR, RAT Technology, Speed) and
+                4 palettes, with serving sector lines, neighbor beams, and missed-handover markers.
+              </p>
             </article>
+
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 002-2V8a2 2 0 00-2-2h-7.93a2 2 0 01-1.66-.9l-.82-1.2A2 2 0 007.93 3H4a2 2 0 00-2 2v13c0 1.1.9 2 2 2z"/></svg>
-              </span>
-              <h3>Campaigns &amp; Multi-Format Export</h3>
-              <p>Searchable campaign library with batch operations and undo. Export to CSV (23-column APK schema), KML, GeoJSON and printable PDF engineering reports, plus CSV log import.</p>
+              <div class="card-icon-box icon-blue" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </div>
+              <h3>3D KMZ, KML, CSV &amp; PDF Reports</h3>
+              <p>
+                Export campaigns to Google Earth 3D extruded KMZ packages, OpenGIS KML 2.2, 23-column
+                industry CSV logs, GeoJSON features, and printable PDF engineering reports.
+              </p>
             </article>
+
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v-3"/><path d="M11 15V8"/><path d="M15 15v-5"/><path d="M19 15V5"/></svg>
-              </span>
-              <h3>Analytics &amp; Route Diagnostics</h3>
-              <p>8-tab analytics: signal stats &amp; CDF (P10/P50/P90), network &amp; band breakdown, 2D heatmap, cell-site inventory, handover log, automated 0–100 route score and campaign comparison.</p>
+              <div class="card-icon-box icon-amber" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                  <line x1="3" y1="20" x2="21" y2="20" />
+                </svg>
+              </div>
+              <h3>8-Tab Deep Analytics &amp; CDF</h3>
+              <p>
+                Inspect P10/P50/P90 Cumulative Distribution Functions, band distribution, handover ping-pong
+                 matrices (&lt;30s), spatial campaign delta comparisons, and 0–100 automated route scores.
+              </p>
             </article>
+
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13a10 10 0 0114 0"/><path d="M8.5 16.5a5 5 0 017 0"/><path d="M2 8.82a15 15 0 0120 0"/><path d="M12 20h.01"/></svg>
-              </span>
-              <h3>PWA Offline-First</h3>
-              <p>Service-worker precaching, installable Web App Manifest, and offline map-tile caching — keep measuring even without connectivity.</p>
+              <div class="card-icon-box icon-cyan" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+              </div>
+              <h3>Android Native Foreground Service</h3>
+              <p>
+                Uninterrupted background logging with wake-lock management, notification telemetry HUD,
+                Dual-SIM slot switching, and OEM diagnostic dialer shortcuts (*#*#4636#*#*).
+              </p>
             </article>
+
             <article class="card feature-card">
-              <span class="card-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-              </span>
-              <h3>Android Native Runtime</h3>
-              <p>Capacitor bridge with a foreground service for real cellular telephony radio metrics and GNSS tracking, plus a standalone Kotlin Jetpack Compose replica.</p>
+              <div class="card-icon-box icon-emerald" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <h3>100% Local-First &amp; Offline Ready</h3>
+              <p>
+                Zero cloud accounts or telemetry uploads. All drive-test campaigns stay on your device in
+                Room / SQLite storage with offline map tile caching for remote rural surveys.
+              </p>
             </article>
           </div>
         </div>
       </section>
 
-      <!-- Tech stack -->
-      <section class="section section-alt" id="tech">
+      <!-- Download Hub Section -->
+      <section class="section section-alt" id="download">
         <div class="container">
-          <h2 class="section-title">Built on a modern, local-first stack</h2>
-          <p class="section-sub">Data stays on your device. No cloud account, no uploads — your measurements are yours.</p>
+          <div class="download-hub-card">
+            <div class="download-hub-left">
+              <div class="eyebrow-pill eyebrow-emerald">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>OFFICIAL ANDROID APK · GITHUB RELEASES</span>
+              </div>
+
+              <h2 class="download-hub-title">Download RF Field Suite for Android</h2>
+              <p class="download-hub-desc">
+                Get the latest compiled Android package directly from GitHub Releases. Includes the native
+                Kotlin Jetpack Compose UI, background cellular collector service, Google Maps 3D route
+                viewer, and KMZ exporter.
+              </p>
+
+              <div class="release-specs-grid">
+                <div class="release-spec-item">
+                  <span class="spec-label">LATEST VERSION</span>
+                  <span class="spec-value text-emerald" id="releaseTag">v1.4.2-android</span>
+                </div>
+                <div class="release-spec-item">
+                  <span class="spec-label">PACKAGE ASSET</span>
+                  <span class="spec-value" id="releaseAssetName">app-debug.apk</span>
+                </div>
+                <div class="release-spec-item">
+                  <span class="spec-label">BINARY SIZE</span>
+                  <span class="spec-value" id="releaseAssetSize">64.9 MB</span>
+                </div>
+                <div class="release-spec-item">
+                  <span class="spec-label">REQUIREMENTS</span>
+                  <span class="spec-value">Android 8.0+ (API 26+)</span>
+                </div>
+              </div>
+
+              <div class="download-hub-actions">
+                <a
+                  class="btn btn-apk btn-lg"
+                  data-apk-download
+                  href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <svg class="btn-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span class="btn-stack">
+                    <span class="btn-stack-main">Download App (Latest APK)</span>
+                    <span class="btn-stack-sub" data-apk-meta>Direct from GitHub Releases</span>
+                  </span>
+                </a>
+
+                <a
+                  class="btn btn-ghost btn-lg"
+                  id="releaseNotesLink"
+                  href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <span>All Releases &amp; Notes</span>
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <div class="download-hub-right">
+              <h3 class="install-steps-title">3-Step Quick Field Setup</h3>
+              <ol class="install-steps-list">
+                <li>
+                  <span class="step-num">1</span>
+                  <div class="step-body">
+                    <strong>Download Latest APK</strong>
+                    <p>Click "Download App" to fetch the latest APK package from our GitHub Releases page.</p>
+                  </div>
+                </li>
+                <li>
+                  <span class="step-num">2</span>
+                  <div class="step-body">
+                    <strong>Install on Android Device</strong>
+                    <p>Open the downloaded APK file and allow browser installation if prompted by Android.</p>
+                  </div>
+                </li>
+                <li>
+                  <span class="step-num">3</span>
+                  <div class="step-body">
+                    <strong>Grant Radio &amp; GNSS Permissions</strong>
+                    <p>Allow Fine Location &amp; Phone State permissions so the app can read 5G/LTE cell metrics.</p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- Platform Runtime Options -->
+          <div class="runtime-grid">
+            <article class="card runtime-card">
+              <div class="runtime-card-head">
+                <h3>Android Native APK</h3>
+                <span class="runtime-tag tag-emerald">Recommended for Field</span>
+              </div>
+              <p>
+                Standalone Kotlin &amp; Jetpack Compose build (`android-native/`) with direct Android
+                `TelephonyManager` access, foreground service, and 3D KMZ export.
+              </p>
+              <a
+                class="btn btn-apk btn-block"
+                data-apk-download
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+                target="_blank"
+                rel="noopener"
+              >
+                Download Latest APK
+              </a>
+            </article>
+
+            <article class="card runtime-card">
+              <div class="runtime-card-head">
+                <h3>Web App (PWA)</h3>
+                <span class="runtime-tag tag-cyan">Instant Browser Launch</span>
+              </div>
+              <p>
+                Installable Progressive Web App with offline service worker, RF route simulator, CSV log
+                import, 8-tab analytics, and printable PDF engineering reports.
+              </p>
+              <a
+                class="btn btn-outline-cyan btn-block"
+                href="https://sigpath-web.saweksoot.workers.dev/"
+                target="_blank"
+                rel="noopener"
+              >
+                Launch Web App
+              </a>
+            </article>
+
+            <article class="card runtime-card">
+              <div class="runtime-card-head">
+                <h3>Source &amp; Design Files</h3>
+                <span class="runtime-tag tag-blue">Open Source</span>
+              </div>
+              <p>
+                Full repository with Capacitor 8 bridge, Kotlin native project, VectorCraft SVG logos, and
+                FigCraft design files (`drive-test-lte-5g.figcraft`).
+              </p>
+              <a
+                class="btn btn-ghost btn-block"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF"
+                target="_blank"
+                rel="noopener"
+              >
+                Explore Repository
+              </a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tech Stack & Documentation -->
+      <section class="section" id="tech">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-eyebrow">ARCHITECTURE &amp; SPECS</span>
+            <h2 class="section-title">Modern, Local-First Engineering Stack</h2>
+            <p class="section-sub">
+              Engineered for reliability, type safety, and complete offline autonomy.
+            </p>
+          </div>
+
           <ul class="tech-list">
-            <li><span class="tech-name">React 19</span><span class="tech-detail">UI runtime</span></li>
-            <li><span class="tech-name">Vite 6</span><span class="tech-detail">Build tooling</span></li>
-            <li><span class="tech-name">Tailwind CSS</span><span class="tech-detail">Design system</span></li>
-            <li><span class="tech-name">Leaflet</span><span class="tech-detail">Interactive maps</span></li>
-            <li><span class="tech-name">Workbox PWA</span><span class="tech-detail">Offline service worker</span></li>
-            <li><span class="tech-name">Capacitor 8</span><span class="tech-detail">Android bridge</span></li>
-            <li><span class="tech-name">SQLite</span><span class="tech-detail">Local campaign store</span></li>
-            <li><span class="tech-name">TypeScript</span><span class="tech-detail">Type safety</span></li>
+            <li>
+              <span class="tech-name">Kotlin &amp; Compose</span>
+              <span class="tech-detail">Android Native UI &amp; Radio Collector</span>
+            </li>
+            <li>
+              <span class="tech-name">React 19 + TypeScript</span>
+              <span class="tech-detail">PWA Frontend &amp; Analytics Engine</span>
+            </li>
+            <li>
+              <span class="tech-name">Google Maps &amp; Leaflet</span>
+              <span class="tech-detail">2D/3D Spatial Route Visualization</span>
+            </li>
+            <li>
+              <span class="tech-name">FigCraft &amp; VectorCraft</span>
+              <span class="tech-detail">UI Design System &amp; Vector Identity</span>
+            </li>
+            <li>
+              <span class="tech-name">Room &amp; SQLite</span>
+              <span class="tech-detail">Local Campaign Persistence</span>
+            </li>
+            <li>
+              <span class="tech-name">Capacitor 8</span>
+              <span class="tech-detail">Hybrid Native Foreground Bridge</span>
+            </li>
+            <li>
+              <span class="tech-name">Workbox PWA</span>
+              <span class="tech-detail">Offline Precaching &amp; Tile Cache</span>
+            </li>
+            <li>
+              <span class="tech-name">3D KMZ / OpenGIS KML</span>
+              <span class="tech-detail">Google Earth Spatial Export</span>
+            </li>
           </ul>
-        </div>
-      </section>
 
-      <!-- Download -->
-      <section class="section" id="download">
-        <div class="container">
-          <h2 class="section-title">Get started</h2>
-          <p class="section-sub">Three ways to run RF Field Suite.</p>
-          <div class="download-grid">
-            <article class="card download-card">
-              <h3>Web App (PWA)</h3>
-              <p>Open in any modern browser and install to your home screen for an app-like experience with offline support.</p>
-              <a class="btn btn-primary" href="https://sigpath-web.saweksoot.workers.dev/" target="_blank" rel="noopener">Launch Web App</a>
-            </article>
-            <article class="card download-card">
-              <h3>Android (Native)</h3>
-              <p>Capacitor Android wrapper with a foreground service for real radio metrics and GNSS telemetry. Build from source.</p>
-              <a class="btn btn-ghost" href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/tree/main/android" target="_blank" rel="noopener">Android Project</a>
-            </article>
-            <article class="card download-card">
-              <h3>Source Code</h3>
-              <p>Open source, clean-room replica of GSM Drive Test: 5G LTE RF. Fork, audit, and build your own instrument.</p>
-              <a class="btn btn-ghost" href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF" target="_blank" rel="noopener">View on GitHub</a>
-            </article>
+          <div class="docs-section" id="docs">
+            <h3 class="docs-heading">Engineering Documentation &amp; Artifacts</h3>
+            <div class="docs-grid">
+              <a
+                class="doc-card"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/README.md"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="doc-card-title">README &amp; Quick Start</span>
+                <span class="doc-card-sub">Setup, build commands, and verification suite</span>
+              </a>
+              <a
+                class="doc-card"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/docs/reverse-engineering-report.md"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="doc-card-title">Reverse Engineering Report</span>
+                <span class="doc-card-sub">Clean-room RF schema and telemetry analysis</span>
+              </a>
+              <a
+                class="doc-card"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/replica/architecture.md"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="doc-card-title">System Architecture</span>
+                <span class="doc-card-sub">Component hierarchy, data flow, and SQL schema</span>
+              </a>
+              <a
+                class="doc-card"
+                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/replica/test-plan.md"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="doc-card-title">Test Plan &amp; Parity Matrix</span>
+                <span class="doc-card-sub">100% feature parity verification &amp; bug log</span>
+              </a>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <!-- Docs -->
-      <section class="section section-alt" id="docs">
-        <div class="container">
-          <h2 class="section-title">Documentation</h2>
-          <p class="section-sub">Engineering documentation and replica artifacts.</p>
-          <ul class="docs-list">
-            <li><a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/README.md" target="_blank" rel="noopener">README — Quick Start &amp; Verification</a></li>
-            <li><a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/docs/reverse-engineering-report.md" target="_blank" rel="noopener">Reverse Engineering Analysis Report</a></li>
-            <li><a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/replica/architecture.md" target="_blank" rel="noopener">Replica Architecture</a></li>
-            <li><a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/blob/main/replica/test-plan.md" target="_blank" rel="noopener">Test Plan &amp; Bug Log</a></li>
-          </ul>
         </div>
       </section>
     </main>
 
+    <!-- Footer -->
     <footer class="site-footer">
       <div class="container footer-inner">
-        <p class="footer-brand">RF Field Suite — 5G/LTE Drive Test &amp; Route Diagnostics</p>
-        <p class="footer-meta">
-          Version <span class="version">v1.9.5</span> · Local-first · Open Source ·
-          <a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF" target="_blank" rel="noopener">GitHub</a>
-        </p>
+        <div class="footer-brand-col">
+          <div class="brand">
+            <img
+              class="brand-logo"
+              src="assets/images/logo.svg"
+              alt="RF Field Suite logo"
+              width="32"
+              height="32"
+            />
+            <span class="brand-text">RF Field Suite — 5G NR / LTE Drive Test</span>
+          </div>
+          <p class="footer-copy">
+            Clean-room open-source RF engineering instrument. Designed with FigCraft &amp; VectorCraft.
+          </p>
+        </div>
+
+        <div class="footer-links-col">
+          <p class="footer-meta">
+            Version <span class="version">v1.10.0</span> ·
+            <a
+              data-apk-download
+              href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
+              target="_blank"
+              rel="noopener"
+            >Download APK</a>
+            ·
+            <a href="https://sigpath-web.saweksoot.workers.dev/" target="_blank" rel="noopener">Web App</a>
+            ·
+            <a href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF" target="_blank" rel="noopener">GitHub</a>
+          </p>
+        </div>
       </div>
     </footer>
 
