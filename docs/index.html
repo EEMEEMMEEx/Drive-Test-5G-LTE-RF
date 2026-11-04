@@ -64,7 +64,6 @@
           <li><a class="nav-link" href="#simulator">Simulator</a></li>
           <li><a class="nav-link" href="#screens">Screens</a></li>
           <li><a class="nav-link" href="#features">Capabilities</a></li>
-          <li><a class="nav-link" href="#download">Download</a></li>
           <li class="nav-actions">
             <a
               class="btn btn-apk btn-sm"
@@ -452,34 +451,6 @@
                 <span class="tech-pill">GNSS 3D Fix</span>
               </div>
 
-              <div class="screen-cta-row">
-                <a
-                  class="btn btn-apk"
-                  data-apk-download
-                  href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  <span>Download Android APK</span>
-                </a>
-                <a
-                  class="btn btn-ghost"
-                  href="design/landing_page.figcraft"
-                  download
-                >
-                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                  </svg>
-                  <span>Download .figcraft File</span>
-                </a>
-              </div>
             </div>
           </div>
         </div>
@@ -593,150 +564,6 @@
         </div>
       </section>
 
-      <!-- Download Hub Section -->
-      <section class="section section-alt" id="download">
-        <div class="container">
-          <div class="download-hub-card">
-            <div class="download-hub-left">
-              <div class="eyebrow-pill eyebrow-emerald">
-                <span class="status-dot" aria-hidden="true"></span>
-                <span>OFFICIAL ANDROID APK · GITHUB RELEASES</span>
-              </div>
-
-              <h2 class="download-hub-title">Download RF Field Suite for Android</h2>
-              <p class="download-hub-desc">
-                Get the latest compiled Android package directly from GitHub Releases. Includes the native
-                Kotlin Jetpack Compose UI, background cellular collector service, Google Maps 3D route
-                viewer, and KMZ exporter.
-              </p>
-
-              <div class="release-specs-grid">
-                <div class="release-spec-item">
-                  <span class="spec-label">LATEST VERSION</span>
-                  <span class="spec-value text-emerald" id="releaseTag">v1.5.0-android</span>
-                </div>
-                <div class="release-spec-item">
-                  <span class="spec-label">PACKAGE ASSET</span>
-                  <span class="spec-value" id="releaseAssetName">drive-test-lte-5g.apk</span>
-                </div>
-                <div class="release-spec-item">
-                  <span class="spec-label">BINARY SIZE</span>
-                  <span class="spec-value" id="releaseAssetSize">44.5 MB</span>
-                </div>
-                <div class="release-spec-item">
-                  <span class="spec-label">REQUIREMENTS</span>
-                  <span class="spec-value">Android 8.0+ (API 26+)</span>
-                </div>
-              </div>
-
-              <div class="download-hub-actions">
-                <a
-                  class="btn btn-apk btn-lg"
-                  data-apk-download
-                  href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <svg class="btn-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  <span class="btn-stack">
-                    <span class="btn-stack-main">Download App (Latest APK)</span>
-                    <span class="btn-stack-sub" data-apk-meta>Direct from GitHub Releases</span>
-                  </span>
-                </a>
-              </div>
-            </div>
-
-            <div class="download-hub-right">
-              <h3 class="install-steps-title">3-Step Quick Field Setup</h3>
-              <ol class="install-steps-list">
-                <li>
-                  <span class="step-num">1</span>
-                  <div class="step-body">
-                    <strong>Download Latest APK</strong>
-                    <p>Click "Download App" to fetch the latest APK package from our GitHub Releases page.</p>
-                  </div>
-                </li>
-                <li>
-                  <span class="step-num">2</span>
-                  <div class="step-body">
-                    <strong>Install on Android Device</strong>
-                    <p>Open the downloaded APK file and allow browser installation if prompted by Android.</p>
-                  </div>
-                </li>
-                <li>
-                  <span class="step-num">3</span>
-                  <div class="step-body">
-                    <strong>Grant Radio &amp; GNSS Permissions</strong>
-                    <p>Allow Fine Location &amp; Phone State permissions so the app can read 5G/LTE cell metrics.</p>
-                  </div>
-                </li>
-              </ol>
-            </div>
-          </div>
-
-          <!-- Platform Runtime Options -->
-          <div class="runtime-grid">
-            <article class="card runtime-card">
-              <div class="runtime-card-head">
-                <h3>Android Native APK</h3>
-                <span class="runtime-tag tag-emerald">Recommended for Field</span>
-              </div>
-              <p>
-                Standalone Kotlin &amp; Jetpack Compose build (`android-native/`) with direct Android
-                `TelephonyManager` access, foreground service, and 3D KMZ export.
-              </p>
-              <a
-                class="btn btn-apk btn-block"
-                data-apk-download
-                href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
-                target="_blank"
-                rel="noopener"
-              >
-                Download Latest APK
-              </a>
-            </article>
-
-            <article class="card runtime-card">
-              <div class="runtime-card-head">
-                <h3>RF Route Simulator</h3>
-                <span class="runtime-tag tag-cyan">Interactive Demo</span>
-              </div>
-              <p>
-                Interactive telemetry engine with live RSRP arc gauge, RSRQ, SINR, CQI modulation mapping,
-                and 4 field scenario presets right on this page.
-              </p>
-              <a
-                class="btn btn-glass btn-block"
-                href="#simulator"
-              >
-                Try Live Simulator
-              </a>
-            </article>
-
-            <article class="card runtime-card">
-              <div class="runtime-card-head">
-                <h3>FigCraft Design Model</h3>
-                <span class="runtime-tag tag-blue">ArtCraft Engine</span>
-              </div>
-              <p>
-                Native `.figcraft` design model with desktop and mobile frames, official VectorCraft logo,
-                and high-contrast dark telemetry theme for FigCraft.
-              </p>
-              <a
-                class="btn btn-ghost btn-block"
-                href="design/landing_page.figcraft"
-                download
-              >
-                Download .figcraft Model
-              </a>
-            </article>
-          </div>
-        </div>
-      </section>
     </main>
 
     <!-- Footer -->
@@ -760,14 +587,7 @@
 
         <div class="footer-links-col">
           <p class="footer-meta">
-            Version <span class="version">v1.10.7</span> ·
-            <a
-              data-apk-download
-              href="https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/latest"
-              target="_blank"
-              rel="noopener"
-            >Download APK</a>
-            ·
+            Version <span class="version">v1.10.8</span> ·
             <a href="#screens">Screens</a>
             ·
             <a href="#simulator">Simulator</a>
