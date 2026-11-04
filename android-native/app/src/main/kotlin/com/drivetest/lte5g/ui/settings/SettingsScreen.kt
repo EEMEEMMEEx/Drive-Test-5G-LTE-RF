@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
+import com.drivetest.lte5g.overlay.DynamicIslandOverlayService
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
 import com.drivetest.lte5g.ui.theme.SignalTier1
@@ -81,13 +82,16 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.8.4"
+    val currentVersionName = packageInfo?.versionName ?: "1.8.5"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 17
+        packageInfo?.longVersionCode?.toInt() ?: 18
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 17
+        packageInfo?.versionCode ?: 18
     }
+
+    var isOverlayEnabled by remember { mutableStateOf(DynamicIslandOverlayService.isOverlayEnabled(context)) }
+    var hasOverlayPermission by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     Column(
         modifier = modifier
@@ -733,6 +737,99 @@ fun SettingsScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Floating Dynamic Island HUD (Overlay) Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "FLOATING DYNAMIC ISLAND HUD (OVERLAY)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "แสดงแคปซูล Dynamic Island ลอยรอบรูกล้องหน้า (แตะเพื่อดูกราฟิก Drive Test แท้ 100% ไม่มีปุ่มเพลง)",
+                            fontSize = 12.sp,
+                            color = Color.White
+                        )
+                    }
+                    Switch(
+                        checked = isOverlayEnabled && hasOverlayPermission,
+                        onCheckedChange = { checked ->
+                            if (checked && !Settings.canDrawOverlays(context)) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } else {
+                                isOverlayEnabled = checked
+                                DynamicIslandOverlayService.setOverlayEnabled(context, checked)
+                                if (DriveTestForegroundService.isRecording.value) {
+                                    if (checked) DynamicIslandOverlayService.start(context)
+                                    else DynamicIslandOverlayService.stop(context)
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF06B6D4),
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+                            uncheckedTrackColor = Color(0xFF334155)
+                        )
+                    )
+                }
+
+                if (!hasOverlayPermission) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = Color(0xFF451A03),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            context.startActivity(intent)
+                        }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "⚠️", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "ต้องการสิทธิ์ 'แสดงทับแอปอื่น' (แตะเพื่อไปเปิดสิทธิ์)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFDBA74)
+                            )
+                        }
+                    }
+                } else if (isOverlayEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "✓ สิทธิ์ได้รับอนุญาตแล้ว — พร้อมทำงานรอบรูกล้องหน้าทันทีเมื่อเริ่มบันทึก",
+                        fontSize = 11.sp,
+                        color = Color(0xFF10B981)
+                    )
                 }
             }
         }
