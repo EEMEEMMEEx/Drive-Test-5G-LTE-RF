@@ -114,24 +114,9 @@ object LiveAlertNotificationHelper {
                 PlaybackStateCompat.STATE_STOPPED
             }
 
-            val stopCustomAction = PlaybackStateCompat.CustomAction.Builder(
-                CUSTOM_ACTION_STOP,
-                "Stop Recording",
-                android.R.drawable.ic_menu_close_clear_cancel
-            ).build()
-
-            val newSessionCustomAction = PlaybackStateCompat.CustomAction.Builder(
-                CUSTOM_ACTION_NEW_SESSION,
-                "New Session",
-                android.R.drawable.ic_popup_sync
-            ).build()
-
-            // OMIT ACTION_PAUSE and ACTION_SKIP_TO_NEXT so SystemUI doesn't render music player buttons
+            // Zero actions to prevent SystemUI media player button rendering
             val playbackState = PlaybackStateCompat.Builder()
-                .setActions(PlaybackStateCompat.ACTION_STOP)
-                .addCustomAction(stopCustomAction)
-                .addCustomAction(newSessionCustomAction)
-                // PLAYBACK_POSITION_UNKNOWN (-1L) suppresses the audio seek bar!
+                .setActions(0L)
                 .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, if (isRecording) 1.0f else 0.0f)
                 .build()
             session.setPlaybackState(playbackState)
@@ -451,23 +436,9 @@ object LiveAlertNotificationHelper {
                 DriveTestForegroundService.newSession(context)
             })
 
-            val stopCustomAction = PlaybackStateCompat.CustomAction.Builder(
-                CUSTOM_ACTION_STOP,
-                "Stop Recording",
-                android.R.drawable.ic_menu_close_clear_cancel
-            ).build()
-
-            val newSessionCustomAction = PlaybackStateCompat.CustomAction.Builder(
-                CUSTOM_ACTION_NEW_SESSION,
-                "New Session",
-                android.R.drawable.ic_popup_sync
-            ).build()
-
-            // OMIT ACTION_PAUSE and ACTION_SKIP_TO_NEXT so SystemUI doesn't render music player buttons
+            // Zero actions to strip pause/skip and custom action buttons
             val playbackState = PlaybackStateCompat.Builder()
-                .setActions(PlaybackStateCompat.ACTION_STOP)
-                .addCustomAction(stopCustomAction)
-                .addCustomAction(newSessionCustomAction)
+                .setActions(0L)
                 .setState(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build()
             session.setPlaybackState(playbackState)
@@ -491,9 +462,6 @@ object LiveAlertNotificationHelper {
 
             val mediaStyle = MediaStyle()
                 .setMediaSession(session.sessionToken)
-                .setShowActionsInCompactView(0, 1)
-                .setShowCancelButton(true)
-                .setCancelButtonIntent(stopIntent)
 
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setStyle(mediaStyle)
@@ -509,9 +477,6 @@ object LiveAlertNotificationHelper {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setContentIntent(pendingIntent)
-                // Utility action buttons (Stop Recording / New Session)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
-                .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
 
             if (artworkBitmap != null) {
                 builder.setLargeIcon(artworkBitmap)
@@ -574,8 +539,6 @@ object LiveAlertNotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
-            .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
 
         if (artworkBitmap != null) {
             builder.setLargeIcon(artworkBitmap)
