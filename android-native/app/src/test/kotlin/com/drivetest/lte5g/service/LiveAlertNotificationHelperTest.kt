@@ -155,4 +155,11 @@ class LiveAlertNotificationHelperTest {
         assertEquals(2000L, MeasurementCadence.STANDARD.intervalMs)
         assertEquals(5000L, MeasurementCadence.ECO.intervalMs)
     }
+
+    @Test
+    fun testGenerateSignalArtworkSafe() {
+        val metrics = CellMetrics(ratType = RatType.NR_NSA)
+        // Must safely handle environment without crashing
+        LiveAlertNotificationHelper.generateSignalArtwork(metrics, LiveAlertNotificationHelper.COLOR_EXCELLENT)
+    }
 }
