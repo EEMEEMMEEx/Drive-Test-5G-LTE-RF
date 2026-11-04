@@ -1,0 +1,367 @@
+package com.drivetest.lte5g.service
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.IBinder
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.drivetest.lte5g.MainActivity
+import com.drivetest.lte5g.data.SessionRepository
+import com.drivetest.lte5g.location.LocationCollector
+import com.drivetest.lte5g.model.DriveTestSample
+import com.drivetest.lte5g.model.MeasurementCadence
+import com.drivetest.lte5g.model.RatLockMode
+import com.drivetest.lte5g.model.RatType
+import com.drivetest.lte5g.telephony.CellCollector
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+class DriveTestForegroundService : Service() {
+
+    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
+    private var collectionJob: Job? = null
+
+    private lateinit var cellCollector: CellCollector
+    private lateinit var locationCollector: LocationCollector
+
+    override fun onCreate() {
+        super.onCreate()
+        SessionRepository.initStorage(applicationContext)
+        createNotificationChannel()
+        cellCollector = CellCollector(this)
+        locationCollector = LocationCollector(this)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START -> {
+                val lockModeStr = intent.getStringExtra(EXTRA_RAT_LOCK)
+                val lockMode = if (lockModeStr != null) {
+                    try { RatLockMode.valueOf(lockModeStr) } catch (e: Exception) { RatLockMode.AUTO }
+                } else {
+                    _ratLockMode.value
+                }
+                _ratLockMode.value = lockMode
+
+                val cadenceStr = intent.getStringExtra(EXTRA_CADENCE)
+                if (cadenceStr != null) {
+                    try { _measurementCadence.value = MeasurementCadence.valueOf(cadenceStr) } catch (_: Exception) {}
+                }
+
+                val sessionName = intent.getStringExtra(EXTRA_SESSION_NAME)
+                startRecording(sessionName)
+            }
+            ACTION_NEW_SESSION -> {
+                val lockModeStr = intent.getStringExtra(EXTRA_RAT_LOCK)
+                val lockMode = if (lockModeStr != null) {
+                    try { RatLockMode.valueOf(lockModeStr) } catch (e: Exception) { RatLockMode.AUTO }
+                } else {
+                    _ratLockMode.value
+                }
+                _ratLockMode.value = lockMode
+
+                val cadenceStr = intent.getStringExtra(EXTRA_CADENCE)
+                if (cadenceStr != null) {
+                    try { _measurementCadence.value = MeasurementCadence.valueOf(cadenceStr) } catch (_: Exception) {}
+                }
+
+                val sessionName = intent.getStringExtra(EXTRA_SESSION_NAME)
+                if (_isRecording.value) {
+                    stopRecording()
+                }
+                startRecording(sessionName)
+            }
+            ACTION_STOP -> {
+                stopRecording()
+                stopSelf()
+            }
+            ACTION_SET_RAT_LOCK -> {
+                val lockModeStr = intent.getStringExtra(EXTRA_RAT_LOCK)
+                if (lockModeStr != null) {
+                    try {
+                        _ratLockMode.value = RatLockMode.valueOf(lockModeStr)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Invalid lock mode string: $lockModeStr", e)
+                    }
+                }
+            }
+            ACTION_SET_CADENCE -> {
+                val cadenceStr = intent.getStringExtra(EXTRA_CADENCE)
+                if (cadenceStr != null) {
+                    try {
+                        val newCadence = MeasurementCadence.valueOf(cadenceStr)
+                        _measurementCadence.value = newCadence
+                        locationCollector.updateInterval(newCadence.intervalMs)
+                        Log.d(TAG, "Measurement cadence updated to ${newCadence.label}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Invalid cadence string: $cadenceStr", e)
+                    }
+                }
+            }
+        }
+        return START_STICKY
+    }
+
+    private fun startRecording(sessionName: String? = null) {
+        if (_isRecording.value) return
+
+        val currentActive = SessionRepository.activeSession.value
+        val session = if (currentActive == null || !currentActive.isRecording) {
+            SessionRepository.createNewSession(
+                name = sessionName,
+                lockMode = _ratLockMode.value,
+                cadence = _measurementCadence.value
+            )
+        } else {
+            currentActive
+        }
+
+        activeSessionId = session.id
+        _isRecording.value = true
+        _samplesList.value = session.samples
+
+        val notification = buildNotification("Drive Test: ${session.name}")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+
+        locationCollector.startTracking(intervalMs = _measurementCadence.value.intervalMs)
+
+        collectionJob = serviceScope.launch {
+            var sampleId = (session.samples.maxOfOrNull { it.id } ?: 0L) + 1L
+            while (isActive) {
+                cellCollector.pollCellInfo()
+                val currentCadence = _measurementCadence.value
+                delay(currentCadence.intervalMs)
+
+                val loc = locationCollector.currentLocation.value
+                val metrics = cellCollector.currentMetrics.value
+                val lockMode = _ratLockMode.value
+
+                // Filter or evaluate based on lock mode
+                val passesFilter = when (lockMode) {
+                    RatLockMode.AUTO -> true
+                    RatLockMode.LTE_ONLY -> metrics.lte != null
+                    RatLockMode.NR_ONLY -> (metrics.nr != null || metrics.ratType == RatType.NR_NSA)
+                }
+
+                if (loc != null && passesFilter) {
+                    val sample = DriveTestSample(
+                        id = sampleId++,
+                        sessionId = activeSessionId,
+                        timestamp = System.currentTimeMillis(),
+                        latitude = loc.latitude,
+                        longitude = loc.longitude,
+                        altitude = loc.altitude,
+                        speedKmh = loc.speed * 3.6f,
+                        bearing = loc.bearing,
+                        accuracyMeters = loc.accuracy,
+                        metrics = metrics,
+                        ratLockMode = lockMode,
+                        cadence = currentCadence
+                    )
+                    _latestSample.value = sample
+                    SessionRepository.addSample(sample)
+                    val currentSamples = SessionRepository.activeSession.value?.samples ?: emptyList()
+                    _samplesList.value = currentSamples
+
+                    // Update notification
+                    val ratLabel = when {
+                        metrics.nr != null -> "5G NR (${metrics.nr.band ?: "n78"})"
+                        metrics.lte != null -> "LTE (${metrics.lte.band ?: "B3"})"
+                        else -> "Scanning"
+                    }
+                    val rsrpVal = metrics.nr?.ssRsrp ?: metrics.lte?.rsrp ?: "N/A"
+                    val content = "${session.name} | $ratLabel | $rsrpVal dBm | Pts: ${currentSamples.size}"
+                    updateNotification(content)
+                } else if (!passesFilter) {
+                    updateNotification("Searching for locked ${lockMode.name} signal...")
+                }
+            }
+        }
+    }
+
+    private fun stopRecording() {
+        collectionJob?.cancel()
+        collectionJob = null
+        locationCollector.stopTracking()
+        SessionRepository.finishCurrentSession()
+        _isRecording.value = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    override fun onDestroy() {
+        stopRecording()
+        cellCollector.stop()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Drive Test Recording Channel",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows real-time drive test signal status and recording count"
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(contentText: String): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val stopIntent = PendingIntent.getService(
+            this,
+            1,
+            Intent(this, DriveTestForegroundService::class.java).apply { action = ACTION_STOP },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("RF Drive Test — Recording")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
+            .build()
+    }
+
+    private fun updateNotification(contentText: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(NOTIFICATION_ID, buildNotification(contentText))
+    }
+
+    companion object {
+        const val TAG = "DriveTestService"
+        const val CHANNEL_ID = "drive_test_channel"
+        const val NOTIFICATION_ID = 1001
+
+        const val ACTION_START = "com.drivetest.lte5g.action.START"
+        const val ACTION_STOP = "com.drivetest.lte5g.action.STOP"
+        const val ACTION_NEW_SESSION = "com.drivetest.lte5g.action.NEW_SESSION"
+        const val ACTION_SET_RAT_LOCK = "com.drivetest.lte5g.action.SET_RAT_LOCK"
+        const val ACTION_SET_CADENCE = "com.drivetest.lte5g.action.SET_CADENCE"
+        const val EXTRA_RAT_LOCK = "EXTRA_RAT_LOCK"
+        const val EXTRA_CADENCE = "EXTRA_CADENCE"
+        const val EXTRA_SESSION_NAME = "EXTRA_SESSION_NAME"
+
+        var activeSessionId: Long = System.currentTimeMillis()
+
+        private val _isRecording = MutableStateFlow(false)
+        val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+        private val _ratLockMode = MutableStateFlow(RatLockMode.AUTO)
+        val ratLockMode: StateFlow<RatLockMode> = _ratLockMode.asStateFlow()
+
+        private val _measurementCadence = MutableStateFlow(MeasurementCadence.PRECISE)
+        val measurementCadence: StateFlow<MeasurementCadence> = _measurementCadence.asStateFlow()
+
+        private val _latestSample = MutableStateFlow<DriveTestSample?>(null)
+        val latestSample: StateFlow<DriveTestSample?> = _latestSample.asStateFlow()
+
+        private val _samplesList = MutableStateFlow<List<DriveTestSample>>(emptyList())
+        val samplesList: StateFlow<List<DriveTestSample>> = _samplesList.asStateFlow()
+
+        fun start(
+            context: Context,
+            lockMode: RatLockMode = _ratLockMode.value,
+            cadence: MeasurementCadence = _measurementCadence.value,
+            sessionName: String? = null
+        ) {
+            _measurementCadence.value = cadence
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_RAT_LOCK, lockMode.name)
+                putExtra(EXTRA_CADENCE, cadence.name)
+                if (sessionName != null) {
+                    putExtra(EXTRA_SESSION_NAME, sessionName)
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun newSession(
+            context: Context,
+            sessionName: String? = null,
+            lockMode: RatLockMode = _ratLockMode.value,
+            cadence: MeasurementCadence = _measurementCadence.value
+        ) {
+            _measurementCadence.value = cadence
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_NEW_SESSION
+                putExtra(EXTRA_RAT_LOCK, lockMode.name)
+                putExtra(EXTRA_CADENCE, cadence.name)
+                if (sessionName != null) {
+                    putExtra(EXTRA_SESSION_NAME, sessionName)
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+
+        fun setRatLock(context: Context, lockMode: RatLockMode) {
+            _ratLockMode.value = lockMode
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_SET_RAT_LOCK
+                putExtra(EXTRA_RAT_LOCK, lockMode.name)
+            }
+            context.startService(intent)
+        }
+
+        fun setMeasurementCadence(context: Context, cadence: MeasurementCadence) {
+            _measurementCadence.value = cadence
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_SET_CADENCE
+                putExtra(EXTRA_CADENCE, cadence.name)
+            }
+            context.startService(intent)
+        }
+    }
+}

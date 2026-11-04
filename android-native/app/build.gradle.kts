@@ -1,18 +1,29 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = Properties().apply {
+  val file = rootProject.file("local.properties")
+  if (file.exists()) {
+    load(file.inputStream())
+  }
+}
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: "AIzaSyAxETgdAlp82c8VtZjmFxjHP15NKGh0eUI"
+
 android {
-  namespace = "com.drivetest.rf"
+  namespace = "com.drivetest.lte5g"
   compileSdk = 37
   defaultConfig {
-    applicationId = "com.drivetest.rf"
+    applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 193
-    versionName = "1.9.3"
+    versionCode = 7
+    versionName = "1.4.1"
+    manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 
   buildTypes {
@@ -61,8 +72,6 @@ dependencies {
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
-  implementation("androidx.compose.material:material-icons-extended")
-  implementation("org.osmdroid:osmdroid-android:6.1.18")
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests
@@ -83,4 +92,10 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+
+  // Location & Google Maps
+  implementation(libs.play.services.location)
+  implementation(libs.play.services.maps)
+  implementation(libs.maps.compose)
+  implementation(libs.androidx.compose.material.icons.extended)
 }
