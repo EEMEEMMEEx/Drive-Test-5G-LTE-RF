@@ -1,18 +1,24 @@
 package com.drivetest.lte5g.ui.settings
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,9 +31,16 @@ import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
 import com.drivetest.lte5g.ui.theme.SignalTier1
+import com.drivetest.lte5g.ui.theme.SignalTier2
+import com.drivetest.lte5g.ui.theme.SignalTier4
+import com.drivetest.lte5g.ui.theme.SignalTier5
 import com.drivetest.lte5g.ui.theme.TelemetryCardBg
 import com.drivetest.lte5g.ui.theme.TelemetryCardStroke
+import com.drivetest.lte5g.ui.theme.TelemetryCyan
 import com.drivetest.lte5g.ui.theme.TelemetryDarkBg
+import com.drivetest.lte5g.updater.OtaState
+import com.drivetest.lte5g.updater.OtaUpdateManager
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -36,6 +49,29 @@ fun SettingsScreen(
     val context = LocalContext.current
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
+
+    // Read authoritative package version info dynamically (Rule 10)
+    val packageInfo = remember {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val currentVersionName = packageInfo?.versionName ?: "1.5.0"
+    val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        packageInfo?.longVersionCode?.toInt() ?: 9
+    } else {
+        @Suppress("DEPRECATION")
+        packageInfo?.versionCode ?: 9
+    }
 
     Column(
         modifier = modifier
@@ -52,7 +88,329 @@ fun SettingsScreen(
             color = Color.White
         )
 
-        // Measurement Cadence Configuration Card (feat)
+        // OTA Software Update Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color(0xFF0284C7), RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            tint = TelemetryCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "OVER-THE-AIR (OTA) UPDATES",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TelemetryCyan
+                        )
+                    }
+
+                    Surface(
+                        color = Color(0xFF0369A1),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "v$currentVersionName",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Check for latest releases directly from GitHub and install updates in-app without computer connection.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // OTA State Display
+                when (val state = otaState) {
+                    is OtaState.Idle -> {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    OtaUpdateManager.checkForUpdates(currentVersionName)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("CHECK FOR UPDATES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    is OtaState.Checking -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = TelemetryCyan,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Checking GitHub Releases...",
+                                fontSize = 12.sp,
+                                color = Color(0xFFA5F3FC)
+                            )
+                        }
+                    }
+
+                    is OtaState.UpToDate -> {
+                        Surface(
+                            color = Color(0xFF064E3B),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SignalTier2, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "App is Up to Date",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "You are on the latest release (v${state.version}).",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFA7F3D0)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    OtaUpdateManager.checkForUpdates(currentVersionName)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Check Again", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        }
+                    }
+
+                    is OtaState.UpdateAvailable -> {
+                        val release = state.releaseInfo
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, SignalTier1, RoundedCornerShape(10.dp))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "NEW VERSION AVAILABLE",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SignalTier1
+                                    )
+                                    Text(
+                                        text = "v${release.versionName}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color.White
+                                    )
+                                }
+
+                                if (release.releaseTitle.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = release.releaseTitle,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFE2E8F0)
+                                    )
+                                }
+
+                                if (release.apkSize > 0) {
+                                    Text(
+                                        text = "Download Size: ${String.format("%.1f", release.apkSize / (1024f * 1024f))} MB",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+
+                                if (release.releaseNotes.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = release.releaseNotes.take(240) + if (release.releaseNotes.length > 240) "..." else "",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFFCBD5E1),
+                                        lineHeight = 14.sp
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = {
+                                        if (!OtaUpdateManager.canRequestPackageInstalls(context)) {
+                                            OtaUpdateManager.openInstallPermissionSettings(context)
+                                        } else {
+                                            scope.launch {
+                                                val res = OtaUpdateManager.downloadApk(context, release)
+                                                res.onSuccess { apkFile ->
+                                                    OtaUpdateManager.installApk(context, apkFile)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = if (!OtaUpdateManager.canRequestPackageInstalls(context))
+                                            "ALLOW PERMISSION & DOWNLOAD"
+                                        else
+                                            "DOWNLOAD & INSTALL UPDATE",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is OtaState.Downloading -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Downloading APK update...",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFA5F3FC),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "${(state.progress * 100).toInt()}%",
+                                    fontSize = 11.sp,
+                                    color = TelemetryCyan,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { state.progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp),
+                                color = TelemetryCyan,
+                                trackColor = Color(0xFF1E293B)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${String.format("%.1f", state.downloadedBytes / (1024f * 1024f))} / ${String.format("%.1f", state.totalBytes / (1024f * 1024f))} MB",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+                    }
+
+                    is OtaState.ReadyToInstall -> {
+                        Button(
+                            onClick = {
+                                OtaUpdateManager.installApk(context, state.apkFile)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("INSTALL DOWNLOADED UPDATE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
+                        }
+                    }
+
+                    is OtaState.Error -> {
+                        Surface(
+                            color = Color(0xFF450A0A),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = SignalTier5, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Update Check Failed",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = state.message,
+                                        fontSize = 10.sp,
+                                        color = SignalTier4
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                OtaUpdateManager.resetState()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Dismiss", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Measurement Cadence Configuration Card
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -197,7 +555,7 @@ fun SettingsScreen(
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(intent)
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                             context.startActivity(intent)
                         }
@@ -234,9 +592,9 @@ fun SettingsScreen(
             }
         }
 
-        // App Info
+        // Dynamic App Info (Rule 10)
         Text(
-            text = "Drive Test LTE/5G v1.0.0 (Build 1) • Native Android Kotlin",
+            text = "Drive Test LTE/5G v$currentVersionName (Build $currentVersionCode) • Native Android Kotlin",
             fontSize = 11.sp,
             color = Color(0xFF64748B),
             modifier = Modifier.padding(top = 8.dp)
