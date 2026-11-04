@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -30,14 +31,21 @@ import java.util.Locale
  * Supports two distinct presentation styles:
  * 1. CAPSULE (Default & Recommended): Activates the Dynamic Island / Fluid Cloud capsule
  *    around the punch-hole front camera on ColorOS / OxygenOS (OnePlus, OPPO, Realme) and
- *    Android 16/17 Promoted Ongoing Notifications. Uses clean RF telemetry labels without
- *    music playback seekbars.
+ *    Android 16/17 Promoted Ongoing Notifications.
+ *    Optimized as a pure Drive Test Telemetry Instrument Panel:
+ *    - Replaces music controls (pause/skip) with CustomActions (Stop Recording / New Session).
+ *    - Suppresses audio scrubber and progress timelines (PLAYBACK_POSITION_UNKNOWN).
+ *    - Generates a multi-metric Telemetry HUD Tile (RAT, Band, RSRP, RSRQ, SINR, Speed, Points).
  * 2. COMPACT: Standard notification drawer card with multi-line BigTextStyle.
  */
 object LiveAlertNotificationHelper {
 
     const val CHANNEL_ID = "drive_test_live_capsule"
     const val NOTIFICATION_ID = 1001
+
+    // Custom Action identifiers
+    const val CUSTOM_ACTION_STOP = "STOP_RECORDING"
+    const val CUSTOM_ACTION_NEW_SESSION = "NEW_SESSION"
 
     // Android 16 (API 36) / Android 17 (API 37) Promoted Ongoing extra key
     const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
@@ -74,8 +82,11 @@ object LiveAlertNotificationHelper {
                 override fun onPause() {
                     onStop()
                 }
-                override fun onSkipToNext() {
-                    onNewSession()
+                override fun onCustomAction(action: String?, extras: Bundle?) {
+                    when (action) {
+                        CUSTOM_ACTION_STOP, "ACTION_STOP" -> onStop()
+                        CUSTOM_ACTION_NEW_SESSION, "ACTION_NEW_SESSION" -> onNewSession()
+                    }
                 }
             })
             isActive = true
@@ -102,12 +113,24 @@ object LiveAlertNotificationHelper {
             } else {
                 PlaybackStateCompat.STATE_STOPPED
             }
+
+            val stopCustomAction = PlaybackStateCompat.CustomAction.Builder(
+                CUSTOM_ACTION_STOP,
+                "Stop Recording",
+                android.R.drawable.ic_menu_close_clear_cancel
+            ).build()
+
+            val newSessionCustomAction = PlaybackStateCompat.CustomAction.Builder(
+                CUSTOM_ACTION_NEW_SESSION,
+                "New Session",
+                android.R.drawable.ic_popup_sync
+            ).build()
+
+            // OMIT ACTION_PAUSE and ACTION_SKIP_TO_NEXT so SystemUI doesn't render music player buttons
             val playbackState = PlaybackStateCompat.Builder()
-                .setActions(
-                    PlaybackStateCompat.ACTION_STOP or
-                    PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                )
+                .setActions(PlaybackStateCompat.ACTION_STOP)
+                .addCustomAction(stopCustomAction)
+                .addCustomAction(newSessionCustomAction)
                 // PLAYBACK_POSITION_UNKNOWN (-1L) suppresses the audio seek bar!
                 .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, if (isRecording) 1.0f else 0.0f)
                 .build()
@@ -119,12 +142,10 @@ object LiveAlertNotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)
 
-            // Delete legacy low-importance channel to remove cached restrictions
             try {
                 manager?.deleteNotificationChannel("drive_test_channel")
             } catch (_: Exception) {}
 
-            // High importance is required for Dynamic Island / Fluid Cloud capsule around the camera
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Drive Test Live Alerts (Capsule)",
@@ -133,7 +154,7 @@ object LiveAlertNotificationHelper {
                 description = "Live dynamic capsule around camera cutout and real-time recording controls"
                 setShowBadge(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setSound(null, null) // Silent so it does not buzz every cadence cycle
+                setSound(null, null)
                 enableVibration(false)
             }
             manager?.createNotificationChannel(channel)
@@ -212,10 +233,19 @@ object LiveAlertNotificationHelper {
     }
 
     /**
-     * Dynamically generates a high-definition 256x256 square "Signal Badge" bitmap,
-     * rendering the RAT, RSRP value, and animated signal bars in the tier color.
+     * Dynamically generates a high-density 256x256 square "Drive Test Telemetry HUD Tile" bitmap,
+     * rendering the full RF telemetry matrix:
+     * - Top Header: Cellular RAT and Carrier Band
+     * - Center: Prominent RSRP value in neon tier color with dBm unit and quality label
+     * - Middle Grid: Secondary RF metrics (RSRQ & SINR) in 2-column layout
+     * - Bottom Row: Speed km/h, points count, and illuminated 5-tier signal bars.
      */
-    fun generateSignalArtwork(metrics: CellMetrics?, tierColor: Int): Bitmap? {
+    fun generateSignalArtwork(
+        metrics: CellMetrics?,
+        tierColor: Int,
+        speedKmh: Float? = null,
+        sampleCount: Int = 0
+    ): Bitmap? {
         return try {
             val size = 256
             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -223,56 +253,113 @@ object LiveAlertNotificationHelper {
 
             // 1. Dark sleek background with rounded corners
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF121620.toInt()
+                color = 0xFF0B1120.toInt()
                 style = Paint.Style.FILL
             }
             val rect = RectF(0f, 0f, size.toFloat(), size.toFloat())
-            canvas.drawRoundRect(rect, 32f, 32f, bgPaint)
+            canvas.drawRoundRect(rect, 28f, 28f, bgPaint)
 
             // 2. Subtle glowing border in signal tier color
             val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = tierColor
-                alpha = 90
+                alpha = 110
                 style = Paint.Style.STROKE
-                strokeWidth = 4f
+                strokeWidth = 3f
             }
-            canvas.drawRoundRect(rect, 32f, 32f, borderPaint)
+            canvas.drawRoundRect(rect, 28f, 28f, borderPaint)
 
-            // 3. RAT Header Label
+            // 3. Top Header Strip (Pill)
+            val headerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF1E293B.toInt()
+                style = Paint.Style.FILL
+            }
+            val headerRect = RectF(14f, 12f, (size - 14).toFloat(), 44f)
+            canvas.drawRoundRect(headerRect, 8f, 8f, headerBgPaint)
+
+            val ratText = formatRatLabel(metrics)
             val ratPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF94A3B8.toInt()
-                textSize = 28f
+                color = 0xFF38BDF8.toInt() // Sky Blue
+                textSize = 19f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
-            val ratText = when (metrics?.ratType) {
-                RatType.NR_NSA -> "5G NSA"
-                RatType.NR_SA -> "5G SA"
-                RatType.LTE -> "LTE 4G"
-                else -> "CELLULAR"
-            }
-            canvas.drawText(ratText, size / 2f, 62f, ratPaint)
+            canvas.drawText(ratText, size / 2f, 35f, ratPaint)
 
-            // 4. Large RSRP value in tier color
+            // 4. Center RSRP Metrics
             val rsrp = getRsrp(metrics)
+            val rsrpText = if (rsrp != null) "$rsrp" else "--"
             val rsrpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = tierColor
-                textSize = 62f
+                textSize = 52f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
-            val rsrpText = if (rsrp != null) "$rsrp" else "--"
-            canvas.drawText(rsrpText, size / 2f, 134f, rsrpPaint)
+            canvas.drawText(rsrpText, (size / 2f) - 18f, 96f, rsrpPaint)
 
             val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF64748B.toInt()
-                textSize = 24f
+                color = 0xFF94A3B8.toInt()
+                textSize = 20f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText("dBm", (size / 2f) + 38f, 96f, unitPaint)
+
+            val qualityLabel = getRsrpQualityLabel(rsrp).uppercase(Locale.US)
+            val qualityPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = tierColor
+                textSize = 15f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
-            canvas.drawText("dBm", size / 2f, 168f, unitPaint)
+            canvas.drawText(qualityLabel, size / 2f, 120f, qualityPaint)
 
-            // 5. 5-Tier Signal Bars at the bottom
+            // 5. Secondary 2-Column Telemetry Grid (RSRQ & SINR)
+            val rsrq = metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq
+            val sinr = metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr
+
+            val subLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF64748B.toInt()
+                textSize = 13f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+
+            val subValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFE2E8F0.toInt()
+                textSize = 16f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+
+            // Left Column: RSRQ
+            val leftColX = 70f
+            canvas.drawText("RSRQ", leftColX, 148f, subLabelPaint)
+            val rsrqStr = if (rsrq != null) "$rsrq dB" else "--"
+            canvas.drawText(rsrqStr, leftColX, 170f, subValPaint)
+
+            // Right Column: SINR
+            val rightColX = 186f
+            canvas.drawText("SINR", rightColX, 148f, subLabelPaint)
+            val sinrStr = if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--"
+            canvas.drawText(sinrStr, rightColX, 170f, subValPaint)
+
+            // Vertical Column Divider
+            val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF334155.toInt()
+                strokeWidth = 1.5f
+            }
+            canvas.drawLine(128f, 138f, 128f, 176f, divPaint)
+
+            // 6. Bottom Row: Stats & 5-Tier Signal Bars
+            val speedFormatted = formatSpeed(speedKmh)
+            val statsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFF94A3B8.toInt()
+                textSize = 13.5f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("$speedFormatted • $sampleCount pts", size / 2f, 204f, statsPaint)
+
             val barCount = 5
             val activeBars = when {
                 rsrp == null -> 0
@@ -286,12 +373,12 @@ object LiveAlertNotificationHelper {
             val barSpacing = 10f
             val totalWidth = barCount * barWidth + (barCount - 1) * barSpacing
             var startX = (size - totalWidth) / 2f
-            val baseY = 224f
+            val baseY = 240f
 
             for (i in 1..barCount) {
-                val barHeight = 12f + (i * 5f)
+                val barHeight = 10f + (i * 4.5f)
                 val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = if (i <= activeBars) tierColor else 0xFF2D3748.toInt()
+                    color = if (i <= activeBars) tierColor else 0xFF243046.toInt()
                     style = Paint.Style.FILL
                 }
                 val barRect = RectF(startX, baseY - barHeight, startX + barWidth, baseY)
@@ -324,7 +411,7 @@ object LiveAlertNotificationHelper {
         val ratLabel = formatRatLabel(metrics)
         val speedStr = formatSpeed(speedKmh)
         val elapsedStr = formatElapsedTime(startTimeMillis)
-        val artworkBitmap = generateSignalArtwork(metrics, tierColor)
+        val artworkBitmap = generateSignalArtwork(metrics, tierColor, speedKmh, sampleCount)
 
         // Pending Intents for Navigation & Action Controls
         val pendingIntent = PendingIntent.getActivity(
@@ -364,14 +451,23 @@ object LiveAlertNotificationHelper {
                 DriveTestForegroundService.newSession(context)
             })
 
-            // Set PlaybackState to PLAYING with PLAYBACK_POSITION_UNKNOWN (-1L)
-            // This prevents Android SystemUI from rendering an audio scrubber timeline!
+            val stopCustomAction = PlaybackStateCompat.CustomAction.Builder(
+                CUSTOM_ACTION_STOP,
+                "Stop Recording",
+                android.R.drawable.ic_menu_close_clear_cancel
+            ).build()
+
+            val newSessionCustomAction = PlaybackStateCompat.CustomAction.Builder(
+                CUSTOM_ACTION_NEW_SESSION,
+                "New Session",
+                android.R.drawable.ic_popup_sync
+            ).build()
+
+            // OMIT ACTION_PAUSE and ACTION_SKIP_TO_NEXT so SystemUI doesn't render music player buttons
             val playbackState = PlaybackStateCompat.Builder()
-                .setActions(
-                    PlaybackStateCompat.ACTION_STOP or
-                    PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-                )
+                .setActions(PlaybackStateCompat.ACTION_STOP)
+                .addCustomAction(stopCustomAction)
+                .addCustomAction(newSessionCustomAction)
                 .setState(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
                 .build()
             session.setPlaybackState(playbackState)
@@ -414,7 +510,7 @@ object LiveAlertNotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setContentIntent(pendingIntent)
                 // Utility action buttons (Stop Recording / New Session)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopIntent)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
                 .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
 
             if (artworkBitmap != null) {
