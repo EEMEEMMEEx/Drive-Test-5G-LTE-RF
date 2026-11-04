@@ -87,7 +87,9 @@ object SessionRepository {
     fun createNewSession(
         name: String? = null,
         lockMode: RatLockMode = RatLockMode.AUTO,
-        cadence: MeasurementCadence = MeasurementCadence.PRECISE
+        cadence: MeasurementCadence = MeasurementCadence.PRECISE,
+        simSlot: Int = 0,
+        simDisplayName: String? = null
     ): DriveTestSession {
         // If there's an ongoing active recording session, finish it first
         if (_activeSession.value?.isRecording == true) {
@@ -112,7 +114,9 @@ object SessionRepository {
             avgRsrq = null,
             avgSinr = null,
             isRecording = true,
-            samples = emptyList()
+            samples = emptyList(),
+            simSlot = simSlot,
+            simDisplayName = simDisplayName
         )
 
         _activeSession.value = newSession
@@ -286,6 +290,8 @@ object SessionRepository {
         obj.put("avgRsrq", session.avgRsrq ?: JSONObject.NULL)
         obj.put("avgSinr", session.avgSinr ?: JSONObject.NULL)
         obj.put("isRecording", session.isRecording)
+        obj.put("simSlot", session.simSlot)
+        obj.put("simDisplayName", session.simDisplayName ?: JSONObject.NULL)
 
         val samplesArray = JSONArray()
         session.samples.forEach { s ->
@@ -301,6 +307,8 @@ object SessionRepository {
             sObj.put("accuracyMeters", s.accuracyMeters.toDouble())
             sObj.put("ratLockMode", s.ratLockMode.name)
             sObj.put("cadence", s.cadence.name)
+            sObj.put("simSlot", s.simSlot)
+            sObj.put("simDisplayName", s.simDisplayName ?: JSONObject.NULL)
 
             // Metrics
             val m = s.metrics
@@ -308,6 +316,8 @@ object SessionRepository {
             mObj.put("ratType", m.ratType.name)
             mObj.put("plmn", m.plmn ?: JSONObject.NULL)
             mObj.put("operatorAlpha", m.operatorAlpha ?: JSONObject.NULL)
+            mObj.put("selectedSimSlot", m.selectedSimSlot)
+            mObj.put("simDisplayName", m.simDisplayName ?: JSONObject.NULL)
 
             m.lte?.let { lte ->
                 val lObj = JSONObject()
@@ -457,7 +467,9 @@ object SessionRepository {
                     operatorAlpha = if (mObj?.isNull("operatorAlpha") != false) null else mObj.optString("operatorAlpha"),
                     lte = lteMetrics,
                     nr = nrMetrics,
-                    neighbors = neighbors
+                    neighbors = neighbors,
+                    selectedSimSlot = mObj?.optInt("selectedSimSlot", 0) ?: 0,
+                    simDisplayName = if (mObj?.isNull("simDisplayName") != false) null else mObj.optString("simDisplayName")
                 )
 
                 samplesList.add(
@@ -481,11 +493,16 @@ object SessionRepository {
                             MeasurementCadence.valueOf(sObj.optString("cadence", MeasurementCadence.PRECISE.name))
                         } catch (_: Exception) {
                             MeasurementCadence.PRECISE
-                        }
+                        },
+                        simSlot = sObj.optInt("simSlot", 0),
+                        simDisplayName = if (sObj.isNull("simDisplayName")) null else sObj.optString("simDisplayName")
                     )
                 )
             }
         }
+
+        val simSlot = obj.optInt("simSlot", 0)
+        val simDisplayName = if (obj.isNull("simDisplayName")) null else obj.optString("simDisplayName")
 
         return DriveTestSession(
             id = id,
@@ -500,7 +517,9 @@ object SessionRepository {
             avgRsrq = avgRsrq,
             avgSinr = avgSinr,
             isRecording = isRecording,
-            samples = samplesList
+            samples = samplesList,
+            simSlot = simSlot,
+            simDisplayName = simDisplayName
         )
     }
 }

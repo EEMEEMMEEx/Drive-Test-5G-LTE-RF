@@ -12,6 +12,7 @@ import android.telephony.CellInfoNr
 import android.telephony.CellSignalStrengthLte
 import android.telephony.CellSignalStrengthNr
 import android.telephony.PhoneStateListener
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
@@ -22,6 +23,7 @@ import com.drivetest.lte5g.model.NeighborCell
 import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
+import com.drivetest.lte5g.model.SimSlotInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,17 +31,36 @@ import java.util.concurrent.Executors
 
 class CellCollector(private val context: Context) {
 
-    private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+    private val baseTelephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+    private var activeTelephonyManager: TelephonyManager = baseTelephonyManager
     private val executor = Executors.newSingleThreadExecutor()
 
     private val _currentMetrics = MutableStateFlow(CellMetrics())
     val currentMetrics: StateFlow<CellMetrics> = _currentMetrics.asStateFlow()
+
+    var currentSlotIndex: Int = 0
+        private set
+    var currentSubId: Int? = null
+        private set
+    var currentSimName: String? = null
+        private set
 
     private var isNsaOverride = false
     private var callback31: Any? = null
     private var legacyListener: PhoneStateListener? = null
 
     init {
+        // Initialize with default subscription if available
+        val subs = getActiveSubscriptions(context)
+        val defaultSub = subs.firstOrNull { it.isDefault } ?: subs.firstOrNull()
+        if (defaultSub != null) {
+            currentSlotIndex = defaultSub.slotIndex
+            currentSubId = defaultSub.subscriptionId
+            currentSimName = defaultSub.displayName
+            if (defaultSub.subscriptionId != -1) {
+                activeTelephonyManager = baseTelephonyManager.createForSubscriptionId(defaultSub.subscriptionId)
+            }
+        }
         registerTelephonyListeners()
     }
 
@@ -54,6 +75,27 @@ class CellCollector(private val context: Context) {
     private fun sanitizeDouble(value: Int): Double? {
         val sanitized = sanitizeInt(value) ?: return null
         return sanitized.toDouble()
+    }
+
+    fun switchSim(slotIndex: Int, subId: Int?, simName: String? = null) {
+        if (slotIndex == currentSlotIndex && subId == currentSubId && activeTelephonyManager != baseTelephonyManager) {
+            return
+        }
+        Log.d("CellCollector", "Switching SIM slot to $slotIndex (subId=$subId, name=$simName)")
+        unregisterTelephonyListeners()
+
+        currentSlotIndex = slotIndex
+        currentSubId = subId
+        currentSimName = simName
+
+        activeTelephonyManager = if (subId != null && subId != -1) {
+            baseTelephonyManager.createForSubscriptionId(subId)
+        } else {
+            baseTelephonyManager
+        }
+
+        registerTelephonyListeners()
+        pollCellInfo()
     }
 
     @SuppressLint("MissingPermission")
@@ -77,9 +119,9 @@ class CellCollector(private val context: Context) {
             }
             callback31 = cb
             try {
-                telephonyManager.registerTelephonyCallback(executor, cb)
+                activeTelephonyManager.registerTelephonyCallback(executor, cb)
             } catch (e: Exception) {
-                Log.e("CellCollector", "Error registering TelephonyCallback", e)
+                Log.e("CellCollector", "Error registering TelephonyCallback on slot $currentSlotIndex", e)
             }
         } else {
             val listener = object : PhoneStateListener() {
@@ -101,17 +143,32 @@ class CellCollector(private val context: Context) {
             legacyListener = listener
             @Suppress("DEPRECATION")
             try {
-                telephonyManager.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
+                activeTelephonyManager.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
             } catch (e: Exception) {
-                Log.e("CellCollector", "Error registering PhoneStateListener", e)
+                Log.e("CellCollector", "Error registering PhoneStateListener on slot $currentSlotIndex", e)
             }
+        }
+    }
+
+    private fun unregisterTelephonyListeners() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callback31 != null) {
+                activeTelephonyManager.unregisterTelephonyCallback(callback31 as TelephonyCallback)
+                callback31 = null
+            } else if (legacyListener != null) {
+                @Suppress("DEPRECATION")
+                activeTelephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_NONE)
+                legacyListener = null
+            }
+        } catch (e: Exception) {
+            Log.e("CellCollector", "Error unregistering telephony listeners", e)
         }
     }
 
     @SuppressLint("MissingPermission")
     fun pollCellInfo() {
         try {
-            telephonyManager.requestCellInfoUpdate(executor, object : TelephonyManager.CellInfoCallback() {
+            activeTelephonyManager.requestCellInfoUpdate(executor, object : TelephonyManager.CellInfoCallback() {
                 override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
                     processCellInfoList(cellInfo)
                 }
@@ -120,7 +177,7 @@ class CellCollector(private val context: Context) {
                     Log.w("CellCollector", "requestCellInfoUpdate error code: $errorCode", detail)
                     // Fallback to cached cell info if update is throttled
                     try {
-                        val cached = telephonyManager.allCellInfo
+                        val cached = activeTelephonyManager.allCellInfo
                         if (!cached.isNullOrEmpty()) {
                             processCellInfoList(cached)
                         }
@@ -140,8 +197,8 @@ class CellCollector(private val context: Context) {
         var servingLte: LteMetrics? = null
         var servingNr: NrMetrics? = null
         val neighbors = mutableListOf<NeighborCell>()
-        var plmn: String? = telephonyManager.networkOperator
-        val operatorAlpha = telephonyManager.networkOperatorName
+        var plmn: String? = activeTelephonyManager.networkOperator.takeIf { it.isNotBlank() }
+        val operatorAlpha = activeTelephonyManager.networkOperatorName.takeIf { it.isNotBlank() }
 
         for (info in cells) {
             if (info is CellInfoLte) {
@@ -158,7 +215,11 @@ class CellCollector(private val context: Context) {
                 val cqi = sanitizeInt(ss.cqi)
 
                 if (plmn.isNullOrBlank()) {
-                    plmn = "${id.mccString ?: ""}-${id.mncString ?: ""}"
+                    val mcc = id.mccString ?: ""
+                    val mnc = id.mncString ?: ""
+                    if (mcc.isNotBlank() || mnc.isNotBlank()) {
+                        plmn = "$mcc-$mnc"
+                    }
                 }
 
                 if (info.isRegistered) {
@@ -202,7 +263,11 @@ class CellCollector(private val context: Context) {
                     val csiSinr = sanitizeDouble(ss.csiSinr)
 
                     if (plmn.isNullOrBlank()) {
-                        plmn = "${id.mccString ?: ""}-${id.mncString ?: ""}"
+                        val mcc = id.mccString ?: ""
+                        val mnc = id.mncString ?: ""
+                        if (mcc.isNotBlank() || mnc.isNotBlank()) {
+                            plmn = "$mcc-$mnc"
+                        }
                     }
 
                     if (info.isRegistered) {
@@ -250,25 +315,59 @@ class CellCollector(private val context: Context) {
             operatorAlpha = operatorAlpha,
             lte = servingLte,
             nr = servingNr,
-            neighbors = neighbors
+            neighbors = neighbors,
+            selectedSimSlot = currentSlotIndex,
+            simDisplayName = currentSimName
         )
     }
 
     fun stop() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callback31 != null) {
-                telephonyManager.unregisterTelephonyCallback(callback31 as TelephonyCallback)
-            } else if (legacyListener != null) {
-                @Suppress("DEPRECATION")
-                telephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_NONE)
-            }
-        } catch (e: Exception) {
-            Log.e("CellCollector", "Error stopping telephony listeners", e)
-        }
+        unregisterTelephonyListeners()
         executor.shutdown()
     }
 
     companion object {
+        @SuppressLint("MissingPermission")
+        fun getActiveSubscriptions(context: Context): List<SimSlotInfo> {
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                ?: return listOf(SimSlotInfo(0, -1, "SIM 1", "", isDefault = true))
+            return try {
+                val list = subManager.activeSubscriptionInfoList
+                if (list.isNullOrEmpty()) {
+                    listOf(SimSlotInfo(0, -1, "SIM 1", "", isDefault = true))
+                } else {
+                    val defaultSubId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        SubscriptionManager.getDefaultDataSubscriptionId()
+                    } else {
+                        -1
+                    }
+                    list.map { subInfo ->
+                        val carrier = subInfo.carrierName?.toString()?.trim() ?: ""
+                        val display = subInfo.displayName?.toString()?.trim() ?: ""
+                        val name = if (carrier.isNotBlank() && display.isNotBlank() && carrier != display) {
+                            "SIM ${subInfo.simSlotIndex + 1}: $carrier ($display)"
+                        } else if (carrier.isNotBlank()) {
+                            "SIM ${subInfo.simSlotIndex + 1}: $carrier"
+                        } else if (display.isNotBlank()) {
+                            "SIM ${subInfo.simSlotIndex + 1}: $display"
+                        } else {
+                            "SIM ${subInfo.simSlotIndex + 1}"
+                        }
+                        SimSlotInfo(
+                            slotIndex = subInfo.simSlotIndex,
+                            subscriptionId = subInfo.subscriptionId,
+                            displayName = name,
+                            carrierName = carrier,
+                            isDefault = (subInfo.subscriptionId == defaultSubId)
+                        )
+                    }.sortedBy { it.slotIndex }
+                }
+            } catch (e: Exception) {
+                Log.e("CellCollector", "Failed getting subscriptions", e)
+                listOf(SimSlotInfo(0, -1, "SIM 1", "", isDefault = true))
+            }
+        }
+
         /**
          * Launch Android RadioInfo engineering mode (*#*#4636#*#*)
          * Allows selecting "LTE only" or "NR only" directly in the modem baseband
