@@ -30,9 +30,9 @@ enum class LiveAlertStyle(
     val fullDesc: String
 ) {
     CAPSULE(
-        label = "Dynamic Island / Fluid Cloud",
-        shortDesc = "เปิดแคปซูลรอบกล้องหน้า (แนะนำ)",
-        fullDesc = "แสดงแคปซูลสดรอบรูกล้องหน้าแบบเรียลไทม์ พร้อมข้อมูลระดับสัญญาณและปุ่มควบคุม Drive Test"
+        label = "Navigation Live Updates",
+        shortDesc = "Google Maps Style (แนะนำ)",
+        fullDesc = "แสดงแคปซูลสดรอบรูกล้องหน้าแบบ Real-time ไร้ปุ่มเพลง ไร้หูฟัง ไร้หลอดเวลา"
     ),
     COMPACT(
         label = "Standard Notification",
