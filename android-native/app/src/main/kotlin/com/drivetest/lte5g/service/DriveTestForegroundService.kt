@@ -10,7 +10,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
@@ -23,7 +22,6 @@ import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import com.drivetest.lte5g.model.SimSlotInfo
-import com.drivetest.lte5g.overlay.DynamicIslandOverlayService
 import com.drivetest.lte5g.telephony.CellCollector
 import com.drivetest.lte5g.telephony.RatLockCapability
 import com.drivetest.lte5g.telephony.RatLockManager
@@ -248,10 +246,6 @@ class DriveTestForegroundService : Service() {
 
         locationCollector.startTracking(intervalMs = _measurementCadence.value.intervalMs)
 
-        if (DynamicIslandOverlayService.isOverlayEnabled(this) && Settings.canDrawOverlays(this)) {
-            DynamicIslandOverlayService.start(this)
-        }
-
         collectionJob = serviceScope.launch {
             var sampleId = (session.samples.maxOfOrNull { it.id } ?: 0L) + 1L
             while (isActive) {
@@ -303,7 +297,6 @@ class DriveTestForegroundService : Service() {
     }
 
     private fun stopRecording() {
-        DynamicIslandOverlayService.stop(this)
         collectionJob?.cancel()
         collectionJob = null
         locationCollector.stopTracking()
@@ -317,7 +310,6 @@ class DriveTestForegroundService : Service() {
 
     override fun onDestroy() {
         stopRecording()
-        DynamicIslandOverlayService.stop(this)
         LiveAlertNotificationHelper.releaseMediaSession()
         cellCollector.stop()
         super.onDestroy()
