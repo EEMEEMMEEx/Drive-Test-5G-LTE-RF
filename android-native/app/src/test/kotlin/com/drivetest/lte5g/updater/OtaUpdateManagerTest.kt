@@ -1,10 +1,12 @@
 package com.drivetest.lte5g.updater
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class OtaUpdateManagerTest {
 
@@ -87,5 +89,14 @@ class OtaUpdateManagerTest {
 
         val release = OtaUpdateManager.parseReleaseJson(sampleJson)
         assertNull(release)
+    }
+
+    @Test
+    fun testExtractCertInfo_dummyData() {
+        val dummyBytes = byteArrayOf(1, 2, 3, 4, 5)
+        val (subject, fingerprint) = OtaUpdateManager.extractCertInfo(dummyBytes)
+        assertNotNull(subject)
+        assertTrue(fingerprint.isNotEmpty())
+        assertTrue(fingerprint.contains(":"))
     }
 }

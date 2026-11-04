@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,19 @@ fun SettingsScreen(
     val context = LocalContext.current
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                OtaUpdateManager.revalidate(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val scope = rememberCoroutineScope()
     val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
 
@@ -65,12 +79,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.7.1"
+    val currentVersionName = packageInfo?.versionName ?: "1.8.0"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 12
+        packageInfo?.longVersionCode?.toInt() ?: 13
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 12
+        packageInfo?.versionCode ?: 13
     }
 
     Column(
@@ -356,15 +370,162 @@ fun SettingsScreen(
                     }
 
                     is OtaState.ReadyToInstall -> {
-                        Button(
-                            onClick = {
-                                OtaUpdateManager.installApk(context, state.apkFile)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("INSTALL DOWNLOADED UPDATE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
+                        if (!state.validation.isValid) {
+                            Surface(
+                                color = Color(0xFF450A0A),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color(0xFFDC2626)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = state.validation.errorMessage ?: "ตรวจสอบการติดตั้งไม่ผ่าน",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.5.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                    if (!state.validation.errorDetails.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = state.validation.errorDetails,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFFFCA5A5),
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                    if (state.validation.isSignatureMismatch) {
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Surface(
+                                            color = Color(0xFF1E293B),
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                Text(
+                                                    text = "💡 คำแนะนำในการอัปเดต:",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.5.sp,
+                                                    color = TelemetryCyan
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "เนื่องจากแอปเดิมและไฟล์ใหม่ลงนามด้วย Keystore ต่างกัน เพื่อความปลอดภัยของระบบ Android ให้ถอนการติดตั้ง (Uninstall) แอปเดิมออกก่อน 1 ครั้ง จากนั้นกดเปิดไฟล์ APK นี้เพื่อติดตั้งใหม่ทันที",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFFCBD5E1),
+                                                    lineHeight = 15.sp
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    OtaUpdateManager.shareApkFile(context, state.apkFile)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = TelemetryCyan),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("เปิด / ส่งต่อไฟล์ APK", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                            }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    OtaUpdateManager.resetState()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("ยกเลิก", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                            }
+                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        OutlinedButton(
+                                            onClick = {
+                                                OtaUpdateManager.resetState()
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("ลบไฟล์และดาวน์โหลดใหม่", fontSize = 11.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (!state.validation.canInstallPackages) {
+                            Surface(
+                                color = Color(0xFF451A03),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color(0xFFD97706)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "ต้องเปิดสิทธิ์ 'ติดตั้งแอปที่ไม่รู้จัก'",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.5.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Android กำหนดให้แอปต้องได้รับอนุญาตสิทธิ์ก่อนเรียก Package Installer เพื่อติดตั้งไฟล์อัปเดต",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFFDE68A),
+                                        lineHeight = 15.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = {
+                                            OtaUpdateManager.openInstallPermissionSettings(context)
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("เปิดการตั้งค่าเพื่ออนุญาตสิทธิ์ ↗", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        OtaUpdateManager.installApk(context, state.apkFile)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("INSTALL DOWNLOADED UPDATE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
+                                }
+                                Surface(
+                                    color = Color(0xFF064E3B).copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "✓ ตรวจสอบไฟล์สมบูรณ์ & Keystore ตรงกัน พร้อมติดตั้งทันที",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF6EE7B7)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
