@@ -22,6 +22,10 @@ import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import com.drivetest.lte5g.model.SimSlotInfo
 import com.drivetest.lte5g.telephony.CellCollector
+import com.drivetest.lte5g.telephony.RatLockCapability
+import com.drivetest.lte5g.telephony.RatLockManager
+import com.drivetest.lte5g.telephony.RatLockStatus
+import com.drivetest.lte5g.telephony.RatLockType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,10 +51,23 @@ class DriveTestForegroundService : Service() {
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
         refreshAvailableSims(this)
+        _ratLockCapability.value = RatLockManager.checkCapability(this)
+        _ratLockStatus.value = RatLockManager.evaluateLockStatus(
+            targetMode = _ratLockMode.value,
+            lockType = _ratLockType.value,
+            capability = _ratLockCapability.value,
+            connectedRat = RatType.UNKNOWN
+        )
 
         serviceScope.launch {
             cellCollector.currentMetrics.collect { m ->
                 _liveMetrics.value = m
+                _ratLockStatus.value = RatLockManager.evaluateLockStatus(
+                    targetMode = _ratLockMode.value,
+                    lockType = _ratLockType.value,
+                    capability = _ratLockCapability.value,
+                    connectedRat = m.ratType
+                )
             }
         }
     }
@@ -100,9 +117,33 @@ class DriveTestForegroundService : Service() {
             }
             ACTION_SET_RAT_LOCK -> {
                 val lockModeStr = intent.getStringExtra(EXTRA_RAT_LOCK)
+                val lockTypeStr = intent.getStringExtra(EXTRA_LOCK_TYPE)
                 if (lockModeStr != null) {
                     try {
-                        _ratLockMode.value = RatLockMode.valueOf(lockModeStr)
+                        val newMode = RatLockMode.valueOf(lockModeStr)
+                        val newType = if (lockTypeStr != null) {
+                            try { RatLockType.valueOf(lockTypeStr) } catch (_: Exception) { RatLockType.SOFTWARE_FILTER }
+                        } else {
+                            if (newMode == RatLockMode.AUTO) RatLockType.AUTO else _ratLockType.value
+                        }
+                        _ratLockMode.value = newMode
+                        _ratLockType.value = newType
+
+                        if (newType == RatLockType.HARDWARE_BASEBAND) {
+                            val res = RatLockManager.tryDirectModemLock(this, newMode, cellCollector.currentSubId)
+                            if (res.isFailure) {
+                                Log.w(TAG, "Hardware modem lock direct call rejected: ${res.exceptionOrNull()?.message}")
+                                _ratLockType.value = RatLockType.SOFTWARE_FILTER
+                            }
+                        }
+
+                        val curRat = cellCollector.currentMetrics.value.ratType
+                        _ratLockStatus.value = RatLockManager.evaluateLockStatus(
+                            targetMode = newMode,
+                            lockType = _ratLockType.value,
+                            capability = _ratLockCapability.value,
+                            connectedRat = curRat
+                        )
                     } catch (e: Exception) {
                         Log.e(TAG, "Invalid lock mode string: $lockModeStr", e)
                     }
@@ -307,6 +348,7 @@ class DriveTestForegroundService : Service() {
         const val ACTION_SET_SIM_SLOT = "com.drivetest.lte5g.action.SET_SIM_SLOT"
 
         const val EXTRA_RAT_LOCK = "EXTRA_RAT_LOCK"
+        const val EXTRA_LOCK_TYPE = "EXTRA_LOCK_TYPE"
         const val EXTRA_CADENCE = "EXTRA_CADENCE"
         const val EXTRA_SESSION_NAME = "EXTRA_SESSION_NAME"
         const val EXTRA_SIM_SLOT = "EXTRA_SIM_SLOT"
@@ -320,6 +362,15 @@ class DriveTestForegroundService : Service() {
 
         private val _ratLockMode = MutableStateFlow(RatLockMode.AUTO)
         val ratLockMode: StateFlow<RatLockMode> = _ratLockMode.asStateFlow()
+
+        private val _ratLockType = MutableStateFlow(RatLockType.AUTO)
+        val ratLockType: StateFlow<RatLockType> = _ratLockType.asStateFlow()
+
+        private val _ratLockCapability = MutableStateFlow(RatLockCapability.RESTRICTED_RADIO_INFO_AVAILABLE)
+        val ratLockCapability: StateFlow<RatLockCapability> = _ratLockCapability.asStateFlow()
+
+        private val _ratLockStatus = MutableStateFlow(RatLockStatus())
+        val ratLockStatus: StateFlow<RatLockStatus> = _ratLockStatus.asStateFlow()
 
         private val _measurementCadence = MutableStateFlow(MeasurementCadence.PRECISE)
         val measurementCadence: StateFlow<MeasurementCadence> = _measurementCadence.asStateFlow()
@@ -390,13 +441,41 @@ class DriveTestForegroundService : Service() {
             context.startService(intent)
         }
 
-        fun setRatLock(context: Context, lockMode: RatLockMode) {
+        fun setRatLock(
+            context: Context,
+            lockMode: RatLockMode,
+            lockType: RatLockType = if (lockMode == RatLockMode.AUTO) RatLockType.AUTO else RatLockType.SOFTWARE_FILTER
+        ) {
             _ratLockMode.value = lockMode
+            _ratLockType.value = lockType
             val intent = Intent(context, DriveTestForegroundService::class.java).apply {
                 action = ACTION_SET_RAT_LOCK
                 putExtra(EXTRA_RAT_LOCK, lockMode.name)
+                putExtra(EXTRA_LOCK_TYPE, lockType.name)
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start service for setRatLock", e)
+            }
+            val curMetrics = _liveMetrics.value
+            _ratLockStatus.value = RatLockManager.evaluateLockStatus(
+                targetMode = lockMode,
+                lockType = lockType,
+                capability = _ratLockCapability.value,
+                connectedRat = curMetrics?.ratType ?: RatType.UNKNOWN
+            )
+        }
+
+        fun refreshRatLockCapability(context: Context) {
+            _ratLockCapability.value = RatLockManager.checkCapability(context)
+            val curMetrics = _liveMetrics.value
+            _ratLockStatus.value = RatLockManager.evaluateLockStatus(
+                targetMode = _ratLockMode.value,
+                lockType = _ratLockType.value,
+                capability = _ratLockCapability.value,
+                connectedRat = curMetrics?.ratType ?: RatType.UNKNOWN
+            )
         }
 
         fun setMeasurementCadence(context: Context, cadence: MeasurementCadence) {

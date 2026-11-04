@@ -44,6 +44,10 @@ import com.drivetest.lte5g.model.RatType
 import com.drivetest.lte5g.model.SimSlotInfo
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
+import com.drivetest.lte5g.telephony.RatLockCapability
+import com.drivetest.lte5g.telephony.RatLockManager
+import com.drivetest.lte5g.telephony.RatLockStatus
+import com.drivetest.lte5g.telephony.RatLockType
 import com.drivetest.lte5g.ui.theme.*
 
 @Composable
@@ -60,8 +64,15 @@ fun DashboardScreen(
     val selectedSimSlot by DriveTestForegroundService.selectedSimSlot.collectAsStateWithLifecycle()
     val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val liveMetrics by DriveTestForegroundService.liveMetrics.collectAsStateWithLifecycle()
+    val ratLockType by DriveTestForegroundService.ratLockType.collectAsStateWithLifecycle()
+    val ratLockCapability by DriveTestForegroundService.ratLockCapability.collectAsStateWithLifecycle()
+    val ratLockStatus by DriveTestForegroundService.ratLockStatus.collectAsStateWithLifecycle()
+
+    val metrics = latestSample?.metrics ?: liveMetrics
+    val isNr = (ratLockMode == RatLockMode.NR_ONLY) || (metrics?.nr != null) || (metrics?.ratType == RatType.NR_NSA) || (metrics?.ratType == RatType.NR_SA)
 
     var showNewSessionDialog by remember { mutableStateOf(false) }
+    var pendingRatLockMode by remember { mutableStateOf<RatLockMode?>(null) }
     var sessionNameInput by remember { mutableStateOf("") }
 
     // Permission Request Launcher
@@ -91,6 +102,7 @@ fun DashboardScreen(
     LaunchedEffect(hasPermissions) {
         if (hasPermissions) {
             DriveTestForegroundService.refreshAvailableSims(context)
+            DriveTestForegroundService.refreshRatLockCapability(context)
         }
     }
 
@@ -215,19 +227,49 @@ fun DashboardScreen(
             }
         }
 
-        // RAT LOCK SELECTOR (CORE USER REQUIREMENT)
+        // RAT LOCK SELECTOR (WITH HARDWARE/SOFTWARE TRANSPARENCY)
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = "TARGET RAT LOCK",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF94A3B8)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "TARGET RAT LOCK",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF94A3B8)
+                    )
+                    Surface(
+                        color = when (ratLockType) {
+                            RatLockType.HARDWARE_BASEBAND -> Color(0xFF14532D)
+                            RatLockType.SOFTWARE_FILTER -> Color(0xFF1E3A8A)
+                            RatLockType.AUTO -> Color(0xFF1E293B)
+                        },
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = when (ratLockType) {
+                                RatLockType.HARDWARE_BASEBAND -> "MODEM LOCKED"
+                                RatLockType.SOFTWARE_FILTER -> "SOFTWARE FILTER"
+                                RatLockType.AUTO -> "AUTO SELECTION"
+                            },
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = when (ratLockType) {
+                                RatLockType.HARDWARE_BASEBAND -> Color(0xFF4ADE80)
+                                RatLockType.SOFTWARE_FILTER -> TelemetryCyan
+                                RatLockType.AUTO -> Color(0xFF94A3B8)
+                            },
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -238,21 +280,101 @@ fun DashboardScreen(
                         isSelected = ratLockMode == RatLockMode.AUTO,
                         modifier = Modifier.weight(1f)
                     ) {
-                        DriveTestForegroundService.setRatLock(context, RatLockMode.AUTO)
+                        DriveTestForegroundService.setRatLock(context, RatLockMode.AUTO, RatLockType.AUTO)
                     }
                     RatLockButton(
                         label = "🔒 LTE Only",
                         isSelected = ratLockMode == RatLockMode.LTE_ONLY,
                         modifier = Modifier.weight(1.1f)
                     ) {
-                        DriveTestForegroundService.setRatLock(context, RatLockMode.LTE_ONLY)
+                        if (ratLockCapability == RatLockCapability.DIRECT_MODEM_LOCK_SUPPORTED) {
+                            DriveTestForegroundService.setRatLock(context, RatLockMode.LTE_ONLY, RatLockType.HARDWARE_BASEBAND)
+                        } else {
+                            pendingRatLockMode = RatLockMode.LTE_ONLY
+                        }
                     }
                     RatLockButton(
                         label = "🔒 5G Only",
                         isSelected = ratLockMode == RatLockMode.NR_ONLY,
                         modifier = Modifier.weight(1.1f)
                     ) {
-                        DriveTestForegroundService.setRatLock(context, RatLockMode.NR_ONLY)
+                        if (ratLockCapability == RatLockCapability.DIRECT_MODEM_LOCK_SUPPORTED) {
+                            DriveTestForegroundService.setRatLock(context, RatLockMode.NR_ONLY, RatLockType.HARDWARE_BASEBAND)
+                        } else {
+                            pendingRatLockMode = RatLockMode.NR_ONLY
+                        }
+                    }
+                }
+
+                // LIVE CONNECTED RAT CONFIRMATION BAR
+                Spacer(modifier = Modifier.height(8.dp))
+                val isMatched = ratLockStatus.isMatched
+                val connectedRatLabel = when (metrics?.ratType) {
+                    RatType.NR_SA -> "5G SA"
+                    RatType.NR_NSA -> "5G NSA"
+                    RatType.LTE -> "LTE 4G"
+                    else -> "Scanning..."
+                }
+
+                Surface(
+                    color = when {
+                        ratLockMode == RatLockMode.AUTO -> Color(0xFF1E293B)
+                        isMatched -> Color(0xFF064E3B).copy(alpha = 0.6f)
+                        else -> Color(0xFF7C2D12).copy(alpha = 0.5f)
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(
+                        0.5.dp,
+                        when {
+                            ratLockMode == RatLockMode.AUTO -> Color(0xFF334155)
+                            isMatched -> Color(0xFF059669)
+                            else -> Color(0xFFDC2626)
+                        }
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
+                            Text(
+                                text = "CONNECTED: $connectedRatLabel",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = ratLockStatus.statusMessage,
+                                fontSize = 10.sp,
+                                color = if (isMatched || ratLockMode == RatLockMode.AUTO) Color(0xFF94A3B8) else Color(0xFFFCA5A5)
+                            )
+                        }
+
+                        if (!isMatched && ratLockMode != RatLockMode.AUTO) {
+                            Surface(
+                                color = Color(0xFF991B1B),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.clickable {
+                                    RatLockManager.launchHardwareLock(context)
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "RadioInfo ↗",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -351,8 +473,6 @@ fun DashboardScreen(
         }
 
         // Serving Cell Card & SIM Selector
-        val metrics = latestSample?.metrics ?: liveMetrics
-        val isNr = (ratLockMode == RatLockMode.NR_ONLY) || (metrics?.nr != null) || (metrics?.ratType == RatType.NR_NSA) || (metrics?.ratType == RatType.NR_SA)
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -402,8 +522,14 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val servingCellTitle = when {
+                        metrics?.ratType == RatType.NR_NSA -> "SERVING CELL (5G NSA · EN-DC DUAL CONNECTIVITY)"
+                        metrics?.ratType == RatType.NR_SA -> "SERVING CELL (5G NR SA · STANDALONE)"
+                        isNr -> "SERVING CELL (5G NR)"
+                        else -> "SERVING CELL (LTE PRIMARY)"
+                    }
                     Text(
-                        text = if (isNr) "SERVING CELL (5G NR)" else "SERVING CELL (LTE PRIMARY)",
+                        text = servingCellTitle,
                         fontSize = 11.sp,
                         color = Color(0xFF94A3B8),
                         fontWeight = FontWeight.Bold
@@ -448,7 +574,17 @@ fun DashboardScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
-                    val bandStr = if (isNr) metrics?.nr?.band?.let { "n$it" } else metrics?.lte?.band?.let { "B$it" }
+                    val bandStr = when {
+                        metrics?.ratType == RatType.NR_NSA && metrics.nr?.band != null && metrics.lte?.band != null ->
+                            "n${metrics.nr.band} + B${metrics.lte.band}"
+                        metrics?.ratType == RatType.NR_NSA && metrics.nr?.band != null ->
+                            "n${metrics.nr.band}"
+                        isNr && metrics?.nr?.band != null ->
+                            "n${metrics.nr.band}"
+                        metrics?.lte?.band != null ->
+                            "B${metrics.lte.band}"
+                        else -> null
+                    }
                     if (bandStr != null) {
                         Text(
                             text = "BAND: $bandStr",
@@ -460,17 +596,25 @@ fun DashboardScreen(
                 }
 
                 // DYNAMIC PARAMETER CHIPS (Only render fields that have real data)
-                val pci = if (isNr) metrics?.nr?.pci ?: metrics?.lte?.pci else metrics?.lte?.pci
-                val arfcn = if (isNr) metrics?.nr?.nrArfcn ?: metrics?.lte?.earfcn else metrics?.lte?.earfcn
-                val tac = if (isNr) metrics?.nr?.tac ?: metrics?.lte?.tac else metrics?.lte?.tac
-                val cellId = if (isNr) metrics?.nr?.nci else metrics?.lte?.eci
-                val cellIdLabel = if (isNr) "NCI" else "ECI"
-
+                val isNsa = metrics?.ratType == RatType.NR_NSA
                 val paramList = buildList {
-                    pci?.let { add("PCI: $it") }
-                    arfcn?.let { add("${if (isNr) "NR-ARFCN" else "EARFCN"}: $it") }
-                    tac?.let { add("TAC: $it") }
-                    cellId?.let { add("$cellIdLabel: $it") }
+                    if (isNsa) {
+                        // In 5G NSA: Show NR-specific metrics if present, otherwise fall back to Anchor LTE metrics
+                        metrics?.nr?.pci?.let { add("NR-PCI: $it") } ?: metrics?.lte?.pci?.let { add("Anchor PCI: $it") }
+                        metrics?.nr?.nrArfcn?.let { add("NR-ARFCN: $it") } ?: metrics?.lte?.earfcn?.let { add("Anchor EARFCN: $it") }
+                        metrics?.nr?.tac?.let { add("NR-TAC: $it") } ?: metrics?.lte?.tac?.let { add("Anchor TAC: $it") }
+                        metrics?.nr?.nci?.let { add("NCI: $it") } ?: metrics?.lte?.eci?.let { add("Anchor ECI: $it") }
+                    } else if (isNr) {
+                        metrics?.nr?.pci?.let { add("PCI: $it") }
+                        metrics?.nr?.nrArfcn?.let { add("NR-ARFCN: $it") }
+                        metrics?.nr?.tac?.let { add("TAC: $it") }
+                        metrics?.nr?.nci?.let { add("NCI: $it") }
+                    } else {
+                        metrics?.lte?.pci?.let { add("PCI: $it") }
+                        metrics?.lte?.earfcn?.let { add("EARFCN: $it") }
+                        metrics?.lte?.tac?.let { add("TAC: $it") }
+                        metrics?.lte?.eci?.let { add("ECI: $it") }
+                    }
                 }
 
                 if (paramList.isNotEmpty()) {
@@ -501,10 +645,11 @@ fun DashboardScreen(
                 if (isNr && metrics?.lte != null) {
                     val anchorLte = metrics.lte
                     val anchorItems = listOfNotNull(
+                        anchorLte.band?.let { "Band B$it" },
                         anchorLte.pci?.let { "PCI $it" },
-                        anchorLte.band?.let { "B$it" },
                         anchorLte.earfcn?.let { "EARFCN $it" },
-                        anchorLte.tac?.let { "TAC $it" }
+                        anchorLte.tac?.let { "TAC $it" },
+                        anchorLte.eci?.let { "ECI $it" }
                     )
                     if (anchorItems.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(6.dp))
@@ -513,13 +658,22 @@ fun DashboardScreen(
                             shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(0.5.dp, Color(0xFF334155))
                         ) {
-                            Text(
-                                text = "🔗 Anchor LTE: " + anchorItems.joinToString(" · "),
-                                fontSize = 11.sp,
-                                color = Color(0xFF93C5FD),
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
+                                Text(
+                                    text = "🔗 Anchor LTE: " + anchorItems.joinToString(" · "),
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF93C5FD),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (metrics.ratType == RatType.NR_NSA) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "ℹ️ ใน 5G NSA โครงข่ายควบคุมผ่าน LTE Anchor (Cell ID/TAC อยู่ที่ 4G, ข้อมูลความเร็วสูงวิ่งบน 5G NR)",
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -711,6 +865,121 @@ fun DashboardScreen(
                     fontSize = 15.sp
                 )
             }
+        }
+
+
+        // RAT LOCK GUIDANCE DIALOG
+        if (pendingRatLockMode != null) {
+            val targetMode = pendingRatLockMode!!
+            val targetLabel = if (targetMode == RatLockMode.NR_ONLY) "5G NR Only" else "LTE Only"
+            AlertDialog(
+                onDismissRequest = { pendingRatLockMode = null },
+                title = {
+                    Text(
+                        text = "การล็อกโมเด็ม (Hardware Modem Lock)",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(
+                            color = Color(0xFF7C2D12).copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFFEA580C)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "ข้อจำกัดความปลอดภัยของ Android Sandbox:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFDBA74)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Android ไม่อนุญาตให้แอปทั่วไปสั่งล็อกชิปโมเด็มฮาร์ดแวร์โดยตรง (ต้องใช้สิทธิ์ MODIFY_PHONE_STATE หรือ Carrier Privileges) เพื่อป้องกันระบบโทรฉุกเฉินและสัญญาณขัดข้อง",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFFED7AA)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "เลือกรูปแบบการทำงานสำหรับ $targetLabel:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+
+                        // Option 1: Hardware Lock via RadioInfo
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.6f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    DriveTestForegroundService.setRatLock(context, targetMode, RatLockType.HARDWARE_BASEBAND)
+                                    RatLockManager.launchHardwareLock(context)
+                                    pendingRatLockMode = null
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "1. เปิดเมนูวิศวกรรม RadioInfo (*#*#4636#*#*)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TelemetryCyan
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "แนะนำสำหรับการขับทดสอบจริง: ไปที่ 'Set Preferred Network Type' และเลือก '${if (targetMode == RatLockMode.NR_ONLY) "NR only" else "LTE only"}' บนชิปโมเด็มโดยตรง",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+                        }
+
+                        // Option 2: Software Filter Only
+                        Surface(
+                            color = Color(0xFF0F172A),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFF334155)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    DriveTestForegroundService.setRatLock(context, targetMode, RatLockType.SOFTWARE_FILTER)
+                                    pendingRatLockMode = null
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "2. ใช้เป็น Software Filter เฉพาะในแอป",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "แอปจะบันทึกและพล็อตพิกัดเฉพาะเมื่อตรวจพบสัญญาณ $targetLabel (ชิปโมเด็มจะยังคงสลับสัญญาณอัตโนมัติตามเครือข่าย)",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { pendingRatLockMode = null }) {
+                        Text("ยกเลิก", color = Color(0xFF94A3B8))
+                    }
+                },
+                containerColor = Color(0xFF0F172A),
+                shape = RoundedCornerShape(16.dp)
+            )
         }
 
         // NEW SESSION DIALOG
