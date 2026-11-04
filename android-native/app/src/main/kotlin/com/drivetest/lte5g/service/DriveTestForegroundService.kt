@@ -50,12 +50,7 @@ class DriveTestForegroundService : Service() {
         SessionRepository.initStorage(applicationContext)
         createNotificationChannel()
 
-        // Initialize MediaSession so Dynamic Island / Fluid Cloud capsule is warm and ready
-        LiveAlertNotificationHelper.initMediaSession(
-            context = this,
-            onStop = { stop(this) },
-            onNewSession = { newSession(this) }
-        )
+        // Navigation Live Updates (Google Maps Architecture) uses native CATEGORY_NAVIGATION
 
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
@@ -179,15 +174,6 @@ class DriveTestForegroundService : Service() {
                     try {
                         val newStyle = LiveAlertStyle.valueOf(styleStr)
                         _liveAlertStyle.value = newStyle
-                        if (newStyle == LiveAlertStyle.COMPACT) {
-                            LiveAlertNotificationHelper.releaseMediaSession()
-                        } else {
-                            LiveAlertNotificationHelper.initMediaSession(
-                                context = this,
-                                onStop = { stop(this) },
-                                onNewSession = { newSession(this) }
-                            )
-                        }
                         updateNotification()
                         Log.d(TAG, "Live alert style updated to ${newStyle.label}")
                     } catch (e: Exception) {
@@ -302,15 +288,11 @@ class DriveTestForegroundService : Service() {
         locationCollector.stopTracking()
         SessionRepository.finishCurrentSession()
         _isRecording.value = false
-        if (_liveAlertStyle.value == LiveAlertStyle.CAPSULE) {
-            LiveAlertNotificationHelper.updatePlaybackState(isRecording = false)
-        }
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     override fun onDestroy() {
         stopRecording()
-        LiveAlertNotificationHelper.releaseMediaSession()
         cellCollector.stop()
         super.onDestroy()
     }

@@ -21,8 +21,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 19
-    versionName = "1.8.6"
+    versionCode = 20
+    versionName = "1.8.7"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 
@@ -79,7 +79,6 @@ dependencies {
   androidTestImplementation(composeBom)
 
   // Core Android dependencies
-  implementation("androidx.media:media:1.7.0")
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
