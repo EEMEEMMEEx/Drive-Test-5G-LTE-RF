@@ -281,8 +281,8 @@ async function resolveLatestGitHubRelease() {
     const sizeMb =
       apkAsset && typeof apkAsset.size === 'number'
         ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB`
-        : '64.9 MB';
-    const assetName = (apkAsset && apkAsset.name) || 'app-debug.apk';
+        : '44.5 MB';
+    const assetName = (apkAsset && apkAsset.name) || 'drive-test-lte-5g.apk';
     const shortTag = tag.replace(/-android$/i, '');
 
     document.querySelectorAll('[data-apk-download]').forEach((el) => {
