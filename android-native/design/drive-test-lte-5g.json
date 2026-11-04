@@ -591,7 +591,7 @@
     },
     "109": {
       "blend": "normal",
-      "characters": "\u25a0 STOP TEST",
+      "characters": "■ STOP TEST",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -767,7 +767,7 @@
     },
     "111": {
       "blend": "normal",
-      "characters": "\ud83d\udea9 FLAG POINT",
+      "characters": "🚩 FLAG POINT",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -828,7 +828,7 @@
     },
     "112": {
       "blend": "normal",
-      "characters": "Speed: 42 km/h  \u2022  Alt: 18.2 m  \u2022  Samples: 1,458 (Cadence 1s)",
+      "characters": "Speed: 42 km/h  •  Alt: 18.2 m  •  Samples: 1,458 (Cadence 1s)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -1367,7 +1367,7 @@
       ],
       "height": 22.0,
       "id": 121,
-      "name": "Badge_GPS \u00b12.4m",
+      "name": "Badge_GPS ±2.4m",
       "parent": 3,
       "transform": [
         1.0,
@@ -1382,7 +1382,7 @@
     },
     "122": {
       "blend": "normal",
-      "characters": "GPS \u00b12.4m",
+      "characters": "GPS ±2.4m",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -2470,7 +2470,7 @@
     },
     "145": {
       "blend": "normal",
-      "characters": "\ud83d\uddfc",
+      "characters": "🗼",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -2646,7 +2646,7 @@
     },
     "148": {
       "blend": "normal",
-      "characters": "\ud83d\udce1",
+      "characters": "📡",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -3291,7 +3291,7 @@
       ],
       "height": 32.0,
       "id": 159,
-      "name": "Badge_\ud83d\udd12 NR ONLY",
+      "name": "Badge_🔒 NR ONLY",
       "parent": 3,
       "transform": [
         1.0,
@@ -3367,7 +3367,7 @@
     },
     "160": {
       "blend": "normal",
-      "characters": "\ud83d\udd12 NR ONLY",
+      "characters": "🔒 NR ONLY",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -3482,7 +3482,7 @@
     },
     "162": {
       "blend": "normal",
-      "characters": "\u2295",
+      "characters": "⊕",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -3597,7 +3597,7 @@
     },
     "164": {
       "blend": "normal",
-      "characters": "\u2296",
+      "characters": "⊖",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -3712,7 +3712,7 @@
     },
     "166": {
       "blend": "normal",
-      "characters": "\ud83c\udfaf",
+      "characters": "🎯",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -3827,7 +3827,7 @@
     },
     "168": {
       "blend": "normal",
-      "characters": "\ud83d\uddfa\ufe0f",
+      "characters": "🗺️",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -4083,7 +4083,7 @@
     },
     "172": {
       "blend": "normal",
-      "characters": "\u2265 -85",
+      "characters": "≥ -85",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -4487,7 +4487,7 @@
     },
     "18": {
       "blend": "normal",
-      "characters": "\ud83d\udd12 LTE Only",
+      "characters": "🔒 LTE Only",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -4825,7 +4825,7 @@
     },
     "185": {
       "blend": "normal",
-      "characters": "From: PCI 120 (RSRP -108 dBm)  \u2794  To: PCI 142 (SS-RSRP -82 dBm)",
+      "characters": "From: PCI 120 (RSRP -108 dBm)  ➔  To: PCI 142 (SS-RSRP -82 dBm)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -4886,7 +4886,7 @@
     },
     "186": {
       "blend": "normal",
-      "characters": "Target Band: n78 (3.5 GHz)  \u2022  RAT Lock Status: MAINTAINED",
+      "characters": "Target Band: n78 (3.5 GHz)  •  RAT Lock Status: MAINTAINED",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -5425,7 +5425,7 @@
       ],
       "height": 22.0,
       "id": 195,
-      "name": "Badge_GPS \u00b12.4m",
+      "name": "Badge_GPS ±2.4m",
       "parent": 4,
       "transform": [
         1.0,
@@ -5440,7 +5440,7 @@
     },
     "196": {
       "blend": "normal",
-      "characters": "GPS \u00b12.4m",
+      "characters": "GPS ±2.4m",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -5623,7 +5623,7 @@
     },
     "199": {
       "blend": "normal",
-      "characters": "Per-Session Log Archive \u2022 Google Earth KMZ & CSV Export",
+      "characters": "Per-Session Log Archive • Google Earth KMZ & CSV Export",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -5837,7 +5837,7 @@
     },
     "20": {
       "blend": "normal",
-      "characters": "\ud83d\udd12 5G NR Only",
+      "characters": "🔒 5G NR Only",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -5977,7 +5977,7 @@
       ],
       "height": 22.0,
       "id": 201,
-      "name": "Badge_\u25cf 5G LOCKED REC",
+      "name": "Badge_● 5G LOCKED REC",
       "parent": 4,
       "transform": [
         1.0,
@@ -5992,7 +5992,7 @@
     },
     "202": {
       "blend": "normal",
-      "characters": "\u25cf 5G LOCKED REC",
+      "characters": "● 5G LOCKED REC",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6114,7 +6114,7 @@
     },
     "204": {
       "blend": "normal",
-      "characters": "Session #08 \u2014 Sukhumvit 5G NR Benchmark",
+      "characters": "Session #08 — Sukhumvit 5G NR Benchmark",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6175,7 +6175,7 @@
     },
     "205": {
       "blend": "normal",
-      "characters": "1,458 samples (Precise 1s) \u2022 12.4 km \u2022 Avg SS-RSRP: -84.2 dBm",
+      "characters": "1,458 samples (Precise 1s) • 12.4 km • Avg SS-RSRP: -84.2 dBm",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6276,7 +6276,7 @@
     },
     "207": {
       "blend": "normal",
-      "characters": "[+ NEW DRIVE TEST SESSION] \u2022 [\u270f\ufe0f Rename Active]",
+      "characters": "[+ NEW DRIVE TEST SESSION] • [✏️ Rename Active]",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6506,7 +6506,7 @@
     },
     "210": {
       "blend": "normal",
-      "characters": "Session #07 \u2014 Bangna 5G n78 SA/NSA Test",
+      "characters": "Session #07 — Bangna 5G n78 SA/NSA Test",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6628,7 +6628,7 @@
     },
     "212": {
       "blend": "normal",
-      "characters": "4,440 samples (5G NR Locked \u2022 Cadence 1s) \u2022 1h 14m",
+      "characters": "4,440 samples (5G NR Locked • Cadence 1s) • 1h 14m",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6689,7 +6689,7 @@
     },
     "213": {
       "blend": "normal",
-      "characters": "Coverage: 92% Excellent/Good  \u2022  Avg SS-SINR: 18.4 dB",
+      "characters": "Coverage: 92% Excellent/Good  •  Avg SS-SINR: 18.4 dB",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6790,7 +6790,7 @@
     },
     "215": {
       "blend": "normal",
-      "characters": "\ud83d\udcbe KMZ (ZIP)",
+      "characters": "💾 KMZ (ZIP)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6891,7 +6891,7 @@
     },
     "217": {
       "blend": "normal",
-      "characters": "\ud83d\udcca CSV DATA",
+      "characters": "📊 CSV DATA",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -6992,7 +6992,7 @@
     },
     "219": {
       "blend": "normal",
-      "characters": "\ud83d\uddfa\ufe0f MAP",
+      "characters": "🗺️ MAP",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7168,7 +7168,7 @@
     },
     "221": {
       "blend": "normal",
-      "characters": "Session #06 \u2014 Silom LTE Only (Eco 5s Test)",
+      "characters": "Session #06 — Silom LTE Only (Eco 5s Test)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7290,7 +7290,7 @@
     },
     "223": {
       "blend": "normal",
-      "characters": "576 samples (LTE Locked \u2022 Eco 5s) \u2022 48m \u2022 14.2 km",
+      "characters": "576 samples (LTE Locked • Eco 5s) • 48m • 14.2 km",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7351,7 +7351,7 @@
     },
     "224": {
       "blend": "normal",
-      "characters": "Coverage: 84% Good \u2022 File size: ~48 KB (KMZ)",
+      "characters": "Coverage: 84% Good • File size: ~48 KB (KMZ)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7452,7 +7452,7 @@
     },
     "226": {
       "blend": "normal",
-      "characters": "\ud83d\udcbe KMZ (ZIP)",
+      "characters": "💾 KMZ (ZIP)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7553,7 +7553,7 @@
     },
     "228": {
       "blend": "normal",
-      "characters": "\ud83d\udcca CSV DATA",
+      "characters": "📊 CSV DATA",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7694,7 +7694,7 @@
     },
     "230": {
       "blend": "normal",
-      "characters": "\ud83d\uddfa\ufe0f MAP",
+      "characters": "🗺️ MAP",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -7971,7 +7971,7 @@
     },
     "235": {
       "blend": "normal",
-      "characters": "\u2022 Compresses doc.kml directly into ZIP (80\u201390% size reduction)",
+      "characters": "• Compresses doc.kml directly into ZIP (80–90% size reduction)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -8032,7 +8032,7 @@
     },
     "236": {
       "blend": "normal",
-      "characters": "\u2022 Embedded 3D Color Track + Placemarks with ExtendedData",
+      "characters": "• Embedded 3D Color Track + Placemarks with ExtendedData",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -8093,7 +8093,7 @@
     },
     "237": {
       "blend": "normal",
-      "characters": "\u2022 Saves via Android Storage Access Framework (SAF)",
+      "characters": "• Saves via Android Storage Access Framework (SAF)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -8194,7 +8194,7 @@
     },
     "239": {
       "blend": "normal",
-      "characters": "\ud83d\udcbe SAVE KMZ (COMPRESSED) VIA PICKER",
+      "characters": "💾 SAVE KMZ (COMPRESSED) VIA PICKER",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -8255,7 +8255,7 @@
     },
     "24": {
       "blend": "normal",
-      "characters": "\u26a1 Precise 1s",
+      "characters": "⚡ Precise 1s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -8754,7 +8754,7 @@
       ],
       "height": 22.0,
       "id": 248,
-      "name": "Badge_GPS \u00b12.4m",
+      "name": "Badge_GPS ±2.4m",
       "parent": 5,
       "transform": [
         1.0,
@@ -8769,7 +8769,7 @@
     },
     "249": {
       "blend": "normal",
-      "characters": "GPS \u00b12.4m",
+      "characters": "GPS ±2.4m",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -9370,7 +9370,7 @@
     },
     "259": {
       "blend": "normal",
-      "characters": "\u26a1 LAUNCH ANDROID RADIO INFO (MODEM LOCK)",
+      "characters": "⚡ LAUNCH ANDROID RADIO INFO (MODEM LOCK)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -9431,7 +9431,7 @@
     },
     "26": {
       "blend": "normal",
-      "characters": "\u2696\ufe0f Standard 2s",
+      "characters": "⚖️ Standard 2s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -9748,7 +9748,7 @@
     },
     "265": {
       "blend": "normal",
-      "characters": "\u2699 OPEN DEVICE BATTERY SETTINGS",
+      "characters": "⚙ OPEN DEVICE BATTERY SETTINGS",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10003,7 +10003,7 @@
       ],
       "height": 22.0,
       "id": 269,
-      "name": "Badge_\ud83c\udf43 ECO 5s",
+      "name": "Badge_🍃 ECO 5s",
       "parent": 5,
       "transform": [
         1.0,
@@ -10058,7 +10058,7 @@
     },
     "270": {
       "blend": "normal",
-      "characters": "\ud83c\udf43 ECO 5s",
+      "characters": "🍃 ECO 5s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10119,7 +10119,7 @@
     },
     "271": {
       "blend": "normal",
-      "characters": "0.2 Hz \u2022 Long Drive / Battery Saver",
+      "characters": "0.2 Hz • Long Drive / Battery Saver",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10320,7 +10320,7 @@
       ],
       "height": 22.0,
       "id": 274,
-      "name": "Badge_\u2696\ufe0f STD 2s",
+      "name": "Badge_⚖️ STD 2s",
       "parent": 5,
       "transform": [
         1.0,
@@ -10335,7 +10335,7 @@
     },
     "275": {
       "blend": "normal",
-      "characters": "\u2696\ufe0f STD 2s",
+      "characters": "⚖️ STD 2s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10396,7 +10396,7 @@
     },
     "276": {
       "blend": "normal",
-      "characters": "0.5 Hz \u2022 Suburban / City Drive",
+      "characters": "0.5 Hz • Suburban / City Drive",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10607,7 +10607,7 @@
       ],
       "height": 22.0,
       "id": 279,
-      "name": "Badge_\u26a1 PRECISE 1s",
+      "name": "Badge_⚡ PRECISE 1s",
       "parent": 5,
       "transform": [
         1.0,
@@ -10622,7 +10622,7 @@
     },
     "28": {
       "blend": "normal",
-      "characters": "\ud83c\udf43 Eco 5s",
+      "characters": "🍃 Eco 5s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10683,7 +10683,7 @@
     },
     "280": {
       "blend": "normal",
-      "characters": "\u26a1 PRECISE 1s",
+      "characters": "⚡ PRECISE 1s",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10744,7 +10744,7 @@
     },
     "281": {
       "blend": "normal",
-      "characters": "1.0 Hz \u2022 Deep RF / Fast Fading (Active)",
+      "characters": "1.0 Hz • Deep RF / Fast Fading (Active)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -10866,7 +10866,7 @@
     },
     "283": {
       "blend": "normal",
-      "characters": "\u2713",
+      "characters": "✓",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -11445,7 +11445,7 @@
       ],
       "height": 22.0,
       "id": 292,
-      "name": "Badge_\u2264 30 m \u25bc",
+      "name": "Badge_≤ 30 m ▼",
       "parent": 5,
       "transform": [
         1.0,
@@ -11460,7 +11460,7 @@
     },
     "293": {
       "blend": "normal",
-      "characters": "\u2264 30 m \u25bc",
+      "characters": "≤ 30 m ▼",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -11521,7 +11521,7 @@
     },
     "294": {
       "blend": "normal",
-      "characters": "DriveTest LTE/5G v1.1.0 \u2022 KMZ (Compressed) & Cadence Ready",
+      "characters": "DriveTest LTE/5G v1.1.0 • KMZ (Compressed) & Cadence Ready",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -11966,7 +11966,7 @@
     },
     "30": {
       "blend": "normal",
-      "characters": "\ud83d\udcc1 Active Session: #08 \u2022 \ud83c\udfaf 5G NR LOCK",
+      "characters": "📁 Active Session: #08 • 🎯 5G NR LOCK",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -12088,7 +12088,7 @@
     },
     "31": {
       "blend": "normal",
-      "characters": "LAUNCH \u2197",
+      "characters": "LAUNCH ↗",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -12203,7 +12203,7 @@
     },
     "33": {
       "blend": "normal",
-      "characters": "SERVING CELL (5G NR)",
+      "characters": "SERVING CELL (5G NSA · EN-DC)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -12826,7 +12826,7 @@
     },
     "42": {
       "blend": "normal",
-      "characters": "\ud83d\udd17 Anchor LTE: PCI 120 \u00b7 B3 (EARFCN 1850)",
+      "characters": "🔗 Anchor LTE: PCI 120 · B3 (EARFCN 1850)",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -14959,7 +14959,7 @@
       ],
       "height": 22.0,
       "id": 8,
-      "name": "Badge_GPS \u00b12.4m",
+      "name": "Badge_GPS ±2.4m",
       "parent": 2,
       "transform": [
         1.0,
@@ -15514,7 +15514,7 @@
     },
     "9": {
       "blend": "normal",
-      "characters": "GPS \u00b12.4m",
+      "characters": "GPS ±2.4m",
       "child_layout": {
         "absolute": false,
         "grid_column": null,
@@ -16223,7 +16223,7 @@
         50.0,
         231.0
       ],
-      "characters": "\ud83d\udcf6 SIM 1: AIS 5G  \u2713",
+      "characters": "📶 SIM 1: AIS 5G  ✓",
       "fills": [
         {
           "type": "solid",
@@ -16338,7 +16338,7 @@
         222.0,
         231.0
       ],
-      "characters": "\ud83d\udcf6 SIM 2: TRUE-DTAC",
+      "characters": "📶 SIM 2: TRUE-DTAC",
       "fills": [
         {
           "type": "solid",
@@ -16453,7 +16453,7 @@
         32.0,
         111.0
       ],
-      "characters": "CONNECTED: 5G NSA (B3+n78)  \u2022  \u2713 5G CONNECTED",
+      "characters": "CONNECTED: 5G NSA (B3+n78)  •  ✓ 5G CONNECTED",
       "fills": [
         {
           "type": "solid",

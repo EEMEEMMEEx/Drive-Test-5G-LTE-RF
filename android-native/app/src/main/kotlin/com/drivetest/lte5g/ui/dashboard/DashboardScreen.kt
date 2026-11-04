@@ -472,7 +472,7 @@ fun DashboardScreen(
             }
         }
 
-        // Serving Cell Card & SIM Selector
+        // Serving Cell Card & SIM Selector (Compact Layout)
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -480,7 +480,7 @@ fun DashboardScreen(
                 .fillMaxWidth()
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 // DUAL SIM SELECTOR (SIM 1 / SIM 2)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -514,7 +514,7 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // SERVING CELL HEADER
                 Row(
@@ -523,8 +523,8 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val servingCellTitle = when {
-                        metrics?.ratType == RatType.NR_NSA -> "SERVING CELL (5G NSA · EN-DC DUAL CONNECTIVITY)"
-                        metrics?.ratType == RatType.NR_SA -> "SERVING CELL (5G NR SA · STANDALONE)"
+                        metrics?.ratType == RatType.NR_NSA -> "SERVING CELL (5G NSA · EN-DC)"
+                        metrics?.ratType == RatType.NR_SA -> "SERVING CELL (5G NR SA)"
                         isNr -> "SERVING CELL (5G NR)"
                         else -> "SERVING CELL (LTE PRIMARY)"
                     }
@@ -532,7 +532,9 @@ fun DashboardScreen(
                         text = servingCellTitle,
                         fontSize = 11.sp,
                         color = Color(0xFF94A3B8),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                     metrics?.let { m ->
                         val ratTag = when (m.ratType) {
@@ -558,7 +560,7 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // PLMN & BAND (Only show BAND if actually present, no fake defaults)
                 Row(
@@ -595,15 +597,21 @@ fun DashboardScreen(
                     }
                 }
 
-                // DYNAMIC PARAMETER CHIPS (Only render fields that have real data)
+                // DYNAMIC PARAMETER CHIPS (FlowRow with no-wrap chips)
                 val isNsa = metrics?.ratType == RatType.NR_NSA
                 val paramList = buildList {
                     if (isNsa) {
-                        // In 5G NSA: Show NR-specific metrics if present, otherwise fall back to Anchor LTE metrics
-                        metrics?.nr?.pci?.let { add("NR-PCI: $it") } ?: metrics?.lte?.pci?.let { add("Anchor PCI: $it") }
-                        metrics?.nr?.nrArfcn?.let { add("NR-ARFCN: $it") } ?: metrics?.lte?.earfcn?.let { add("Anchor EARFCN: $it") }
-                        metrics?.nr?.tac?.let { add("NR-TAC: $it") } ?: metrics?.lte?.tac?.let { add("Anchor TAC: $it") }
-                        metrics?.nr?.nci?.let { add("NCI: $it") } ?: metrics?.lte?.eci?.let { add("Anchor ECI: $it") }
+                        // In 5G NSA: Clean concise telecom notation
+                        val pci = metrics?.nr?.pci ?: metrics?.lte?.pci
+                        val arfcn = metrics?.nr?.nrArfcn ?: metrics?.lte?.earfcn
+                        val tac = metrics?.nr?.tac ?: metrics?.lte?.tac
+                        val cellId = metrics?.nr?.nci ?: metrics?.lte?.eci
+                        val isNrCell = metrics?.nr?.nci != null
+
+                        pci?.let { add("PCI: $it") }
+                        arfcn?.let { add("${if (metrics?.nr?.nrArfcn != null) "NR-ARFCN" else "EARFCN"}: $it") }
+                        tac?.let { add("TAC: $it") }
+                        cellId?.let { add("${if (isNrCell) "NCI" else "ECI"}: $it") }
                     } else if (isNr) {
                         metrics?.nr?.pci?.let { add("PCI: $it") }
                         metrics?.nr?.nrArfcn?.let { add("NR-ARFCN: $it") }
@@ -619,9 +627,11 @@ fun DashboardScreen(
 
                 if (paramList.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    Row(
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         paramList.forEach { param ->
                             Surface(
@@ -634,7 +644,9 @@ fun DashboardScreen(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = Color(0xFFE2E8F0),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                 )
                             }
                         }
@@ -658,19 +670,20 @@ fun DashboardScreen(
                             shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(0.5.dp, Color(0xFF334155))
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                                 Text(
                                     text = "🔗 Anchor LTE: " + anchorItems.joinToString(" · "),
-                                    fontSize = 11.sp,
+                                    fontSize = 10.5.sp,
                                     color = Color(0xFF93C5FD),
                                     fontWeight = FontWeight.Medium
                                 )
                                 if (metrics.ratType == RatType.NR_NSA) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "ℹ️ ใน 5G NSA โครงข่ายควบคุมผ่าน LTE Anchor (Cell ID/TAC อยู่ที่ 4G, ข้อมูลความเร็วสูงวิ่งบน 5G NR)",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF94A3B8)
+                                        text = "ℹ️ 5G NSA ควบคุมผ่าน LTE Anchor (Cell ID/TAC อยู่บน 4G, Throughput วิ่งบน 5G)",
+                                        fontSize = 9.5.sp,
+                                        color = Color(0xFF94A3B8),
+                                        lineHeight = 13.sp
                                     )
                                 }
                             }
