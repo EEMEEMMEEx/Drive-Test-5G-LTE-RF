@@ -41,6 +41,7 @@ import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.NeighborCell
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
+import com.drivetest.lte5g.model.SimSlotInfo
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
 import com.drivetest.lte5g.ui.theme.*
@@ -56,6 +57,9 @@ fun DashboardScreen(
     val latestSample by DriveTestForegroundService.latestSample.collectAsStateWithLifecycle()
     val samplesList by DriveTestForegroundService.samplesList.collectAsStateWithLifecycle()
     val activeSession by SessionRepository.activeSession.collectAsStateWithLifecycle()
+    val selectedSimSlot by DriveTestForegroundService.selectedSimSlot.collectAsStateWithLifecycle()
+    val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
+    val liveMetrics by DriveTestForegroundService.liveMetrics.collectAsStateWithLifecycle()
 
     var showNewSessionDialog by remember { mutableStateOf(false) }
     var sessionNameInput by remember { mutableStateOf("") }
@@ -82,6 +86,12 @@ fun DashboardScreen(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         hasPermissions = results.values.all { it }
+    }
+
+    LaunchedEffect(hasPermissions) {
+        if (hasPermissions) {
+            DriveTestForegroundService.refreshAvailableSims(context)
+        }
     }
 
     val scrollState = rememberScrollState()
@@ -312,11 +322,13 @@ fun DashboardScreen(
                 .clickable { CellCollector.launchRadioInfo(context) }
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = "⚡ Hardware Modem Lock (*#*#4636#*#*)",
                         fontSize = 12.sp,
@@ -329,13 +341,18 @@ fun DashboardScreen(
                         color = Color(0xFFBFDBFE)
                     )
                 }
-                Text(text = "LAUNCH ↗", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TelemetryCyan)
+                Text(
+                    text = "LAUNCH ↗",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TelemetryCyan
+                )
             }
         }
 
-        // Serving Cell Card
-        val metrics = latestSample?.metrics
-        val isNr = (ratLockMode == RatLockMode.NR_ONLY) || (metrics?.nr != null)
+        // Serving Cell Card & SIM Selector
+        val metrics = latestSample?.metrics ?: liveMetrics
+        val isNr = (ratLockMode == RatLockMode.NR_ONLY) || (metrics?.nr != null) || (metrics?.ratType == RatType.NR_NSA) || (metrics?.ratType == RatType.NR_SA)
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -344,51 +361,168 @@ fun DashboardScreen(
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = if (isNr) "SERVING CELL (5G NR)" else "SERVING CELL (LTE PRIMARY)",
-                    fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                // DUAL SIM SELECTOR (SIM 1 / SIM 2)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val sim1 = availableSims.firstOrNull { it.slotIndex == 0 }
+                    val sim2 = availableSims.firstOrNull { it.slotIndex == 1 }
+
+                    val sim1Label = sim1?.displayName?.takeIf { it.isNotBlank() } ?: "SIM 1"
+                    val sim2Label = sim2?.displayName?.takeIf { it.isNotBlank() }
+                        ?: if (availableSims.size > 1) "SIM 2" else "SIM 2 (No SIM)"
+
+                    SimSlotButton(
+                        label = "📶 $sim1Label",
+                        isSelected = selectedSimSlot == 0,
+                        isEnabled = true,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        DriveTestForegroundService.setSimSlot(context, 0, sim1?.subscriptionId, sim1?.displayName)
+                    }
+
+                    SimSlotButton(
+                        label = "📶 $sim2Label",
+                        isSelected = selectedSimSlot == 1,
+                        isEnabled = (sim2 != null || availableSims.size > 1),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (sim2 != null || availableSims.size > 1) {
+                            DriveTestForegroundService.setSimSlot(context, 1, sim2?.subscriptionId, sim2?.displayName)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // SERVING CELL HEADER
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "PLMN: ${metrics?.plmn ?: "Searching..."} (${metrics?.operatorAlpha ?: ""})",
+                        text = if (isNr) "SERVING CELL (5G NR)" else "SERVING CELL (LTE PRIMARY)",
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        fontWeight = FontWeight.Bold
+                    )
+                    metrics?.let { m ->
+                        val ratTag = when (m.ratType) {
+                            RatType.NR_SA -> "5G SA"
+                            RatType.NR_NSA -> "5G NSA"
+                            RatType.LTE -> "LTE"
+                            else -> null
+                        }
+                        ratTag?.let { tag ->
+                            Surface(
+                                color = Color(0xFF1E3A8A).copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    fontSize = 10.sp,
+                                    color = TelemetryCyan,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // PLMN & BAND (Only show BAND if actually present, no fake defaults)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val plmnStr = metrics?.plmn?.takeIf { it.isNotBlank() } ?: "Searching..."
+                    val alphaStr = metrics?.operatorAlpha?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                    Text(
+                        text = "PLMN: $plmnStr$alphaStr",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
-                    Text(
-                        text = "BAND: ${if (isNr) "n${metrics?.nr?.band ?: "78"}" else "B${metrics?.lte?.band ?: "3"}"}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TelemetryCyan
-                    )
+                    val bandStr = if (isNr) metrics?.nr?.band?.let { "n$it" } else metrics?.lte?.band?.let { "B$it" }
+                    if (bandStr != null) {
+                        Text(
+                            text = "BAND: $bandStr",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TelemetryCyan
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        text = "PCI: ${if (isNr) metrics?.nr?.pci ?: "--" else metrics?.lte?.pci ?: "--"}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Text(
-                        text = "ARFCN: ${if (isNr) metrics?.nr?.nrArfcn ?: "--" else metrics?.lte?.earfcn ?: "--"}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFCBD5E1)
-                    )
-                    Text(
-                        text = "TAC: ${if (isNr) metrics?.nr?.tac ?: "--" else metrics?.lte?.tac ?: "--"}",
-                        fontSize = 12.sp,
-                        color = Color(0xFFCBD5E1)
-                    )
+
+                // DYNAMIC PARAMETER CHIPS (Only render fields that have real data)
+                val pci = if (isNr) metrics?.nr?.pci ?: metrics?.lte?.pci else metrics?.lte?.pci
+                val arfcn = if (isNr) metrics?.nr?.nrArfcn ?: metrics?.lte?.earfcn else metrics?.lte?.earfcn
+                val tac = if (isNr) metrics?.nr?.tac ?: metrics?.lte?.tac else metrics?.lte?.tac
+                val cellId = if (isNr) metrics?.nr?.nci else metrics?.lte?.eci
+                val cellIdLabel = if (isNr) "NCI" else "ECI"
+
+                val paramList = buildList {
+                    pci?.let { add("PCI: $it") }
+                    arfcn?.let { add("${if (isNr) "NR-ARFCN" else "EARFCN"}: $it") }
+                    tac?.let { add("TAC: $it") }
+                    cellId?.let { add("$cellIdLabel: $it") }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (isNr) "NCI: ${metrics?.nr?.nci ?: "--"}" else "ECI: ${metrics?.lte?.eci ?: "--"}",
-                    fontSize = 11.sp,
-                    color = Color(0xFF64748B)
-                )
+
+                if (paramList.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        paramList.forEach { param ->
+                            Surface(
+                                color = Color(0xFF1E293B),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(0.5.dp, Color(0xFF334155))
+                            ) {
+                                Text(
+                                    text = param,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFE2E8F0),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 5G NSA ANCHOR LTE INFO
+                if (isNr && metrics?.lte != null) {
+                    val anchorLte = metrics.lte
+                    val anchorItems = listOfNotNull(
+                        anchorLte.pci?.let { "PCI $it" },
+                        anchorLte.band?.let { "B$it" },
+                        anchorLte.earfcn?.let { "EARFCN $it" },
+                        anchorLte.tac?.let { "TAC $it" }
+                    )
+                    if (anchorItems.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            color = Color(0xFF1E293B).copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFF334155))
+                        ) {
+                            Text(
+                                text = "🔗 Anchor LTE: " + anchorItems.joinToString(" · "),
+                                fontSize = 11.sp,
+                                color = Color(0xFF93C5FD),
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -836,5 +970,64 @@ fun getSinrTierLabel(sinr: Double?): String {
         sinr >= 5.0 -> "FAIR"
         sinr >= 0.0 -> "POOR"
         else -> "BAD"
+    }
+}
+
+@Composable
+fun SimSlotButton(
+    label: String,
+    isSelected: Boolean,
+    isEnabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = when {
+            !isEnabled -> Color(0xFF1E293B).copy(alpha = 0.4f)
+            isSelected -> Color(0xFF0369A1)
+            else -> Color(0xFF1E293B)
+        },
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(
+            1.dp,
+            when {
+                !isEnabled -> Color(0xFF334155).copy(alpha = 0.3f)
+                isSelected -> TelemetryCyan
+                else -> Color(0xFF334155)
+            }
+        ),
+        modifier = modifier
+            .height(34.dp)
+            .clickable(enabled = isEnabled, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = when {
+                    !isEnabled -> Color(0xFF64748B)
+                    isSelected -> Color.White
+                    else -> Color(0xFF94A3B8)
+                },
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "✓",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TelemetryCyan
+                )
+            }
+        }
     }
 }

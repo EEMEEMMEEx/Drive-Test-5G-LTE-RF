@@ -140,4 +140,64 @@ class SessionRepositoryTest {
         assertNull(SessionRepository.activeSession.value)
         assertNull(SessionRepository.sessions.value.find { it.id == s1.id })
     }
+    @Test
+    fun testCreateNewSession_withSimSlot_preservesSimInfo() {
+        val session = SessionRepository.createNewSession(
+            name = "Dual SIM Test",
+            lockMode = RatLockMode.NR_ONLY,
+            cadence = MeasurementCadence.PRECISE,
+            simSlot = 1,
+            simDisplayName = "SIM 2: TRUE 5G"
+        )
+
+        assertEquals(1, session.simSlot)
+        assertEquals("SIM 2: TRUE 5G", session.simDisplayName)
+        assertEquals(session.id, SessionRepository.activeSession.value?.id)
+        assertEquals(1, SessionRepository.activeSession.value?.simSlot)
+        assertEquals("SIM 2: TRUE 5G", SessionRepository.activeSession.value?.simDisplayName)
+    }
+
+    @Test
+    fun testPersistence_savesAndLoadsSimSlotInfo() {
+        val s = SessionRepository.createNewSession(
+            name = "Persist SIM Test",
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS"
+        )
+        val sample = DriveTestSample(
+            id = 10L,
+            sessionId = s.id,
+            timestamp = System.currentTimeMillis(),
+            latitude = 13.75,
+            longitude = 100.50,
+            altitude = 12.0,
+            speedKmh = 25f,
+            bearing = 0f,
+            accuracyMeters = 2f,
+            metrics = CellMetrics(
+                ratType = RatType.NR_NSA,
+                plmn = "52003",
+                selectedSimSlot = 0,
+                simDisplayName = "SIM 1: AIS"
+            ),
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS"
+        )
+        SessionRepository.addSample(sample)
+        SessionRepository.finishCurrentSession()
+
+        // Re-load from storage
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        SessionRepository.initStorage(testDir)
+
+        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
+        assertNotNull(loaded)
+        assertEquals(0, loaded!!.simSlot)
+        assertEquals("SIM 1: AIS", loaded.simDisplayName)
+        assertEquals(1, loaded.samples.size)
+        assertEquals(0, loaded.samples[0].simSlot)
+        assertEquals("SIM 1: AIS", loaded.samples[0].simDisplayName)
+        assertEquals(0, loaded.samples[0].metrics.selectedSimSlot)
+        assertEquals("SIM 1: AIS", loaded.samples[0].metrics.simDisplayName)
+    }
 }

@@ -24,6 +24,14 @@ enum class MeasurementCadence(
     PRECISE(1000L, "Precise (1 s)", "1.0 Hz", "ความละเอียดสูงสุด สำหรับ Fast Fading & Handover")
 }
 
+data class SimSlotInfo(
+    val slotIndex: Int,
+    val subscriptionId: Int,
+    val displayName: String,
+    val carrierName: String,
+    val isDefault: Boolean = false
+)
+
 data class LteMetrics(
     val pci: Int?,
     val eci: Long?,
@@ -66,7 +74,9 @@ data class CellMetrics(
     val operatorAlpha: String? = null,
     val lte: LteMetrics? = null,
     val nr: NrMetrics? = null,
-    val neighbors: List<NeighborCell> = emptyList()
+    val neighbors: List<NeighborCell> = emptyList(),
+    val selectedSimSlot: Int = 0,
+    val simDisplayName: String? = null
 )
 
 data class DriveTestSample(
@@ -81,7 +91,9 @@ data class DriveTestSample(
     val accuracyMeters: Float,
     val metrics: CellMetrics,
     val ratLockMode: RatLockMode = RatLockMode.AUTO,
-    val cadence: MeasurementCadence = MeasurementCadence.PRECISE
+    val cadence: MeasurementCadence = MeasurementCadence.PRECISE,
+    val simSlot: Int = 0,
+    val simDisplayName: String? = null
 )
 
 data class DriveTestSession(
@@ -97,5 +109,7 @@ data class DriveTestSession(
     val avgRsrq: Int? = null,
     val avgSinr: Double? = null,
     val isRecording: Boolean = false,
-    val samples: List<DriveTestSample> = emptyList()
+    val samples: List<DriveTestSample> = emptyList(),
+    val simSlot: Int = 0,
+    val simDisplayName: String? = null
 )

@@ -15,10 +15,12 @@ import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.location.LocationCollector
+import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
+import com.drivetest.lte5g.model.SimSlotInfo
 import com.drivetest.lte5g.telephony.CellCollector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +46,13 @@ class DriveTestForegroundService : Service() {
         createNotificationChannel()
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
+        refreshAvailableSims(this)
+
+        serviceScope.launch {
+            cellCollector.currentMetrics.collect { m ->
+                _liveMetrics.value = m
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -112,6 +121,16 @@ class DriveTestForegroundService : Service() {
                     }
                 }
             }
+            ACTION_SET_SIM_SLOT -> {
+                val slot = intent.getIntExtra(EXTRA_SIM_SLOT, 0)
+                val subId = intent.getIntExtra(EXTRA_SUB_ID, -1)
+                val simName = intent.getStringExtra(EXTRA_SIM_NAME)
+                _selectedSimSlot.value = slot
+                if (::cellCollector.isInitialized) {
+                    cellCollector.switchSim(slot, if (subId == -1) null else subId, simName)
+                    _liveMetrics.value = cellCollector.currentMetrics.value
+                }
+            }
         }
         return START_STICKY
     }
@@ -119,12 +138,17 @@ class DriveTestForegroundService : Service() {
     private fun startRecording(sessionName: String? = null) {
         if (_isRecording.value) return
 
+        val currentSlot = _selectedSimSlot.value
+        val currentSimName = _availableSims.value.firstOrNull { it.slotIndex == currentSlot }?.displayName
+
         val currentActive = SessionRepository.activeSession.value
         val session = if (currentActive == null || !currentActive.isRecording) {
             SessionRepository.createNewSession(
                 name = sessionName,
                 lockMode = _ratLockMode.value,
-                cadence = _measurementCadence.value
+                cadence = _measurementCadence.value,
+                simSlot = currentSlot,
+                simDisplayName = currentSimName
             )
         } else {
             currentActive
@@ -156,6 +180,7 @@ class DriveTestForegroundService : Service() {
 
                 val loc = locationCollector.currentLocation.value
                 val metrics = cellCollector.currentMetrics.value
+                _liveMetrics.value = metrics
                 val lockMode = _ratLockMode.value
 
                 // Filter or evaluate based on lock mode
@@ -166,6 +191,9 @@ class DriveTestForegroundService : Service() {
                 }
 
                 if (loc != null && passesFilter) {
+                    val simSlot = _selectedSimSlot.value
+                    val simName = _availableSims.value.firstOrNull { it.slotIndex == simSlot }?.displayName
+
                     val sample = DriveTestSample(
                         id = sampleId++,
                         sessionId = activeSessionId,
@@ -178,7 +206,9 @@ class DriveTestForegroundService : Service() {
                         accuracyMeters = loc.accuracy,
                         metrics = metrics,
                         ratLockMode = lockMode,
-                        cadence = currentCadence
+                        cadence = currentCadence,
+                        simSlot = simSlot,
+                        simDisplayName = simName
                     )
                     _latestSample.value = sample
                     SessionRepository.addSample(sample)
@@ -187,8 +217,8 @@ class DriveTestForegroundService : Service() {
 
                     // Update notification
                     val ratLabel = when {
-                        metrics.nr != null -> "5G NR (${metrics.nr.band ?: "n78"})"
-                        metrics.lte != null -> "LTE (${metrics.lte.band ?: "B3"})"
+                        metrics.nr != null -> "5G NR (${metrics.nr.band?.let { "n$it" } ?: ""})"
+                        metrics.lte != null -> "LTE (${metrics.lte.band?.let { "B$it" } ?: ""})"
                         else -> "Scanning"
                     }
                     val rsrpVal = metrics.nr?.ssRsrp ?: metrics.lte?.rsrp ?: "N/A"
@@ -274,9 +304,14 @@ class DriveTestForegroundService : Service() {
         const val ACTION_NEW_SESSION = "com.drivetest.lte5g.action.NEW_SESSION"
         const val ACTION_SET_RAT_LOCK = "com.drivetest.lte5g.action.SET_RAT_LOCK"
         const val ACTION_SET_CADENCE = "com.drivetest.lte5g.action.SET_CADENCE"
+        const val ACTION_SET_SIM_SLOT = "com.drivetest.lte5g.action.SET_SIM_SLOT"
+
         const val EXTRA_RAT_LOCK = "EXTRA_RAT_LOCK"
         const val EXTRA_CADENCE = "EXTRA_CADENCE"
         const val EXTRA_SESSION_NAME = "EXTRA_SESSION_NAME"
+        const val EXTRA_SIM_SLOT = "EXTRA_SIM_SLOT"
+        const val EXTRA_SUB_ID = "EXTRA_SUB_ID"
+        const val EXTRA_SIM_NAME = "EXTRA_SIM_NAME"
 
         var activeSessionId: Long = System.currentTimeMillis()
 
@@ -294,6 +329,15 @@ class DriveTestForegroundService : Service() {
 
         private val _samplesList = MutableStateFlow<List<DriveTestSample>>(emptyList())
         val samplesList: StateFlow<List<DriveTestSample>> = _samplesList.asStateFlow()
+
+        private val _selectedSimSlot = MutableStateFlow(0)
+        val selectedSimSlot: StateFlow<Int> = _selectedSimSlot.asStateFlow()
+
+        private val _availableSims = MutableStateFlow<List<SimSlotInfo>>(emptyList())
+        val availableSims: StateFlow<List<SimSlotInfo>> = _availableSims.asStateFlow()
+
+        private val _liveMetrics = MutableStateFlow<CellMetrics?>(null)
+        val liveMetrics: StateFlow<CellMetrics?> = _liveMetrics.asStateFlow()
 
         fun start(
             context: Context,
@@ -362,6 +406,29 @@ class DriveTestForegroundService : Service() {
                 putExtra(EXTRA_CADENCE, cadence.name)
             }
             context.startService(intent)
+        }
+
+        fun setSimSlot(context: Context, slot: Int, subId: Int? = null, simName: String? = null) {
+            _selectedSimSlot.value = slot
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_SET_SIM_SLOT
+                putExtra(EXTRA_SIM_SLOT, slot)
+                if (subId != null) putExtra(EXTRA_SUB_ID, subId)
+                if (simName != null) putExtra(EXTRA_SIM_NAME, simName)
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed sending setSimSlot", e)
+            }
+        }
+
+        fun refreshAvailableSims(context: Context) {
+            val list = CellCollector.getActiveSubscriptions(context)
+            _availableSims.value = list
+            if (list.isNotEmpty() && list.none { it.slotIndex == _selectedSimSlot.value }) {
+                _selectedSimSlot.value = list.first().slotIndex
+            }
         }
     }
 }
