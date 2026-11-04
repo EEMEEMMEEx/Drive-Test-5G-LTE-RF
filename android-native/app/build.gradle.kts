@@ -21,15 +21,33 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 11
-    versionName = "1.7.0"
+    versionCode = 12
+    versionName = "1.7.1"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+  }
+
+  signingConfigs {
+    create("release") {
+      val keystoreFile = file("D:/EEMEEMMEEx")
+      if (keystoreFile.exists()) {
+        storeFile = keystoreFile
+        storePassword = "@#@Eemeemmee006"
+        keyAlias = "key0"
+        keyPassword = "@#@Eemeemmee006"
+      } else {
+        val debugConfig = signingConfigs.getByName("debug")
+        storeFile = debugConfig.storeFile
+        storePassword = debugConfig.storePassword
+        keyAlias = debugConfig.keyAlias
+        keyPassword = debugConfig.keyPassword
+      }
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }
