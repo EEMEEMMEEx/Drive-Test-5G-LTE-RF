@@ -1,4 +1,4 @@
-# RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics (`v1.10.3`)
+# RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics (`v1.10.4`)
 
 A local-first web application replicating the full capabilities, UI screens, data schema, and RF engineering analytics of **GSM Drive Test: 5G LTE RF (`com.drivetest.app` v1.8.0)**, built following the [replica-skill](https://github.com/Jakeschincariol/replica-skill) clean-room methodology, complete with PWA offline-first support and Android Capacitor/Native runtime.
 
@@ -7,7 +7,7 @@ A local-first web application replicating the full capabilities, UI screens, dat
 
 ## Key Features
 
-- **PWA & Android Native Runtime (v1.10.3):**
+- **PWA & Android Native Runtime (v1.10.4):**
   - **PWA Offline-First:** Service worker precaching, Web App Manifest, offline map tile caching (`stale-while-revalidate` / `network-first`), and standalone install prompt.
   - **Capacitor Android Wrapper:** Bridge plugin (`DriveTestPlugin.java`) with foreground service (`DriveTestForegroundService.java`) for real cellular telephony radio metrics and GNSS location tracking on device.
   - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.4.1`) with Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
