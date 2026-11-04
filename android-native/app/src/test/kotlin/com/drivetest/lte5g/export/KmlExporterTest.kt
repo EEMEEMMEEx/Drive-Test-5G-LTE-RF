@@ -83,4 +83,67 @@ class KmlExporterTest {
         zipIn.closeEntry()
         zipIn.close()
     }
-}
+
+    @Test
+    fun exportCsv_withDualSim_exportsBothSimColumns() {
+        val sample = DriveTestSample(
+            id = 1,
+            sessionId = 100,
+            timestamp = 1700000000000L,
+            latitude = 13.7563,
+            longitude = 100.5018,
+            altitude = 15.0,
+            speedKmh = 42.0f,
+            bearing = 120.0f,
+            accuracyMeters = 3.2f,
+            metrics = CellMetrics(
+                ratType = RatType.LTE,
+                plmn = "520-01",
+                operatorAlpha = "AIS",
+                simDisplayName = "SIM 1: AIS",
+                lte = LteMetrics(
+                    pci = 142,
+                    eci = 28491024L,
+                    tac = 45210,
+                    earfcn = 1850,
+                    band = 3,
+                    rsrp = -82,
+                    rsrq = -10,
+                    rssnr = 18.5,
+                    cqi = 12
+                )
+            ),
+            metricsSim2 = CellMetrics(
+                ratType = RatType.NR_NSA,
+                plmn = "520-04",
+                operatorAlpha = "TRUE",
+                simDisplayName = "SIM 2: TRUE",
+                nr = com.drivetest.lte5g.model.NrMetrics(
+                    pci = 220,
+                    nci = 9876543L,
+                    tac = 500,
+                    nrArfcn = 630000,
+                    band = 78,
+                    ssRsrp = -90,
+                    ssRsrq = -11,
+                    ssSinr = 14.0,
+                    csiRsrp = -92,
+                    csiRsrq = -12,
+                    csiSinr = 13.0,
+                    isNsa = true
+                )
+            ),
+            ratLockMode = RatLockMode.AUTO,
+            cadence = MeasurementCadence.PRECISE
+        )
+
+        val out = ByteArrayOutputStream()
+        KmlExporter.exportCsv(listOf(sample), out)
+        val csv = out.toString(Charsets.UTF_8.name())
+
+        assertTrue("CSV header must contain SIM1 columns", csv.contains("SIM1_Name,SIM1_RAT,SIM1_Operator,SIM1_PCI"))
+        assertTrue("CSV header must contain SIM2 columns", csv.contains("SIM2_Name,SIM2_RAT,SIM2_Operator,SIM2_PCI"))
+        assertTrue("CSV must contain AIS metrics", csv.contains("SIM 1: AIS,LTE,AIS,142,1850,3,-82"))
+        assertTrue("CSV must contain TRUE metrics", csv.contains("SIM 2: TRUE,5G_NSA,TRUE,220,630000,78,-90"))
+    }
+}

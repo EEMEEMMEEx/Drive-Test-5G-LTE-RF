@@ -21,7 +21,6 @@ import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.NeighborCell
 import com.drivetest.lte5g.model.NrMetrics
-import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import com.drivetest.lte5g.model.SimSlotInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,10 +32,14 @@ class CellCollector(private val context: Context) {
 
     private val baseTelephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
     private var activeTelephonyManager: TelephonyManager = baseTelephonyManager
+    private var secondaryTelephonyManager: TelephonyManager? = null
     private val executor = Executors.newSingleThreadExecutor()
 
     private val _currentMetrics = MutableStateFlow(CellMetrics())
     val currentMetrics: StateFlow<CellMetrics> = _currentMetrics.asStateFlow()
+
+    private val _currentMetricsSim2 = MutableStateFlow<CellMetrics?>(null)
+    val currentMetricsSim2: StateFlow<CellMetrics?> = _currentMetricsSim2.asStateFlow()
 
     var currentSlotIndex: Int = 0
         private set
@@ -45,9 +48,24 @@ class CellCollector(private val context: Context) {
     var currentSimName: String? = null
         private set
 
-    private var isNsaOverride = false
-    private var callback31: Any? = null
-    private var legacyListener: PhoneStateListener? = null
+    var secondarySlotIndex: Int = 1
+        private set
+    var secondarySubId: Int? = null
+        private set
+    var secondarySimName: String? = null
+        private set
+
+    var isDualSimLogging: Boolean = false
+        private set
+
+    private var isNsaOverrideSim1 = false
+    private var isNsaOverrideSim2 = false
+
+    private var callbackSim1: Any? = null
+    private var legacyListenerSim1: PhoneStateListener? = null
+
+    private var callbackSim2: Any? = null
+    private var legacyListenerSim2: PhoneStateListener? = null
 
     init {
         // Initialize with default subscription if available
@@ -61,7 +79,7 @@ class CellCollector(private val context: Context) {
                 activeTelephonyManager = baseTelephonyManager.createForSubscriptionId(defaultSub.subscriptionId)
             }
         }
-        registerTelephonyListeners()
+        registerTelephonyListenersSim1()
     }
 
     private fun sanitizeInt(value: Int): Int? {
@@ -77,12 +95,45 @@ class CellCollector(private val context: Context) {
         return sanitized.toDouble()
     }
 
+    fun setDualSimLogging(enabled: Boolean) {
+        if (isDualSimLogging == enabled) return
+        isDualSimLogging = enabled
+        Log.d("CellCollector", "setDualSimLogging: $enabled")
+
+        if (enabled) {
+            setupSecondarySim()
+        } else {
+            unregisterTelephonyListenersSim2()
+            secondaryTelephonyManager = null
+            secondarySubId = null
+            secondarySimName = null
+            _currentMetricsSim2.value = null
+        }
+    }
+
+    private fun setupSecondarySim() {
+        val subs = getActiveSubscriptions(context)
+        val secondarySub = subs.firstOrNull { it.slotIndex != currentSlotIndex }
+        if (secondarySub != null && secondarySub.subscriptionId != -1) {
+            secondarySlotIndex = secondarySub.slotIndex
+            secondarySubId = secondarySub.subscriptionId
+            secondarySimName = secondarySub.displayName
+            secondaryTelephonyManager = baseTelephonyManager.createForSubscriptionId(secondarySub.subscriptionId)
+            registerTelephonyListenersSim2()
+            Log.d("CellCollector", "Secondary SIM configured: slot $secondarySlotIndex, subId $secondarySubId, name $secondarySimName")
+        } else {
+            Log.w("CellCollector", "Secondary SIM not available or inactive")
+            secondaryTelephonyManager = null
+            _currentMetricsSim2.value = null
+        }
+    }
+
     fun switchSim(slotIndex: Int, subId: Int?, simName: String? = null) {
         if (slotIndex == currentSlotIndex && subId == currentSubId && activeTelephonyManager != baseTelephonyManager) {
             return
         }
         Log.d("CellCollector", "Switching SIM slot to $slotIndex (subId=$subId, name=$simName)")
-        unregisterTelephonyListeners()
+        unregisterTelephonyListenersSim1()
 
         currentSlotIndex = slotIndex
         currentSubId = subId
@@ -94,12 +145,18 @@ class CellCollector(private val context: Context) {
             baseTelephonyManager
         }
 
-        registerTelephonyListeners()
+        registerTelephonyListenersSim1()
+
+        if (isDualSimLogging) {
+            unregisterTelephonyListenersSim2()
+            setupSecondarySim()
+        }
+
         pollCellInfo()
     }
 
     @SuppressLint("MissingPermission")
-    private fun registerTelephonyListeners() {
+    private fun registerTelephonyListenersSim1() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val cb = object : TelephonyCallback(),
                 TelephonyCallback.DisplayInfoListener,
@@ -107,98 +164,258 @@ class CellCollector(private val context: Context) {
 
                 override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
                     val override = telephonyDisplayInfo.overrideNetworkType
-                    isNsaOverride = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
+                    isNsaOverrideSim1 = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
                             override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED)
-                    Log.d("CellCollector", "DisplayInfo changed: isNsaOverride=$isNsaOverride (override=$override)")
-                    pollCellInfo()
+                    Log.d("CellCollector", "SIM1 DisplayInfo changed: isNsaOverride=$isNsaOverrideSim1 (override=$override)")
+                    pollCellInfoSim1()
                 }
 
                 override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
-                    processCellInfoList(cellInfo)
+                    _currentMetrics.value = parseCellMetrics(
+                        tm = activeTelephonyManager,
+                        slotIndex = currentSlotIndex,
+                        simName = currentSimName,
+                        cells = cellInfo,
+                        isNsaOverride = isNsaOverrideSim1
+                    )
                 }
             }
-            callback31 = cb
+            callbackSim1 = cb
             try {
                 activeTelephonyManager.registerTelephonyCallback(executor, cb)
             } catch (e: Exception) {
-                Log.e("CellCollector", "Error registering TelephonyCallback on slot $currentSlotIndex", e)
+                Log.e("CellCollector", "Error registering TelephonyCallback on SIM1 slot $currentSlotIndex", e)
             }
         } else {
             val listener = object : PhoneStateListener() {
                 @Deprecated("Deprecated in Java")
                 override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>?) {
-                    processCellInfoList(cellInfo ?: emptyList())
+                    _currentMetrics.value = parseCellMetrics(
+                        tm = activeTelephonyManager,
+                        slotIndex = currentSlotIndex,
+                        simName = currentSimName,
+                        cells = cellInfo ?: emptyList(),
+                        isNsaOverride = isNsaOverrideSim1
+                    )
                 }
 
                 @Deprecated("Deprecated in Java")
                 override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                         val override = telephonyDisplayInfo.overrideNetworkType
-                        isNsaOverride = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
+                        isNsaOverrideSim1 = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
                                 override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED)
-                        pollCellInfo()
+                        pollCellInfoSim1()
                     }
                 }
             }
-            legacyListener = listener
+            legacyListenerSim1 = listener
             @Suppress("DEPRECATION")
             try {
                 activeTelephonyManager.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
             } catch (e: Exception) {
-                Log.e("CellCollector", "Error registering PhoneStateListener on slot $currentSlotIndex", e)
+                Log.e("CellCollector", "Error registering PhoneStateListener on SIM1 slot $currentSlotIndex", e)
             }
         }
     }
 
-    private fun unregisterTelephonyListeners() {
+    private fun unregisterTelephonyListenersSim1() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callback31 != null) {
-                activeTelephonyManager.unregisterTelephonyCallback(callback31 as TelephonyCallback)
-                callback31 = null
-            } else if (legacyListener != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callbackSim1 != null) {
+                activeTelephonyManager.unregisterTelephonyCallback(callbackSim1 as TelephonyCallback)
+                callbackSim1 = null
+            } else if (legacyListenerSim1 != null) {
                 @Suppress("DEPRECATION")
-                activeTelephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_NONE)
-                legacyListener = null
+                activeTelephonyManager.listen(legacyListenerSim1, PhoneStateListener.LISTEN_NONE)
+                legacyListenerSim1 = null
             }
         } catch (e: Exception) {
-            Log.e("CellCollector", "Error unregistering telephony listeners", e)
+            Log.e("CellCollector", "Error unregistering telephony listeners for SIM1", e)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerTelephonyListenersSim2() {
+        val tm = secondaryTelephonyManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val cb = object : TelephonyCallback(),
+                TelephonyCallback.DisplayInfoListener,
+                TelephonyCallback.CellInfoListener {
+
+                override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
+                    val override = telephonyDisplayInfo.overrideNetworkType
+                    isNsaOverrideSim2 = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
+                            override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED)
+                    Log.d("CellCollector", "SIM2 DisplayInfo changed: isNsaOverride=$isNsaOverrideSim2 (override=$override)")
+                    pollCellInfoSim2()
+                }
+
+                override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
+                    _currentMetricsSim2.value = parseCellMetrics(
+                        tm = tm,
+                        slotIndex = secondarySlotIndex,
+                        simName = secondarySimName,
+                        cells = cellInfo,
+                        isNsaOverride = isNsaOverrideSim2
+                    )
+                }
+            }
+            callbackSim2 = cb
+            try {
+                tm.registerTelephonyCallback(executor, cb)
+            } catch (e: Exception) {
+                Log.e("CellCollector", "Error registering TelephonyCallback on SIM2 slot $secondarySlotIndex", e)
+            }
+        } else {
+            val listener = object : PhoneStateListener() {
+                @Deprecated("Deprecated in Java")
+                override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>?) {
+                    _currentMetricsSim2.value = parseCellMetrics(
+                        tm = tm,
+                        slotIndex = secondarySlotIndex,
+                        simName = secondarySimName,
+                        cells = cellInfo ?: emptyList(),
+                        isNsaOverride = isNsaOverrideSim2
+                    )
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val override = telephonyDisplayInfo.overrideNetworkType
+                        isNsaOverrideSim2 = (override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
+                                override == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED)
+                        pollCellInfoSim2()
+                    }
+                }
+            }
+            legacyListenerSim2 = listener
+            @Suppress("DEPRECATION")
+            try {
+                tm.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
+            } catch (e: Exception) {
+                Log.e("CellCollector", "Error registering PhoneStateListener on SIM2 slot $secondarySlotIndex", e)
+            }
+        }
+    }
+
+    private fun unregisterTelephonyListenersSim2() {
+        try {
+            val tm = secondaryTelephonyManager
+            if (tm != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callbackSim2 != null) {
+                    tm.unregisterTelephonyCallback(callbackSim2 as TelephonyCallback)
+                    callbackSim2 = null
+                } else if (legacyListenerSim2 != null) {
+                    @Suppress("DEPRECATION")
+                    tm.listen(legacyListenerSim2, PhoneStateListener.LISTEN_NONE)
+                    legacyListenerSim2 = null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CellCollector", "Error unregistering telephony listeners for SIM2", e)
         }
     }
 
     @SuppressLint("MissingPermission")
     fun pollCellInfo() {
+        pollCellInfoSim1()
+        if (isDualSimLogging && secondaryTelephonyManager != null) {
+            pollCellInfoSim2()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun pollCellInfoSim1() {
         try {
             activeTelephonyManager.requestCellInfoUpdate(executor, object : TelephonyManager.CellInfoCallback() {
                 override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
-                    processCellInfoList(cellInfo)
+                    _currentMetrics.value = parseCellMetrics(
+                        tm = activeTelephonyManager,
+                        slotIndex = currentSlotIndex,
+                        simName = currentSimName,
+                        cells = cellInfo,
+                        isNsaOverride = isNsaOverrideSim1
+                    )
                 }
 
                 override fun onError(errorCode: Int, detail: Throwable?) {
-                    Log.w("CellCollector", "requestCellInfoUpdate error code: $errorCode", detail)
-                    // Fallback to cached cell info if update is throttled
+                    Log.w("CellCollector", "SIM1 requestCellInfoUpdate error code: $errorCode", detail)
                     try {
                         val cached = activeTelephonyManager.allCellInfo
                         if (!cached.isNullOrEmpty()) {
-                            processCellInfoList(cached)
+                            _currentMetrics.value = parseCellMetrics(
+                                tm = activeTelephonyManager,
+                                slotIndex = currentSlotIndex,
+                                simName = currentSimName,
+                                cells = cached,
+                                isNsaOverride = isNsaOverrideSim1
+                            )
                         }
                     } catch (e: Exception) {
-                        Log.e("CellCollector", "Failed getting cached allCellInfo", e)
+                        Log.e("CellCollector", "Failed getting cached allCellInfo for SIM1", e)
                     }
                 }
             })
         } catch (e: Exception) {
-            Log.e("CellCollector", "Failed requestCellInfoUpdate", e)
+            Log.e("CellCollector", "Failed requestCellInfoUpdate for SIM1", e)
         }
     }
 
-    private fun processCellInfoList(cells: List<CellInfo>) {
-        if (cells.isEmpty()) return
+    @SuppressLint("MissingPermission")
+    private fun pollCellInfoSim2() {
+        val tm = secondaryTelephonyManager ?: return
+        try {
+            tm.requestCellInfoUpdate(executor, object : TelephonyManager.CellInfoCallback() {
+                override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
+                    _currentMetricsSim2.value = parseCellMetrics(
+                        tm = tm,
+                        slotIndex = secondarySlotIndex,
+                        simName = secondarySimName,
+                        cells = cellInfo,
+                        isNsaOverride = isNsaOverrideSim2
+                    )
+                }
+
+                override fun onError(errorCode: Int, detail: Throwable?) {
+                    Log.w("CellCollector", "SIM2 requestCellInfoUpdate error code: $errorCode", detail)
+                    try {
+                        val cached = tm.allCellInfo
+                        if (!cached.isNullOrEmpty()) {
+                            _currentMetricsSim2.value = parseCellMetrics(
+                                tm = tm,
+                                slotIndex = secondarySlotIndex,
+                                simName = secondarySimName,
+                                cells = cached,
+                                isNsaOverride = isNsaOverrideSim2
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e("CellCollector", "Failed getting cached allCellInfo for SIM2", e)
+                    }
+                }
+            })
+        } catch (e: Exception) {
+            Log.e("CellCollector", "Failed requestCellInfoUpdate for SIM2", e)
+        }
+    }
+
+    private fun parseCellMetrics(
+        tm: TelephonyManager,
+        slotIndex: Int,
+        simName: String?,
+        cells: List<CellInfo>,
+        isNsaOverride: Boolean
+    ): CellMetrics {
+        if (cells.isEmpty()) {
+            return CellMetrics(selectedSimSlot = slotIndex, simDisplayName = simName)
+        }
 
         var servingLte: LteMetrics? = null
         var servingNr: NrMetrics? = null
         val neighbors = mutableListOf<NeighborCell>()
-        var plmn: String? = activeTelephonyManager.networkOperator.takeIf { it.isNotBlank() }
-        val operatorAlpha = activeTelephonyManager.networkOperatorName.takeIf { it.isNotBlank() }
+        var plmn: String? = tm.networkOperator.takeIf { it.isNotBlank() }
+        val operatorAlpha = tm.networkOperatorName.takeIf { it.isNotBlank() }
 
         for (info in cells) {
             if (info is CellInfoLte) {
@@ -309,20 +526,21 @@ class CellCollector(private val context: Context) {
             else -> RatType.UNKNOWN
         }
 
-        _currentMetrics.value = CellMetrics(
+        return CellMetrics(
             ratType = determinedRat,
             plmn = plmn,
             operatorAlpha = operatorAlpha,
             lte = servingLte,
             nr = servingNr,
             neighbors = neighbors,
-            selectedSimSlot = currentSlotIndex,
-            simDisplayName = currentSimName
+            selectedSimSlot = slotIndex,
+            simDisplayName = simName
         )
     }
 
     fun stop() {
-        unregisterTelephonyListeners()
+        unregisterTelephonyListenersSim1()
+        unregisterTelephonyListenersSim2()
         executor.shutdown()
     }
 

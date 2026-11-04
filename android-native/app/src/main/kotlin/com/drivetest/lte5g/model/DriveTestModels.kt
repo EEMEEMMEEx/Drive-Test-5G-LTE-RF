@@ -107,6 +107,7 @@ data class DriveTestSample(
     val bearing: Float,
     val accuracyMeters: Float,
     val metrics: CellMetrics,
+    val metricsSim2: CellMetrics? = null,
     val ratLockMode: RatLockMode = RatLockMode.AUTO,
     val cadence: MeasurementCadence = MeasurementCadence.PRECISE,
     val simSlot: Int = 0,
@@ -128,5 +129,9 @@ data class DriveTestSession(
     val isRecording: Boolean = false,
     val samples: List<DriveTestSample> = emptyList(),
     val simSlot: Int = 0,
-    val simDisplayName: String? = null
+    val simDisplayName: String? = null,
+    val isDualSimLogging: Boolean = false,
+    val sim2DisplayName: String? = null,
+    val avgRsrpSim2: Int? = null,
+    val avgSinrSim2: Double? = null
 )

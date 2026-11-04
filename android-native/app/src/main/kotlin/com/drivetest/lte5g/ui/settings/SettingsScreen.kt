@@ -50,7 +50,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
-    val liveAlertStyle by DriveTestForegroundService.liveAlertStyle.collectAsStateWithLifecycle()
+    val liveAlertStyle by DriveTestForegroundService.liveAlertStyle.collectAsStateWithLifecycle()
+    val isDualSimMode by DriveTestForegroundService.isDualSimMode.collectAsStateWithLifecycle()
+    val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -655,6 +657,68 @@ fun SettingsScreen(
             }
         }
 
+        // Dual-SIM Simultaneous Benchmark Logging Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, if (isDualSimMode) TelemetryCyan.copy(alpha = 0.7f) else TelemetryCardStroke, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = "DUAL-SIM BENCHMARK LOGGING",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDualSimMode) TelemetryCyan else Color(0xFF94A3B8)
+                        )
+                        Text(
+                            text = "บันทึก 2 ซิมพร้อมกันแบบ Operator Benchmark",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Switch(
+                        checked = isDualSimMode,
+                        onCheckedChange = { checked ->
+                            DriveTestForegroundService.setDualSimMode(context, checked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = TelemetryCyan,
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+                            uncheckedTrackColor = Color(0xFF1E293B)
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "บันทึกข้อมูล RF ของทั้ง SIM 1 (เช่น AIS) และ SIM 2 (เช่น TRUE) พร้อมกันในเซสชันเดียว เหมาะสำหรับการขับทดสอบเปรียบเทียบคุณภาพโครงข่ายบนเส้นทางเดียวกัน",
+                    fontSize = 11.sp,
+                    color = Color(0xFFCBD5E1),
+                    lineHeight = 15.sp
+                )
+                if (availableSims.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    availableSims.forEach { sim ->
+                        Text(
+                            text = "• ${sim.displayName}${if (sim.carrierName.isNotBlank() && !sim.displayName.contains(sim.carrierName)) " (${sim.carrierName})" else ""}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TelemetryCyan
+                        )
+                    }
+                }
+            }
+        }
+
         // Live Alerts Notification Style Card
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
