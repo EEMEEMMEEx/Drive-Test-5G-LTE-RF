@@ -317,7 +317,9 @@ object LiveAlertNotificationHelper {
         cadence: MeasurementCadence,
         simDisplayName: String? = null,
         lockMode: RatLockMode = RatLockMode.AUTO,
-        style: LiveAlertStyle = LiveAlertStyle.CAPSULE
+        style: LiveAlertStyle = LiveAlertStyle.CAPSULE,
+        metricsSim2: CellMetrics? = null,
+        sim2DisplayName: String? = null
     ): Notification {
         val rsrp = getRsrp(metrics)
         val rsrpStr = if (rsrp != null) "$rsrp dBm" else "N/A"
@@ -337,9 +339,18 @@ object LiveAlertNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val titleText = "$ratLabel · $rsrpStr ($qualityLabel)"
+        val rsrp2 = getRsrp(metricsSim2)
+        val rsrp2Str = if (rsrp2 != null) "$rsrp2 dBm" else "N/A"
+        val rat2Label = formatRatLabel(metricsSim2)
+
+        val isDualSim = metricsSim2 != null
+        val titleText = if (isDualSim) {
+            "S1: $ratLabel $rsrpStr | S2: $rat2Label $rsrp2Str"
+        } else {
+            "$ratLabel · $rsrpStr ($qualityLabel)"
+        }
         val contentText = "$sessionName · $sampleCount pts · $speedStr"
-        val subText = "Live Route · ${cadence.label}"
+        val subText = if (isDualSim) "Dual SIM Benchmark · ${cadence.label}" else "Live Route · ${cadence.label}"
 
         val rsrq = metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq
         val sinr = metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr
@@ -348,11 +359,23 @@ object LiveAlertNotificationHelper {
 
         val detailLines = buildString {
             append("📍 Points: $sampleCount pts  |  🚗 Speed: $speedStr\n")
-            append("📶 RSRQ: $rsrqStr  |  SINR: $sinrStr\n")
-            append("⏱️ Elapsed: $elapsedStr  |  ⚙️ Cadence: ${cadence.label} (${cadence.frequencyLabel})\n")
-            if (!simDisplayName.isNullOrBlank()) {
-                append("📱 SIM: $simDisplayName  |  ")
+            if (isDualSim) {
+                val name1 = simDisplayName ?: "SIM 1"
+                val name2 = sim2DisplayName ?: "SIM 2"
+                val rsrq2 = metricsSim2?.nr?.ssRsrq ?: metricsSim2?.lte?.rsrq
+                val sinr2 = metricsSim2?.nr?.ssSinr ?: metricsSim2?.lte?.rssnr
+                val rsrq2Str = if (rsrq2 != null) "$rsrq2 dB" else "--"
+                val sinr2Str = if (sinr2 != null) String.format(Locale.US, "%.1f dB", sinr2) else "--"
+
+                append("📱 $name1: $ratLabel $rsrpStr (RSRQ $rsrqStr, SINR $sinrStr)\n")
+                append("📱 $name2: $rat2Label $rsrp2Str (RSRQ $rsrq2Str, SINR $sinr2Str)\n")
+            } else {
+                append("📶 RSRQ: $rsrqStr  |  SINR: $sinrStr\n")
+                if (!simDisplayName.isNullOrBlank()) {
+                    append("📱 SIM: $simDisplayName  |  ")
+                }
             }
+            append("⏱️ Elapsed: $elapsedStr  |  ⚙️ Cadence: ${cadence.label} (${cadence.frequencyLabel})\n")
             append("🔒 Mode: ${lockMode.name}")
         }
 
@@ -397,9 +420,11 @@ object LiveAlertNotificationHelper {
             builder.extras.putString("coloros.notification.capsule.type", "navigation")
             builder.extras.putString("oplus.notification.capsule.status", "navigating")
             builder.extras.putString("coloros.notification.capsule.status", "navigating")
-            builder.extras.putString("oplus.notification.capsule.title", "$ratLabel · $rsrpStr")
+
+            val capsuleTitle = if (isDualSim) "S1:$rsrpStr | S2:$rsrp2Str" else "$ratLabel · $rsrpStr"
+            builder.extras.putString("oplus.notification.capsule.title", capsuleTitle)
             builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
-            builder.extras.putString("coloros.notification.capsule.title", "$ratLabel · $rsrpStr")
+            builder.extras.putString("coloros.notification.capsule.title", capsuleTitle)
             builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
         }
         builder.extras.putString("android.substName", "Drive Test 5G")

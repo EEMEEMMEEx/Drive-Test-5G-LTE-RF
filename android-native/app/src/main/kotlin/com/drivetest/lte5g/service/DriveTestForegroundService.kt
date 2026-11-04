@@ -63,6 +63,11 @@ class DriveTestForegroundService : Service() {
             connectedRat = RatType.UNKNOWN
         )
 
+        // Initialize dual SIM state if enabled
+        if (_isDualSimMode.value) {
+            cellCollector.setDualSimLogging(true)
+        }
+
         serviceScope.launch {
             cellCollector.currentMetrics.collect { m ->
                 _liveMetrics.value = m
@@ -72,6 +77,12 @@ class DriveTestForegroundService : Service() {
                     capability = _ratLockCapability.value,
                     connectedRat = m.ratType
                 )
+            }
+        }
+
+        serviceScope.launch {
+            cellCollector.currentMetricsSim2.collect { m2 ->
+                _liveMetricsSim2.value = m2
             }
         }
     }
@@ -92,6 +103,12 @@ class DriveTestForegroundService : Service() {
                     try { _measurementCadence.value = MeasurementCadence.valueOf(cadenceStr) } catch (_: Exception) {}
                 }
 
+                val dualSimExtra = intent.getBooleanExtra(EXTRA_DUAL_SIM_ENABLED, _isDualSimMode.value)
+                _isDualSimMode.value = dualSimExtra
+                if (::cellCollector.isInitialized) {
+                    cellCollector.setDualSimLogging(dualSimExtra)
+                }
+
                 val sessionName = intent.getStringExtra(EXTRA_SESSION_NAME)
                 startRecording(sessionName)
             }
@@ -107,6 +124,12 @@ class DriveTestForegroundService : Service() {
                 val cadenceStr = intent.getStringExtra(EXTRA_CADENCE)
                 if (cadenceStr != null) {
                     try { _measurementCadence.value = MeasurementCadence.valueOf(cadenceStr) } catch (_: Exception) {}
+                }
+
+                val dualSimExtra = intent.getBooleanExtra(EXTRA_DUAL_SIM_ENABLED, _isDualSimMode.value)
+                _isDualSimMode.value = dualSimExtra
+                if (::cellCollector.isInitialized) {
+                    cellCollector.setDualSimLogging(dualSimExtra)
                 }
 
                 val sessionName = intent.getStringExtra(EXTRA_SESSION_NAME)
@@ -189,8 +212,21 @@ class DriveTestForegroundService : Service() {
                 if (::cellCollector.isInitialized) {
                     cellCollector.switchSim(slot, if (subId == -1) null else subId, simName)
                     _liveMetrics.value = cellCollector.currentMetrics.value
+                    if (_isDualSimMode.value) {
+                        _liveMetricsSim2.value = cellCollector.currentMetricsSim2.value
+                    }
                     updateNotification()
                 }
+            }
+            ACTION_SET_DUAL_SIM_MODE -> {
+                val enabled = intent.getBooleanExtra(EXTRA_DUAL_SIM_ENABLED, false)
+                _isDualSimMode.value = enabled
+                if (::cellCollector.isInitialized) {
+                    cellCollector.setDualSimLogging(enabled)
+                    _liveMetricsSim2.value = cellCollector.currentMetricsSim2.value
+                }
+                updateNotification()
+                Log.d(TAG, "Dual SIM Benchmark mode updated: $enabled")
             }
         }
         return START_STICKY
@@ -201,6 +237,12 @@ class DriveTestForegroundService : Service() {
 
         val currentSlot = _selectedSimSlot.value
         val currentSimName = _availableSims.value.firstOrNull { it.slotIndex == currentSlot }?.displayName
+        val isDualSim = _isDualSimMode.value && _availableSims.value.size >= 2
+        val secondarySim = if (isDualSim) _availableSims.value.firstOrNull { it.slotIndex != currentSlot } else null
+
+        if (::cellCollector.isInitialized) {
+            cellCollector.setDualSimLogging(isDualSim)
+        }
 
         val currentActive = SessionRepository.activeSession.value
         val session = if (currentActive == null || !currentActive.isRecording) {
@@ -209,7 +251,9 @@ class DriveTestForegroundService : Service() {
                 lockMode = _ratLockMode.value,
                 cadence = _measurementCadence.value,
                 simSlot = currentSlot,
-                simDisplayName = currentSimName
+                simDisplayName = currentSimName,
+                isDualSimLogging = isDualSim,
+                sim2DisplayName = secondarySim?.displayName
             )
         } else {
             currentActive
@@ -264,7 +308,10 @@ class DriveTestForegroundService : Service() {
 
                 val loc = locationCollector.currentLocation.value
                 val metrics = cellCollector.currentMetrics.value
+                val metricsSim2 = if (_isDualSimMode.value) cellCollector.currentMetricsSim2.value else null
+
                 _liveMetrics.value = metrics
+                _liveMetricsSim2.value = metricsSim2
                 val lockMode = _ratLockMode.value
 
                 // Filter or evaluate based on lock mode
@@ -289,6 +336,7 @@ class DriveTestForegroundService : Service() {
                         bearing = loc.bearing,
                         accuracyMeters = loc.accuracy,
                         metrics = metrics,
+                        metricsSim2 = metricsSim2,
                         ratLockMode = lockMode,
                         cadence = currentCadence,
                         simSlot = simSlot,
@@ -329,11 +377,13 @@ class DriveTestForegroundService : Service() {
     private fun buildNotification(): Notification {
         val session = SessionRepository.activeSession.value
         val metrics = _liveMetrics.value
+        val metricsSim2 = if (_isDualSimMode.value) _liveMetricsSim2.value else null
         val loc = locationCollector.currentLocation.value
         val speedKmh = loc?.let { it.speed * 3.6f }
         val currentSamples = _samplesList.value
         val currentSlot = _selectedSimSlot.value
         val simName = _availableSims.value.firstOrNull { it.slotIndex == currentSlot }?.displayName
+        val secondarySim = if (_isDualSimMode.value) _availableSims.value.firstOrNull { it.slotIndex != currentSlot } else null
 
         return LiveAlertNotificationHelper.buildLiveNotification(
             context = this,
@@ -345,7 +395,9 @@ class DriveTestForegroundService : Service() {
             cadence = _measurementCadence.value,
             simDisplayName = simName,
             lockMode = _ratLockMode.value,
-            style = _liveAlertStyle.value
+            style = _liveAlertStyle.value,
+            metricsSim2 = metricsSim2,
+            sim2DisplayName = secondarySim?.displayName
         )
     }
 
@@ -367,6 +419,7 @@ class DriveTestForegroundService : Service() {
         const val ACTION_SET_CADENCE = "com.drivetest.lte5g.action.SET_CADENCE"
         const val ACTION_SET_LIVE_ALERT_STYLE = "com.drivetest.lte5g.action.SET_LIVE_ALERT_STYLE"
         const val ACTION_SET_SIM_SLOT = "com.drivetest.lte5g.action.SET_SIM_SLOT"
+        const val ACTION_SET_DUAL_SIM_MODE = "com.drivetest.lte5g.action.SET_DUAL_SIM_MODE"
 
         const val EXTRA_RAT_LOCK = "EXTRA_RAT_LOCK"
         const val EXTRA_LOCK_TYPE = "EXTRA_LOCK_TYPE"
@@ -376,11 +429,15 @@ class DriveTestForegroundService : Service() {
         const val EXTRA_SIM_SLOT = "EXTRA_SIM_SLOT"
         const val EXTRA_SUB_ID = "EXTRA_SUB_ID"
         const val EXTRA_SIM_NAME = "EXTRA_SIM_NAME"
+        const val EXTRA_DUAL_SIM_ENABLED = "EXTRA_DUAL_SIM_ENABLED"
 
         var activeSessionId: Long = System.currentTimeMillis()
 
         private val _isRecording = MutableStateFlow(false)
         val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+        private val _isDualSimMode = MutableStateFlow(false)
+        val isDualSimMode: StateFlow<Boolean> = _isDualSimMode.asStateFlow()
 
         private val _ratLockMode = MutableStateFlow(RatLockMode.AUTO)
         val ratLockMode: StateFlow<RatLockMode> = _ratLockMode.asStateFlow()
@@ -416,6 +473,9 @@ class DriveTestForegroundService : Service() {
         private val _liveMetrics = MutableStateFlow<CellMetrics?>(null)
         val liveMetrics: StateFlow<CellMetrics?> = _liveMetrics.asStateFlow()
 
+        private val _liveMetricsSim2 = MutableStateFlow<CellMetrics?>(null)
+        val liveMetricsSim2: StateFlow<CellMetrics?> = _liveMetricsSim2.asStateFlow()
+
         fun start(
             context: Context,
             lockMode: RatLockMode = _ratLockMode.value,
@@ -427,6 +487,7 @@ class DriveTestForegroundService : Service() {
                 action = ACTION_START
                 putExtra(EXTRA_RAT_LOCK, lockMode.name)
                 putExtra(EXTRA_CADENCE, cadence.name)
+                putExtra(EXTRA_DUAL_SIM_ENABLED, _isDualSimMode.value)
                 if (sessionName != null) {
                     putExtra(EXTRA_SESSION_NAME, sessionName)
                 }
@@ -449,6 +510,7 @@ class DriveTestForegroundService : Service() {
                 action = ACTION_NEW_SESSION
                 putExtra(EXTRA_RAT_LOCK, lockMode.name)
                 putExtra(EXTRA_CADENCE, cadence.name)
+                putExtra(EXTRA_DUAL_SIM_ENABLED, _isDualSimMode.value)
                 if (sessionName != null) {
                     putExtra(EXTRA_SESSION_NAME, sessionName)
                 }
@@ -538,6 +600,19 @@ class DriveTestForegroundService : Service() {
                 context.startService(intent)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed sending setSimSlot", e)
+            }
+        }
+
+        fun setDualSimMode(context: Context, enabled: Boolean) {
+            _isDualSimMode.value = enabled
+            val intent = Intent(context, DriveTestForegroundService::class.java).apply {
+                action = ACTION_SET_DUAL_SIM_MODE
+                putExtra(EXTRA_DUAL_SIM_ENABLED, enabled)
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed sending setDualSimMode", e)
             }
         }
 

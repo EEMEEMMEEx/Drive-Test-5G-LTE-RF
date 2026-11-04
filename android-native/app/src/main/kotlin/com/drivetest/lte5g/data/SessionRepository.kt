@@ -89,7 +89,9 @@ object SessionRepository {
         lockMode: RatLockMode = RatLockMode.AUTO,
         cadence: MeasurementCadence = MeasurementCadence.PRECISE,
         simSlot: Int = 0,
-        simDisplayName: String? = null
+        simDisplayName: String? = null,
+        isDualSimLogging: Boolean = false,
+        sim2DisplayName: String? = null
     ): DriveTestSession {
         // If there's an ongoing active recording session, finish it first
         if (_activeSession.value?.isRecording == true) {
@@ -116,7 +118,9 @@ object SessionRepository {
             isRecording = true,
             samples = emptyList(),
             simSlot = simSlot,
-            simDisplayName = simDisplayName
+            simDisplayName = simDisplayName,
+            isDualSimLogging = isDualSimLogging,
+            sim2DisplayName = sim2DisplayName
         )
 
         _activeSession.value = newSession
@@ -152,16 +156,22 @@ object SessionRepository {
         val current = _activeSession.value ?: return
         val updatedSamples = current.samples + sample
 
-        // Calculate averages
+        // Calculate averages for primary SIM
         val validRsrp = updatedSamples.mapNotNull { it.metrics.nr?.ssRsrp ?: it.metrics.lte?.rsrp }
         val validRsrq = updatedSamples.mapNotNull { it.metrics.nr?.ssRsrq ?: it.metrics.lte?.rsrq }
         val validSinr = updatedSamples.mapNotNull { it.metrics.nr?.ssSinr ?: it.metrics.lte?.rssnr }
+
+        // Calculate averages for secondary SIM if dual SIM logging
+        val validRsrpSim2 = updatedSamples.mapNotNull { it.metricsSim2?.let { m2 -> m2.nr?.ssRsrp ?: m2.lte?.rsrp } }
+        val validSinrSim2 = updatedSamples.mapNotNull { it.metricsSim2?.let { m2 -> m2.nr?.ssSinr ?: m2.lte?.rssnr } }
 
         val updatedSession = current.copy(
             sampleCount = updatedSamples.size,
             avgRsrp = if (validRsrp.isNotEmpty()) validRsrp.average().toInt() else null,
             avgRsrq = if (validRsrq.isNotEmpty()) validRsrq.average().toInt() else null,
             avgSinr = if (validSinr.isNotEmpty()) Math.round(validSinr.average() * 10.0) / 10.0 else null,
+            avgRsrpSim2 = if (validRsrpSim2.isNotEmpty()) validRsrpSim2.average().toInt() else null,
+            avgSinrSim2 = if (validSinrSim2.isNotEmpty()) Math.round(validSinrSim2.average() * 10.0) / 10.0 else null,
             samples = updatedSamples
         )
 
@@ -276,6 +286,137 @@ object SessionRepository {
         }
     }
 
+    private fun metricsToJson(m: CellMetrics): JSONObject {
+        val mObj = JSONObject()
+        mObj.put("ratType", m.ratType.name)
+        mObj.put("plmn", m.plmn ?: JSONObject.NULL)
+        mObj.put("operatorAlpha", m.operatorAlpha ?: JSONObject.NULL)
+        mObj.put("selectedSimSlot", m.selectedSimSlot)
+        mObj.put("simDisplayName", m.simDisplayName ?: JSONObject.NULL)
+
+        m.lte?.let { lte ->
+            val lObj = JSONObject()
+            lObj.put("pci", lte.pci ?: JSONObject.NULL)
+            lObj.put("eci", lte.eci ?: JSONObject.NULL)
+            lObj.put("tac", lte.tac ?: JSONObject.NULL)
+            lObj.put("earfcn", lte.earfcn ?: JSONObject.NULL)
+            lObj.put("band", lte.band ?: JSONObject.NULL)
+            lObj.put("rsrp", lte.rsrp ?: JSONObject.NULL)
+            lObj.put("rsrq", lte.rsrq ?: JSONObject.NULL)
+            lObj.put("rssnr", lte.rssnr ?: JSONObject.NULL)
+            lObj.put("cqi", lte.cqi ?: JSONObject.NULL)
+            mObj.put("lte", lObj)
+        }
+
+        m.nr?.let { nr ->
+            val nObj = JSONObject()
+            nObj.put("pci", nr.pci ?: JSONObject.NULL)
+            nObj.put("nci", nr.nci ?: JSONObject.NULL)
+            nObj.put("tac", nr.tac ?: JSONObject.NULL)
+            nObj.put("nrArfcn", nr.nrArfcn ?: JSONObject.NULL)
+            nObj.put("band", nr.band ?: JSONObject.NULL)
+            nObj.put("ssRsrp", nr.ssRsrp ?: JSONObject.NULL)
+            nObj.put("ssRsrq", nr.ssRsrq ?: JSONObject.NULL)
+            nObj.put("ssSinr", nr.ssSinr ?: JSONObject.NULL)
+            nObj.put("csiRsrp", nr.csiRsrp ?: JSONObject.NULL)
+            nObj.put("csiRsrq", nr.csiRsrq ?: JSONObject.NULL)
+            nObj.put("csiSinr", nr.csiSinr ?: JSONObject.NULL)
+            nObj.put("isNsa", nr.isNsa)
+            mObj.put("nr", nObj)
+        }
+
+        val neighArray = JSONArray()
+        m.neighbors.forEach { n ->
+            val nItem = JSONObject()
+            nItem.put("rat", n.rat.name)
+            nItem.put("pci", n.pci ?: JSONObject.NULL)
+            nItem.put("arfcn", n.arfcn ?: JSONObject.NULL)
+            nItem.put("rsrp", n.rsrp ?: JSONObject.NULL)
+            nItem.put("rsrq", n.rsrq ?: JSONObject.NULL)
+            nItem.put("sinr", n.sinr ?: JSONObject.NULL)
+            neighArray.put(nItem)
+        }
+        mObj.put("neighbors", neighArray)
+        return mObj
+    }
+
+    private fun jsonToMetrics(mObj: JSONObject?): CellMetrics {
+        if (mObj == null) return CellMetrics()
+
+        var lteMetrics: LteMetrics? = null
+        val lObj = mObj.optJSONObject("lte")
+        if (lObj != null) {
+            lteMetrics = LteMetrics(
+                pci = if (lObj.isNull("pci")) null else lObj.optInt("pci"),
+                eci = if (lObj.isNull("eci")) null else lObj.optLong("eci"),
+                tac = if (lObj.isNull("tac")) null else lObj.optInt("tac"),
+                earfcn = if (lObj.isNull("earfcn")) null else lObj.optInt("earfcn"),
+                band = if (lObj.isNull("band")) null else lObj.optInt("band"),
+                rsrp = if (lObj.isNull("rsrp")) null else lObj.optInt("rsrp"),
+                rsrq = if (lObj.isNull("rsrq")) null else lObj.optInt("rsrq"),
+                rssnr = if (lObj.isNull("rssnr")) null else lObj.optDouble("rssnr"),
+                cqi = if (lObj.isNull("cqi")) null else lObj.optInt("cqi")
+            )
+        }
+
+        var nrMetrics: NrMetrics? = null
+        val nObj = mObj.optJSONObject("nr")
+        if (nObj != null) {
+            nrMetrics = NrMetrics(
+                pci = if (nObj.isNull("pci")) null else nObj.optInt("pci"),
+                nci = if (nObj.isNull("nci")) null else nObj.optLong("nci"),
+                tac = if (nObj.isNull("tac")) null else nObj.optInt("tac"),
+                nrArfcn = if (nObj.isNull("nrArfcn")) null else nObj.optInt("nrArfcn"),
+                band = if (nObj.isNull("band")) null else nObj.optInt("band"),
+                ssRsrp = if (nObj.isNull("ssRsrp")) null else nObj.optInt("ssRsrp"),
+                ssRsrq = if (nObj.isNull("ssRsrq")) null else nObj.optInt("ssRsrq"),
+                ssSinr = if (nObj.isNull("ssSinr")) null else nObj.optDouble("ssSinr"),
+                csiRsrp = if (nObj.isNull("csiRsrp")) null else nObj.optInt("csiRsrp"),
+                csiRsrq = if (nObj.isNull("csiRsrq")) null else nObj.optInt("csiRsrq"),
+                csiSinr = if (nObj.isNull("csiSinr")) null else nObj.optDouble("csiSinr"),
+                isNsa = nObj.optBoolean("isNsa", false)
+            )
+        }
+
+        val neighbors = mutableListOf<NeighborCell>()
+        val neighArray = mObj.optJSONArray("neighbors")
+        if (neighArray != null) {
+            for (j in 0 until neighArray.length()) {
+                val nItem = neighArray.getJSONObject(j)
+                val rType = try {
+                    RatType.valueOf(nItem.optString("rat", RatType.UNKNOWN.name))
+                } catch (_: Exception) {
+                    RatType.UNKNOWN
+                }
+                neighbors.add(
+                    NeighborCell(
+                        rat = rType,
+                        pci = if (nItem.isNull("pci")) null else nItem.optInt("pci"),
+                        arfcn = if (nItem.isNull("arfcn")) null else nItem.optInt("arfcn"),
+                        rsrp = if (nItem.isNull("rsrp")) null else nItem.optInt("rsrp"),
+                        rsrq = if (nItem.isNull("rsrq")) null else nItem.optInt("rsrq"),
+                        sinr = if (nItem.isNull("sinr")) null else nItem.optDouble("sinr")
+                    )
+                )
+            }
+        }
+
+        return CellMetrics(
+            ratType = try {
+                RatType.valueOf(mObj.optString("ratType", RatType.UNKNOWN.name))
+            } catch (_: Exception) {
+                RatType.UNKNOWN
+            },
+            plmn = if (mObj.isNull("plmn")) null else mObj.optString("plmn"),
+            operatorAlpha = if (mObj.isNull("operatorAlpha")) null else mObj.optString("operatorAlpha"),
+            lte = lteMetrics,
+            nr = nrMetrics,
+            neighbors = neighbors,
+            selectedSimSlot = mObj.optInt("selectedSimSlot", 0),
+            simDisplayName = if (mObj.isNull("simDisplayName")) null else mObj.optString("simDisplayName")
+        )
+    }
+
     private fun sessionToJson(session: DriveTestSession): JSONObject {
         val obj = JSONObject()
         obj.put("id", session.id)
@@ -292,6 +433,10 @@ object SessionRepository {
         obj.put("isRecording", session.isRecording)
         obj.put("simSlot", session.simSlot)
         obj.put("simDisplayName", session.simDisplayName ?: JSONObject.NULL)
+        obj.put("isDualSimLogging", session.isDualSimLogging)
+        obj.put("sim2DisplayName", session.sim2DisplayName ?: JSONObject.NULL)
+        obj.put("avgRsrpSim2", session.avgRsrpSim2 ?: JSONObject.NULL)
+        obj.put("avgSinrSim2", session.avgSinrSim2 ?: JSONObject.NULL)
 
         val samplesArray = JSONArray()
         session.samples.forEach { s ->
@@ -310,59 +455,13 @@ object SessionRepository {
             sObj.put("simSlot", s.simSlot)
             sObj.put("simDisplayName", s.simDisplayName ?: JSONObject.NULL)
 
-            // Metrics
-            val m = s.metrics
-            val mObj = JSONObject()
-            mObj.put("ratType", m.ratType.name)
-            mObj.put("plmn", m.plmn ?: JSONObject.NULL)
-            mObj.put("operatorAlpha", m.operatorAlpha ?: JSONObject.NULL)
-            mObj.put("selectedSimSlot", m.selectedSimSlot)
-            mObj.put("simDisplayName", m.simDisplayName ?: JSONObject.NULL)
+            // Primary SIM metrics
+            sObj.put("metrics", metricsToJson(s.metrics))
 
-            m.lte?.let { lte ->
-                val lObj = JSONObject()
-                lObj.put("pci", lte.pci ?: JSONObject.NULL)
-                lObj.put("eci", lte.eci ?: JSONObject.NULL)
-                lObj.put("tac", lte.tac ?: JSONObject.NULL)
-                lObj.put("earfcn", lte.earfcn ?: JSONObject.NULL)
-                lObj.put("band", lte.band ?: JSONObject.NULL)
-                lObj.put("rsrp", lte.rsrp ?: JSONObject.NULL)
-                lObj.put("rsrq", lte.rsrq ?: JSONObject.NULL)
-                lObj.put("rssnr", lte.rssnr ?: JSONObject.NULL)
-                lObj.put("cqi", lte.cqi ?: JSONObject.NULL)
-                mObj.put("lte", lObj)
+            // Secondary SIM metrics if present
+            if (s.metricsSim2 != null) {
+                sObj.put("metricsSim2", metricsToJson(s.metricsSim2))
             }
-
-            m.nr?.let { nr ->
-                val nObj = JSONObject()
-                nObj.put("pci", nr.pci ?: JSONObject.NULL)
-                nObj.put("nci", nr.nci ?: JSONObject.NULL)
-                nObj.put("tac", nr.tac ?: JSONObject.NULL)
-                nObj.put("nrArfcn", nr.nrArfcn ?: JSONObject.NULL)
-                nObj.put("band", nr.band ?: JSONObject.NULL)
-                nObj.put("ssRsrp", nr.ssRsrp ?: JSONObject.NULL)
-                nObj.put("ssRsrq", nr.ssRsrq ?: JSONObject.NULL)
-                nObj.put("ssSinr", nr.ssSinr ?: JSONObject.NULL)
-                nObj.put("csiRsrp", nr.csiRsrp ?: JSONObject.NULL)
-                nObj.put("csiRsrq", nr.csiRsrq ?: JSONObject.NULL)
-                nObj.put("csiSinr", nr.csiSinr ?: JSONObject.NULL)
-                nObj.put("isNsa", nr.isNsa)
-                mObj.put("nr", nObj)
-            }
-
-            val neighArray = JSONArray()
-            m.neighbors.forEach { n ->
-                val nItem = JSONObject()
-                nItem.put("rat", n.rat.name)
-                nItem.put("pci", n.pci ?: JSONObject.NULL)
-                nItem.put("arfcn", n.arfcn ?: JSONObject.NULL)
-                nItem.put("rsrp", n.rsrp ?: JSONObject.NULL)
-                nItem.put("rsrq", n.rsrq ?: JSONObject.NULL)
-                nItem.put("sinr", n.sinr ?: JSONObject.NULL)
-                neighArray.put(nItem)
-            }
-            mObj.put("neighbors", neighArray)
-            sObj.put("metrics", mObj)
 
             samplesArray.put(sObj)
         }
@@ -391,86 +490,20 @@ object SessionRepository {
         val avgRsrq = if (obj.isNull("avgRsrq")) null else obj.optInt("avgRsrq")
         val avgSinr = if (obj.isNull("avgSinr")) null else obj.optDouble("avgSinr")
         val isRecording = obj.optBoolean("isRecording", false)
+        val isDualSimLogging = obj.optBoolean("isDualSimLogging", false)
+        val sim2DisplayName = if (obj.isNull("sim2DisplayName")) null else obj.optString("sim2DisplayName")
+        val avgRsrpSim2 = if (obj.isNull("avgRsrpSim2")) null else obj.optInt("avgRsrpSim2")
+        val avgSinrSim2 = if (obj.isNull("avgSinrSim2")) null else obj.optDouble("avgSinrSim2")
 
         val samplesList = mutableListOf<DriveTestSample>()
         val samplesArray = obj.optJSONArray("samples")
         if (samplesArray != null) {
             for (i in 0 until samplesArray.length()) {
                 val sObj = samplesArray.getJSONObject(i)
-                val mObj = sObj.optJSONObject("metrics")
-
-                var lteMetrics: LteMetrics? = null
-                val lObj = mObj?.optJSONObject("lte")
-                if (lObj != null) {
-                    lteMetrics = LteMetrics(
-                        pci = if (lObj.isNull("pci")) null else lObj.optInt("pci"),
-                        eci = if (lObj.isNull("eci")) null else lObj.optLong("eci"),
-                        tac = if (lObj.isNull("tac")) null else lObj.optInt("tac"),
-                        earfcn = if (lObj.isNull("earfcn")) null else lObj.optInt("earfcn"),
-                        band = if (lObj.isNull("band")) null else lObj.optInt("band"),
-                        rsrp = if (lObj.isNull("rsrp")) null else lObj.optInt("rsrp"),
-                        rsrq = if (lObj.isNull("rsrq")) null else lObj.optInt("rsrq"),
-                        rssnr = if (lObj.isNull("rssnr")) null else lObj.optDouble("rssnr"),
-                        cqi = if (lObj.isNull("cqi")) null else lObj.optInt("cqi")
-                    )
-                }
-
-                var nrMetrics: NrMetrics? = null
-                val nObj = mObj?.optJSONObject("nr")
-                if (nObj != null) {
-                    nrMetrics = NrMetrics(
-                        pci = if (nObj.isNull("pci")) null else nObj.optInt("pci"),
-                        nci = if (nObj.isNull("nci")) null else nObj.optLong("nci"),
-                        tac = if (nObj.isNull("tac")) null else nObj.optInt("tac"),
-                        nrArfcn = if (nObj.isNull("nrArfcn")) null else nObj.optInt("nrArfcn"),
-                        band = if (nObj.isNull("band")) null else nObj.optInt("band"),
-                        ssRsrp = if (nObj.isNull("ssRsrp")) null else nObj.optInt("ssRsrp"),
-                        ssRsrq = if (nObj.isNull("ssRsrq")) null else nObj.optInt("ssRsrq"),
-                        ssSinr = if (nObj.isNull("ssSinr")) null else nObj.optDouble("ssSinr"),
-                        csiRsrp = if (nObj.isNull("csiRsrp")) null else nObj.optInt("csiRsrp"),
-                        csiRsrq = if (nObj.isNull("csiRsrq")) null else nObj.optInt("csiRsrq"),
-                        csiSinr = if (nObj.isNull("csiSinr")) null else nObj.optDouble("csiSinr"),
-                        isNsa = nObj.optBoolean("isNsa", false)
-                    )
-                }
-
-                val neighbors = mutableListOf<NeighborCell>()
-                val neighArray = mObj?.optJSONArray("neighbors")
-                if (neighArray != null) {
-                    for (j in 0 until neighArray.length()) {
-                        val nItem = neighArray.getJSONObject(j)
-                        val rType = try {
-                            RatType.valueOf(nItem.optString("rat", RatType.UNKNOWN.name))
-                        } catch (_: Exception) {
-                            RatType.UNKNOWN
-                        }
-                        neighbors.add(
-                            NeighborCell(
-                                rat = rType,
-                                pci = if (nItem.isNull("pci")) null else nItem.optInt("pci"),
-                                arfcn = if (nItem.isNull("arfcn")) null else nItem.optInt("arfcn"),
-                                rsrp = if (nItem.isNull("rsrp")) null else nItem.optInt("rsrp"),
-                                rsrq = if (nItem.isNull("rsrq")) null else nItem.optInt("rsrq"),
-                                sinr = if (nItem.isNull("sinr")) null else nItem.optDouble("sinr")
-                            )
-                        )
-                    }
-                }
-
-                val cellMetrics = CellMetrics(
-                    ratType = try {
-                        RatType.valueOf(mObj?.optString("ratType", RatType.UNKNOWN.name) ?: RatType.UNKNOWN.name)
-                    } catch (_: Exception) {
-                        RatType.UNKNOWN
-                    },
-                    plmn = if (mObj?.isNull("plmn") != false) null else mObj.optString("plmn"),
-                    operatorAlpha = if (mObj?.isNull("operatorAlpha") != false) null else mObj.optString("operatorAlpha"),
-                    lte = lteMetrics,
-                    nr = nrMetrics,
-                    neighbors = neighbors,
-                    selectedSimSlot = mObj?.optInt("selectedSimSlot", 0) ?: 0,
-                    simDisplayName = if (mObj?.isNull("simDisplayName") != false) null else mObj.optString("simDisplayName")
-                )
+                val primaryMetrics = jsonToMetrics(sObj.optJSONObject("metrics"))
+                val secondaryMetrics = if (sObj.has("metricsSim2") && !sObj.isNull("metricsSim2")) {
+                    jsonToMetrics(sObj.optJSONObject("metricsSim2"))
+                } else null
 
                 samplesList.add(
                     DriveTestSample(
@@ -483,7 +516,8 @@ object SessionRepository {
                         speedKmh = sObj.optDouble("speedKmh", 0.0).toFloat(),
                         bearing = sObj.optDouble("bearing", 0.0).toFloat(),
                         accuracyMeters = sObj.optDouble("accuracyMeters", 0.0).toFloat(),
-                        metrics = cellMetrics,
+                        metrics = primaryMetrics,
+                        metricsSim2 = secondaryMetrics,
                         ratLockMode = try {
                             RatLockMode.valueOf(sObj.optString("ratLockMode", RatLockMode.AUTO.name))
                         } catch (_: Exception) {
@@ -519,7 +553,11 @@ object SessionRepository {
             isRecording = isRecording,
             samples = samplesList,
             simSlot = simSlot,
-            simDisplayName = simDisplayName
+            simDisplayName = simDisplayName,
+            isDualSimLogging = isDualSimLogging,
+            sim2DisplayName = sim2DisplayName,
+            avgRsrpSim2 = avgRsrpSim2,
+            avgSinrSim2 = avgSinrSim2
         )
     }
 }

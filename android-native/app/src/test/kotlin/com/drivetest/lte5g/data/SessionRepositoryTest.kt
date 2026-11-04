@@ -200,4 +200,67 @@ class SessionRepositoryTest {
         assertEquals(0, loaded.samples[0].metrics.selectedSimSlot)
         assertEquals("SIM 1: AIS", loaded.samples[0].metrics.simDisplayName)
     }
-}
+
+    @Test
+    fun testDualSimLogging_savesAndLoadsMetricsSim2AndAverages() {
+        val s = SessionRepository.createNewSession(
+            name = "Dual SIM Benchmark Test",
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS 5G",
+            isDualSimLogging = true,
+            sim2DisplayName = "SIM 2: TRUE 5G"
+        )
+        assertTrue(s.isDualSimLogging)
+        assertEquals("SIM 2: TRUE 5G", s.sim2DisplayName)
+
+        val sample = DriveTestSample(
+            id = 100L,
+            sessionId = s.id,
+            timestamp = System.currentTimeMillis(),
+            latitude = 13.75,
+            longitude = 100.50,
+            altitude = 12.0,
+            speedKmh = 30f,
+            bearing = 0f,
+            accuracyMeters = 2f,
+            metrics = CellMetrics(
+                ratType = RatType.NR_NSA,
+                plmn = "52001",
+                operatorAlpha = "AIS",
+                lte = LteMetrics(pci = 100, eci = 1234L, tac = 20, earfcn = 1800, band = 3, rsrp = -80, rsrq = -10, rssnr = 15.0, cqi = 10)
+            ),
+            metricsSim2 = CellMetrics(
+                ratType = RatType.LTE,
+                plmn = "52004",
+                operatorAlpha = "TRUE",
+                lte = LteMetrics(pci = 200, eci = 5678L, tac = 30, earfcn = 2100, band = 1, rsrp = -92, rsrq = -12, rssnr = 10.0, cqi = 8)
+            ),
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS 5G"
+        )
+        SessionRepository.addSample(sample)
+
+        val active = SessionRepository.activeSession.value
+        assertNotNull(active)
+        assertEquals(-80, active?.avgRsrp)
+        assertEquals(-92, active?.avgRsrpSim2)
+        assertEquals(10.0, active?.avgSinrSim2)
+
+        SessionRepository.finishCurrentSession()
+
+        // Reload and verify persistence
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        SessionRepository.initStorage(testDir)
+
+        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
+        assertNotNull(loaded)
+        assertTrue(loaded!!.isDualSimLogging)
+        assertEquals("SIM 2: TRUE 5G", loaded.sim2DisplayName)
+        assertEquals(-80, loaded.avgRsrp)
+        assertEquals(-92, loaded.avgRsrpSim2)
+        assertEquals(1, loaded.samples.size)
+        assertNotNull(loaded.samples[0].metricsSim2)
+        assertEquals("52004", loaded.samples[0].metricsSim2?.plmn)
+        assertEquals(-92, loaded.samples[0].metricsSim2?.lte?.rsrp)
+    }
+}

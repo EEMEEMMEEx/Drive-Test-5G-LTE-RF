@@ -181,6 +181,26 @@ object KmlExporter {
             val tier = getStyleForRsrp(rsrp)
             val rsrpColorHex = getColorHexForRsrp(rsrp)
 
+            val m2 = sample.metricsSim2
+            val isNr2 = m2?.nr != null
+            val rat2 = if (m2 == null) null else if (isNr2) (if (m2.nr!!.isNsa) "5G NSA" else "5G SA") else if (m2.lte != null) "LTE" else "Unknown"
+            val pci2 = m2?.nr?.pci ?: m2?.lte?.pci
+            val rsrp2 = m2?.nr?.ssRsrp ?: m2?.lte?.rsrp
+            val op2 = m2?.operatorAlpha ?: ""
+
+            val sim2Row = if (m2 != null && rat2 != null) {
+                """<tr bgcolor="#f1f5f9"><td><b>SIM 2 Benchmark</b></td><td>$rat2 (${rsrp2 ?: "--"} dBm, $op2)</td></tr>"""
+            } else ""
+
+            val sim2ExtendedData = if (m2 != null) {
+                buildString {
+                    append("\n                <Data name=\"SIM2_RAT\"><value>${rat2 ?: ""}</value></Data>")
+                    append("\n                <Data name=\"SIM2_Operator\"><value>$op2</value></Data>")
+                    append("\n                <Data name=\"SIM2_PCI\"><value>${pci2 ?: ""}</value></Data>")
+                    append("\n                <Data name=\"SIM2_RSRP_dBm\"><value>${rsrp2 ?: ""}</value></Data>")
+                }
+            } else ""
+
             writer.write("""
         <Placemark>
             <name>$rat PCI:$pci (${rsrp}dBm)</name>
@@ -197,6 +217,7 @@ object KmlExporter {
                         <tr bgcolor="#f8fafc"><td><b>SINR (Noise Ratio)</b></td><td>$sinr dB</td></tr>
                         <tr><td><b>Band / ARFCN</b></td><td>${if (band > 0) "B$band" else "N/A"} / $arfcn</td></tr>
                         <tr bgcolor="#f8fafc"><td><b>Serving Cell PCI</b></td><td>$pci</td></tr>
+                        $sim2Row
                         <tr><td><b>Vehicle Speed</b></td><td>${String.format(Locale.US, "%.1f", sample.speedKmh)} km/h</td></tr>
                         <tr bgcolor="#f8fafc"><td><b>GPS Accuracy</b></td><td>±${String.format(Locale.US, "%.1f", sample.accuracyMeters)} m</td></tr>
                         <tr><td><b>Measurement Cadence</b></td><td>${sample.cadence.label}</td></tr>
@@ -217,7 +238,7 @@ object KmlExporter {
                 <Data name="SINR_dB"><value>$sinr</value></Data>
                 <Data name="Speed_kmh"><value>${sample.speedKmh}</value></Data>
                 <Data name="Accuracy_m"><value>${sample.accuracyMeters}</value></Data>
-                <Data name="Cadence_s"><value>${sample.cadence.intervalMs / 1000}</value></Data>
+                <Data name="Cadence_s"><value>${sample.cadence.intervalMs / 1000}</value></Data>$sim2ExtendedData
             </ExtendedData>
         </Placemark>""")
         }
@@ -231,25 +252,68 @@ object KmlExporter {
 
     fun exportCsv(samples: List<DriveTestSample>, outputStream: OutputStream) {
         val writer = outputStream.bufferedWriter(Charsets.UTF_8)
-        writer.write("Timestamp,DateTime,Latitude,Longitude,Altitude_m,Speed_kmh,Bearing,Accuracy_m,Cadence_s,RAT,PCI,ARFCN,Band,RSRP_dBm,RSRQ_dB,SINR_dB,CQI,TAC,CellID\n")
+        val hasSim2 = samples.any { it.metricsSim2 != null }
 
-        for (s in samples) {
-            val m = s.metrics
-            val isNr = m.nr != null
-            val rat = if (isNr) (if (m.nr.isNsa) "5G_NSA" else "5G_SA") else if (m.lte != null) "LTE" else "Unknown"
-            val pci = m.nr?.pci ?: m.lte?.pci ?: ""
-            val arfcn = m.nr?.nrArfcn ?: m.lte?.earfcn ?: ""
-            val band = m.nr?.band ?: m.lte?.band ?: ""
-            val rsrp = m.nr?.ssRsrp ?: m.lte?.rsrp ?: ""
-            val rsrq = m.nr?.ssRsrq ?: m.lte?.rsrq ?: ""
-            val sinr = m.nr?.ssSinr ?: m.lte?.rssnr ?: ""
-            val cqi = m.lte?.cqi ?: ""
-            val tac = m.nr?.tac ?: m.lte?.tac ?: ""
-            val cellId = m.nr?.nci ?: m.lte?.eci ?: ""
-            val dt = displayFormat.format(Date(s.timestamp))
-            val cadenceSec = s.cadence.intervalMs / 1000
+        if (hasSim2) {
+            writer.write("Timestamp,DateTime,Latitude,Longitude,Altitude_m,Speed_kmh,Bearing,Accuracy_m,Cadence_s,SIM1_Name,SIM1_RAT,SIM1_Operator,SIM1_PCI,SIM1_ARFCN,SIM1_Band,SIM1_RSRP_dBm,SIM1_RSRQ_dB,SIM1_SINR_dB,SIM1_CQI,SIM1_TAC,SIM1_CellID,SIM2_Name,SIM2_RAT,SIM2_Operator,SIM2_PCI,SIM2_ARFCN,SIM2_Band,SIM2_RSRP_dBm,SIM2_RSRQ_dB,SIM2_SINR_dB,SIM2_CQI,SIM2_TAC,SIM2_CellID\n")
+            for (s in samples) {
+                val dt = displayFormat.format(Date(s.timestamp))
+                val cadenceSec = s.cadence.intervalMs / 1000
 
-            writer.write("${s.timestamp},$dt,${s.latitude},${s.longitude},${s.altitude},${s.speedKmh},${s.bearing},${s.accuracyMeters},$cadenceSec,$rat,$pci,$arfcn,$band,$rsrp,$rsrq,$sinr,$cqi,$tac,$cellId\n")
+                // SIM 1
+                val m1 = s.metrics
+                val isNr1 = m1.nr != null
+                val rat1 = if (isNr1) (if (m1.nr.isNsa) "5G_NSA" else "5G_SA") else if (m1.lte != null) "LTE" else "Unknown"
+                val name1 = m1.simDisplayName ?: s.simDisplayName ?: "SIM 1"
+                val op1 = m1.operatorAlpha ?: ""
+                val pci1 = m1.nr?.pci ?: m1.lte?.pci ?: ""
+                val arfcn1 = m1.nr?.nrArfcn ?: m1.lte?.earfcn ?: ""
+                val band1 = m1.nr?.band ?: m1.lte?.band ?: ""
+                val rsrp1 = m1.nr?.ssRsrp ?: m1.lte?.rsrp ?: ""
+                val rsrq1 = m1.nr?.ssRsrq ?: m1.lte?.rsrq ?: ""
+                val sinr1 = m1.nr?.ssSinr ?: m1.lte?.rssnr ?: ""
+                val cqi1 = m1.lte?.cqi ?: ""
+                val tac1 = m1.nr?.tac ?: m1.lte?.tac ?: ""
+                val cellId1 = m1.nr?.nci ?: m1.lte?.eci ?: ""
+
+                // SIM 2
+                val m2 = s.metricsSim2
+                val isNr2 = m2?.nr != null
+                val rat2 = if (m2 == null) "" else if (isNr2) (if (m2.nr!!.isNsa) "5G_NSA" else "5G_SA") else if (m2.lte != null) "LTE" else "Unknown"
+                val name2 = m2?.simDisplayName ?: "SIM 2"
+                val op2 = m2?.operatorAlpha ?: ""
+                val pci2 = m2?.nr?.pci ?: m2?.lte?.pci ?: ""
+                val arfcn2 = m2?.nr?.nrArfcn ?: m2?.lte?.earfcn ?: ""
+                val band2 = m2?.nr?.band ?: m2?.lte?.band ?: ""
+                val rsrp2 = m2?.nr?.ssRsrp ?: m2?.lte?.rsrp ?: ""
+                val rsrq2 = m2?.nr?.ssRsrq ?: m2?.lte?.rsrq ?: ""
+                val sinr2 = m2?.nr?.ssSinr ?: m2?.lte?.rssnr ?: ""
+                val cqi2 = m2?.lte?.cqi ?: ""
+                val tac2 = m2?.nr?.tac ?: m2?.lte?.tac ?: ""
+                val cellId2 = m2?.nr?.nci ?: m2?.lte?.eci ?: ""
+
+                writer.write("${s.timestamp},$dt,${s.latitude},${s.longitude},${s.altitude},${s.speedKmh},${s.bearing},${s.accuracyMeters},$cadenceSec,$name1,$rat1,$op1,$pci1,$arfcn1,$band1,$rsrp1,$rsrq1,$sinr1,$cqi1,$tac1,$cellId1,$name2,$rat2,$op2,$pci2,$arfcn2,$band2,$rsrp2,$rsrq2,$sinr2,$cqi2,$tac2,$cellId2\n")
+            }
+        } else {
+            writer.write("Timestamp,DateTime,Latitude,Longitude,Altitude_m,Speed_kmh,Bearing,Accuracy_m,Cadence_s,RAT,PCI,ARFCN,Band,RSRP_dBm,RSRQ_dB,SINR_dB,CQI,TAC,CellID\n")
+            for (s in samples) {
+                val m = s.metrics
+                val isNr = m.nr != null
+                val rat = if (isNr) (if (m.nr.isNsa) "5G_NSA" else "5G_SA") else if (m.lte != null) "LTE" else "Unknown"
+                val pci = m.nr?.pci ?: m.lte?.pci ?: ""
+                val arfcn = m.nr?.nrArfcn ?: m.lte?.earfcn ?: ""
+                val band = m.nr?.band ?: m.lte?.band ?: ""
+                val rsrp = m.nr?.ssRsrp ?: m.lte?.rsrp ?: ""
+                val rsrq = m.nr?.ssRsrq ?: m.lte?.rsrq ?: ""
+                val sinr = m.nr?.ssSinr ?: m.lte?.rssnr ?: ""
+                val cqi = m.lte?.cqi ?: ""
+                val tac = m.nr?.tac ?: m.lte?.tac ?: ""
+                val cellId = m.nr?.nci ?: m.lte?.eci ?: ""
+                val dt = displayFormat.format(Date(s.timestamp))
+                val cadenceSec = s.cadence.intervalMs / 1000
+
+                writer.write("${s.timestamp},$dt,${s.latitude},${s.longitude},${s.altitude},${s.speedKmh},${s.bearing},${s.accuracyMeters},$cadenceSec,$rat,$pci,$arfcn,$band,$rsrp,$rsrq,$sinr,$cqi,$tac,$cellId\n")
+            }
         }
         writer.flush()
     }
