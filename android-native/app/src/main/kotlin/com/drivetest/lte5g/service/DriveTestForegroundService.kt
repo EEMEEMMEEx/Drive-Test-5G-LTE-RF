@@ -48,6 +48,11 @@ class DriveTestForegroundService : Service() {
         super.onCreate()
         SessionRepository.initStorage(applicationContext)
         createNotificationChannel()
+        LiveAlertNotificationHelper.initMediaSession(
+            context = this,
+            onStop = { stop(this) },
+            onNewSession = { newSession(this) }
+        )
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
         refreshAvailableSims(this)
@@ -271,11 +276,13 @@ class DriveTestForegroundService : Service() {
         locationCollector.stopTracking()
         SessionRepository.finishCurrentSession()
         _isRecording.value = false
+        LiveAlertNotificationHelper.updatePlaybackState(isRecording = false)
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     override fun onDestroy() {
         stopRecording()
+        LiveAlertNotificationHelper.releaseMediaSession()
         cellCollector.stop()
         super.onDestroy()
     }
@@ -316,7 +323,7 @@ class DriveTestForegroundService : Service() {
 
     companion object {
         const val TAG = "DriveTestService"
-        const val CHANNEL_ID = "drive_test_channel"
+        const val CHANNEL_ID = LiveAlertNotificationHelper.CHANNEL_ID
         const val NOTIFICATION_ID = 1001
 
         const val ACTION_START = "com.drivetest.lte5g.action.START"
