@@ -161,7 +161,12 @@ class LiveAlertNotificationHelperTest {
     fun testGenerateSignalArtworkSafe() {
         val metrics = CellMetrics(ratType = RatType.NR_NSA)
         // Must safely handle environment without crashing
-        LiveAlertNotificationHelper.generateSignalArtwork(metrics, LiveAlertNotificationHelper.COLOR_EXCELLENT)
+        LiveAlertNotificationHelper.generateSignalArtwork(
+            metrics = metrics,
+            tierColor = LiveAlertNotificationHelper.COLOR_EXCELLENT,
+            speedKmh = 45.2f,
+            sampleCount = 150
+        )
     }
 
     @Test
