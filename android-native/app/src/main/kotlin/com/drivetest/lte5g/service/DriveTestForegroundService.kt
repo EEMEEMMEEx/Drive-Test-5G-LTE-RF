@@ -50,14 +50,12 @@ class DriveTestForegroundService : Service() {
         SessionRepository.initStorage(applicationContext)
         createNotificationChannel()
 
-        // Only initialize media session if user explicitly selected MEDIA style
-        if (_liveAlertStyle.value == LiveAlertStyle.MEDIA) {
-            LiveAlertNotificationHelper.initMediaSession(
-                context = this,
-                onStop = { stop(this) },
-                onNewSession = { newSession(this) }
-            )
-        }
+        // Initialize MediaSession so Dynamic Island / Fluid Cloud capsule is warm and ready
+        LiveAlertNotificationHelper.initMediaSession(
+            context = this,
+            onStop = { stop(this) },
+            onNewSession = { newSession(this) }
+        )
 
         cellCollector = CellCollector(this)
         locationCollector = LocationCollector(this)
@@ -181,7 +179,7 @@ class DriveTestForegroundService : Service() {
                     try {
                         val newStyle = LiveAlertStyle.valueOf(styleStr)
                         _liveAlertStyle.value = newStyle
-                        if (newStyle == LiveAlertStyle.TELEMETRY) {
+                        if (newStyle == LiveAlertStyle.COMPACT) {
                             LiveAlertNotificationHelper.releaseMediaSession()
                         } else {
                             LiveAlertNotificationHelper.initMediaSession(
@@ -304,7 +302,7 @@ class DriveTestForegroundService : Service() {
         locationCollector.stopTracking()
         SessionRepository.finishCurrentSession()
         _isRecording.value = false
-        if (_liveAlertStyle.value == LiveAlertStyle.MEDIA) {
+        if (_liveAlertStyle.value == LiveAlertStyle.CAPSULE) {
             LiveAlertNotificationHelper.updatePlaybackState(isRecording = false)
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -394,8 +392,8 @@ class DriveTestForegroundService : Service() {
         private val _measurementCadence = MutableStateFlow(MeasurementCadence.PRECISE)
         val measurementCadence: StateFlow<MeasurementCadence> = _measurementCadence.asStateFlow()
 
-        // Default to TELEMETRY mode (pure RF telemetry monitor, no media player elements)
-        private val _liveAlertStyle = MutableStateFlow(LiveAlertStyle.TELEMETRY)
+        // Default to CAPSULE mode (Dynamic Island / Fluid Cloud capsule around camera active)
+        private val _liveAlertStyle = MutableStateFlow(LiveAlertStyle.CAPSULE)
         val liveAlertStyle: StateFlow<LiveAlertStyle> = _liveAlertStyle.asStateFlow()
 
         private val _latestSample = MutableStateFlow<DriveTestSample?>(null)
