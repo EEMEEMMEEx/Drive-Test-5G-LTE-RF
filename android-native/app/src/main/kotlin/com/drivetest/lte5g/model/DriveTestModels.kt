@@ -29,15 +29,15 @@ enum class LiveAlertStyle(
     val shortDesc: String,
     val fullDesc: String
 ) {
-    TELEMETRY(
-        label = "RF Telemetry Monitor",
-        shortDesc = "แนะนำ • โหมดมืออาชีพ (ไม่มีปุ่มเพลง)",
-        fullDesc = "การ์ดแจ้งเตือนเทเลเมทรี RF พร้อม Signal Badge และเวลานับสด ไม่มีแถบเลื่อนเพลงและไม่มีปุ่มหูฟัง"
+    CAPSULE(
+        label = "Dynamic Island / Fluid Cloud",
+        shortDesc = "เปิดแคปซูลรอบกล้องหน้า (แนะนำ)",
+        fullDesc = "แสดงแคปซูลสดรอบรูกล้องหน้าแบบเรียลไทม์ พร้อมข้อมูลระดับสัญญาณและปุ่มควบคุม Drive Test"
     ),
-    MEDIA(
-        label = "Media Player Carousel",
-        shortDesc = "โหมดเครื่องเล่นเพลง (Spotify Style)",
-        fullDesc = "เชื่อมต่อระบบ Media Controls ของ Android สำหรับแสดงผลแบบเครื่องเล่นเพลง"
+    COMPACT(
+        label = "Standard Notification",
+        shortDesc = "การแจ้งเตือนปกติ",
+        fullDesc = "แสดงการแจ้งเตือนมาตรฐานในแถบดึงลง โดยไม่ขึ้นแคปซูลรอบกล้องหน้า"
     )
 }
 

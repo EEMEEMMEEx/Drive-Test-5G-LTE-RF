@@ -166,7 +166,7 @@ class LiveAlertNotificationHelperTest {
 
     @Test
     fun testLiveAlertStyles() {
-        assertEquals("RF Telemetry Monitor", LiveAlertStyle.TELEMETRY.label)
-        assertEquals("Media Player Carousel", LiveAlertStyle.MEDIA.label)
+        assertEquals("Dynamic Island / Fluid Cloud", LiveAlertStyle.CAPSULE.label)
+        assertEquals("Standard Notification", LiveAlertStyle.COMPACT.label)
     }
 }

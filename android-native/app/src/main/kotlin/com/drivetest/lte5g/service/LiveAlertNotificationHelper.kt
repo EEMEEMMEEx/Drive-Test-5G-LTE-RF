@@ -28,13 +28,11 @@ import java.util.Locale
 /**
  * Helper object to build Live Alerts Notifications for Drive Test LTE/5G NR.
  * Supports two distinct presentation styles:
- * 1. TELEMETRY (Recommended / Default): Pure RF telemetry monitor with dynamic signal badge,
- *    live ticking chronometer, and clean action buttons. NO music playback controls, NO seekbar,
- *    and NO audio routing buttons.
- * 2. MEDIA: Spotify-style MediaSession + MediaStyle for the system media carousel.
- *
- * Both modes integrate with Android 16/17 Promoted Ongoing Notifications and ColorOS/OxygenOS
- * Fluid Cloud capsule hooks.
+ * 1. CAPSULE (Default & Recommended): Activates the Dynamic Island / Fluid Cloud capsule
+ *    around the punch-hole front camera on ColorOS / OxygenOS (OnePlus, OPPO, Realme) and
+ *    Android 16/17 Promoted Ongoing Notifications. Uses clean RF telemetry labels without
+ *    music playback seekbars.
+ * 2. COMPACT: Standard notification drawer card with multi-line BigTextStyle.
  */
 object LiveAlertNotificationHelper {
 
@@ -96,7 +94,7 @@ object LiveAlertNotificationHelper {
         mediaSession = null
     }
 
-    fun updatePlaybackState(isRecording: Boolean, elapsedMs: Long = 0L) {
+    fun updatePlaybackState(isRecording: Boolean) {
         val session = mediaSession ?: return
         try {
             val state = if (isRecording) {
@@ -110,7 +108,8 @@ object LiveAlertNotificationHelper {
                     PlaybackStateCompat.ACTION_PAUSE or
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                 )
-                .setState(state, elapsedMs, if (isRecording) 1.0f else 0.0f)
+                // PLAYBACK_POSITION_UNKNOWN (-1L) suppresses the audio seek bar!
+                .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, if (isRecording) 1.0f else 0.0f)
                 .build()
             session.setPlaybackState(playbackState)
         } catch (_: Exception) {}
@@ -316,7 +315,7 @@ object LiveAlertNotificationHelper {
         cadence: MeasurementCadence,
         simDisplayName: String? = null,
         lockMode: RatLockMode = RatLockMode.AUTO,
-        style: LiveAlertStyle = LiveAlertStyle.TELEMETRY
+        style: LiveAlertStyle = LiveAlertStyle.CAPSULE
     ): Notification {
         val rsrp = getRsrp(metrics)
         val rsrpStr = if (rsrp != null) "$rsrp dBm" else "N/A"
@@ -355,49 +354,67 @@ object LiveAlertNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Branch 1: TELEMETRY Mode (Default & Recommended)
-        // Clean RF telemetry card with dynamic signal badge & chronometer.
-        // No audio scrubber bar, no headphone button, no music controls.
-        if (style == LiveAlertStyle.TELEMETRY) {
-            // Ensure any active MediaSession is released so OS doesn't render media player
-            releaseMediaSession()
+        // Branch 1: CAPSULE Mode (Default & Recommended)
+        // Activates the Dynamic Island / Fluid Cloud capsule around the camera cutout on ColorOS/OxygenOS.
+        // Uses clean labels, no audio scrubber, and dedicated utility buttons (Stop / New Session).
+        if (style == LiveAlertStyle.CAPSULE) {
+            val session = mediaSession ?: initMediaSession(context, {
+                DriveTestForegroundService.stop(context)
+            }, {
+                DriveTestForegroundService.newSession(context)
+            })
 
+            // Set PlaybackState to PLAYING with PLAYBACK_POSITION_UNKNOWN (-1L)
+            // This prevents Android SystemUI from rendering an audio scrubber timeline!
+            val playbackState = PlaybackStateCompat.Builder()
+                .setActions(
+                    PlaybackStateCompat.ACTION_STOP or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                )
+                .setState(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+                .build()
+            session.setPlaybackState(playbackState)
+
+            // Update MediaMetadata with telemetry data
             val titleText = "$ratLabel · $rsrpStr ($qualityLabel)"
-            val contentText = "$sessionName · $sampleCount pts · $speedStr"
-            val subText = "Live Alert · ${cadence.label}"
+            val artistText = "📍 $sampleCount pts  |  🚗 $speedStr"
+            val albumText = "⏱️ $elapsedStr  |  ⚙️ ${cadence.label}${if (!simDisplayName.isNullOrBlank()) "  |  📱 $simDisplayName" else ""}"
 
-            val detailLines = buildString {
-                append("🚗 Speed: $speedStr | 📍 Points: $sampleCount pts\n")
-                append("⏱️ Elapsed: $elapsedStr | ⚙️ Cadence: ${cadence.label} (${cadence.frequencyLabel})\n")
-                if (!simDisplayName.isNullOrBlank()) {
-                    append("📱 SIM: $simDisplayName | ")
-                }
-                append("🔒 Mode: ${lockMode.name}")
+            val metadataBuilder = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, titleText)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistText)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumText)
+                // NOTE: We intentionally OMIT METADATA_KEY_DURATION so SystemUI does not render a duration bar
+
+            if (artworkBitmap != null) {
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artworkBitmap)
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artworkBitmap)
             }
+            session.setMetadata(metadataBuilder.build())
 
-            val bigTextStyle = NotificationCompat.BigTextStyle()
-                .setBigContentTitle(titleText)
-                .setSummaryText(subText)
-                .bigText(detailLines)
+            val mediaStyle = MediaStyle()
+                .setMediaSession(session.sessionToken)
+                .setShowActionsInCompactView(0, 1)
+                .setShowCancelButton(true)
+                .setCancelButtonIntent(stopIntent)
 
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setStyle(bigTextStyle)
+                .setStyle(mediaStyle)
                 .setContentTitle(titleText)
-                .setContentText(contentText)
-                .setSubText(subText)
+                .setContentText(artistText)
+                .setSubText("Live Alert · ${cadence.label}")
                 .setSmallIcon(android.R.drawable.stat_sys_upload)
                 .setColor(tierColor)
                 .setColorized(true)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setUsesChronometer(true)
-                .setWhen(startTimeMillis)
-                .setShowWhen(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
                 .setContentIntent(pendingIntent)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
+                // Utility action buttons (Stop Recording / New Session)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopIntent)
                 .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
 
             if (artworkBitmap != null) {
@@ -407,12 +424,12 @@ object LiveAlertNotificationHelper {
             // Android 16/17 Promoted Ongoing Notifications (Live Updates)
             builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
 
-            // ColorOS / OxygenOS Fluid Cloud / Live Alerts capsule triggers (around camera)
+            // ColorOS / OxygenOS Fluid Cloud capsule hooks (around punch-hole camera)
             builder.extras.putBoolean("oplus.notification.capsule", true)
             builder.extras.putBoolean("coloros.notification.capsule", true)
             builder.extras.putBoolean("com.oplus.notification.capsule", true)
-            builder.extras.putString("oplus.notification.capsule.type", "workout")
-            builder.extras.putString("coloros.notification.capsule.type", "workout")
+            builder.extras.putString("oplus.notification.capsule.type", "media")
+            builder.extras.putString("coloros.notification.capsule.type", "media")
             builder.extras.putString("oplus.notification.capsule.status", "active")
             builder.extras.putString("oplus.notification.capsule.title", "$ratLabel · $rsrpStr")
             builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
@@ -423,74 +440,52 @@ object LiveAlertNotificationHelper {
             return builder.build()
         }
 
-        // Branch 2: MEDIA Mode (Spotify Media Player Carousel)
-        val session = mediaSession ?: initMediaSession(context, {
-            DriveTestForegroundService.stop(context)
-        }, {
-            DriveTestForegroundService.newSession(context)
-        })
+        // Branch 2: COMPACT Mode (Standard notification drawer card)
+        releaseMediaSession()
 
-        val elapsedMs = maxOf(0L, System.currentTimeMillis() - startTimeMillis)
-        val playbackState = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_STOP or
-                PlaybackStateCompat.ACTION_PAUSE or
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-            )
-            .setState(PlaybackStateCompat.STATE_PLAYING, elapsedMs, 1.0f)
-            .build()
-        session.setPlaybackState(playbackState)
+        val titleText = "$ratLabel · $rsrpStr ($qualityLabel)"
+        val contentText = "$sessionName · $sampleCount pts · $speedStr"
+        val subText = "Live Alert · ${cadence.label}"
 
-        val titleText = "$ratLabel · $rsrpStr"
-        val artistText = "$sessionName · $sampleCount pts · $speedStr"
-        val albumText = "RF Drive Test · Cadence: ${cadence.label}${if (!simDisplayName.isNullOrBlank()) " · $simDisplayName" else ""}"
-
-        val metadataBuilder = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, titleText)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistText)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumText)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
-
-        if (artworkBitmap != null) {
-            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artworkBitmap)
-            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artworkBitmap)
+        val detailLines = buildString {
+            append("🚗 Speed: $speedStr | 📍 Points: $sampleCount pts\n")
+            append("⏱️ Elapsed: $elapsedStr | ⚙️ Cadence: ${cadence.label} (${cadence.frequencyLabel})\n")
+            if (!simDisplayName.isNullOrBlank()) {
+                append("📱 SIM: $simDisplayName | ")
+            }
+            append("🔒 Mode: ${lockMode.name}")
         }
-        session.setMetadata(metadataBuilder.build())
 
-        val mediaStyle = MediaStyle()
-            .setMediaSession(session.sessionToken)
-            .setShowActionsInCompactView(0, 1)
-            .setShowCancelButton(true)
-            .setCancelButtonIntent(stopIntent)
+        val bigTextStyle = NotificationCompat.BigTextStyle()
+            .setBigContentTitle(titleText)
+            .setSummaryText(subText)
+            .bigText(detailLines)
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setStyle(mediaStyle)
+            .setStyle(bigTextStyle)
             .setContentTitle(titleText)
-            .setContentText(artistText)
-            .setSubText("Live Alert · ${cadence.label}")
+            .setContentText(contentText)
+            .setSubText(subText)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setColor(tierColor)
             .setColorized(true)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setUsesChronometer(true)
+            .setWhen(startTimeMillis)
+            .setShowWhen(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopIntent)
-            .addAction(android.R.drawable.ic_media_next, "New Session", newSessionIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
+            .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
 
         if (artworkBitmap != null) {
             builder.setLargeIcon(artworkBitmap)
         }
 
         builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
-        builder.extras.putBoolean("oplus.notification.capsule", true)
-        builder.extras.putBoolean("coloros.notification.capsule", true)
-        builder.extras.putBoolean("com.oplus.notification.capsule", true)
-        builder.extras.putString("oplus.notification.capsule.type", "media")
-        builder.extras.putString("coloros.notification.capsule.type", "media")
-        builder.extras.putString("oplus.notification.capsule.status", "active")
         builder.extras.putString("android.substName", "Drive Test 5G")
 
         return builder.build()
