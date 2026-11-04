@@ -21,14 +21,15 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 10
-    versionName = "1.6.0"
+    versionCode = 11
+    versionName = "1.7.0"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfig = signingConfigs.getByName("debug")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }
