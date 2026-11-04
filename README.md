@@ -10,7 +10,7 @@ A local-first web application replicating the full capabilities, UI screens, dat
 - **PWA & Android Native Runtime (v1.10.8):**
   - **PWA Offline-First:** Service worker precaching, Web App Manifest, offline map tile caching (`stale-while-revalidate` / `network-first`), and standalone install prompt.
   - **Capacitor Android Wrapper:** Bridge plugin (`DriveTestPlugin.java`) with foreground service (`DriveTestForegroundService.java`) for real cellular telephony radio metrics and GNSS location tracking on device.
-  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.8.8`) with In-Place Telemetry Dynamic Island Fluid Cloud capsule (with Telemetry HUD tile, custom Stop/New Session actions, and suppressed audio scrubber), In-App OTA Updates, Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
+  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.8.9`) with In-Place Telemetry Dynamic Island Fluid Cloud capsule (with Telemetry HUD tile, custom Stop/New Session actions, and suppressed audio scrubber), In-App OTA Updates, Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
 - **Screen S01 — Live Drive Test Dashboard (`DriveTestDashboard`):**
   - Real-time semi-circular RSRP gauge (`-135` to `-55 dBm`) with live RSRQ, SINR, RSSI, CSI-RSRP, CQI (`1..15`), and Timing Advance (`TA`).
   - Serving Cell & **5G NR (`SA` / `NSA`) + LTE Carrier Aggregation (`CA`)** component monitor (`Band`, `EARFCN`, `DL Frequency`, `Bandwidth`, `PCI`, `Cell ID`, `TAC/LAC`, `PLMN`).
