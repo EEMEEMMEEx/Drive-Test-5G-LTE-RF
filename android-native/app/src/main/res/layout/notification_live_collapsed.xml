@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:background="@drawable/bg_notification_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="6dp">
+
+    <!-- 5G Badge -->
+    <TextView
+        android:id="@+id/tv_collapsed_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_badge_5g"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:text="5G NSA"
+        android:textColor="#34D399"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- Hero RSRP -->
+    <TextView
+        android:id="@+id/tv_collapsed_rsrp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:text="-78 dBm"
+        android:textColor="#10B981"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <!-- Quality Pill -->
+    <TextView
+        android:id="@+id/tv_collapsed_quality"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_badge_5g"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:text="EXCELLENT"
+        android:textColor="#34D399"
+        android:textSize="8sp"
+        android:textStyle="bold" />
+
+    <!-- Space -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1" />
+
+    <!-- Speed & Points -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_collapsed_speed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚗 2.2 km/h"
+            android:textColor="#E2E8F0"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_collapsed_points"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 147 pts"
+            android:textColor="#94A3B8"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+</LinearLayout>
