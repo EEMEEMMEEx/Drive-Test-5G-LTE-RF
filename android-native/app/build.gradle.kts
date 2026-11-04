@@ -12,7 +12,7 @@ val localProperties = Properties().apply {
     load(file.inputStream())
   }
 }
-val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: "AIzaSyAxETgdAlp82c8VtZjmFxjHP15NKGh0eUI"
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: System.getenv("MAPS_API_KEY") ?: ""
 
 android {
   namespace = "com.drivetest.lte5g"
@@ -21,8 +21,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 7
-    versionName = "1.4.1"
+    versionCode = 8
+    versionName = "1.4.2"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 
