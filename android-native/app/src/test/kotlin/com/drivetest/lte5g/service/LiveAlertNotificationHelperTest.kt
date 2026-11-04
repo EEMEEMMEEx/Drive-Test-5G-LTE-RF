@@ -171,7 +171,7 @@ class LiveAlertNotificationHelperTest {
 
     @Test
     fun testLiveAlertStyles() {
-        assertEquals("Dynamic Island / Fluid Cloud", LiveAlertStyle.CAPSULE.label)
+        assertEquals("Navigation Live Updates", LiveAlertStyle.CAPSULE.label)
         assertEquals("Standard Notification", LiveAlertStyle.COMPACT.label)
     }
 }

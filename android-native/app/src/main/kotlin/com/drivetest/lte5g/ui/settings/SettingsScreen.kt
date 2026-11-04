@@ -81,12 +81,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.8.9"
+    val currentVersionName = packageInfo?.versionName ?: "1.8.10"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 22
+        packageInfo?.longVersionCode?.toInt() ?: 23
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 22
+        packageInfo?.versionCode ?: 23
     }
 
     Column(
