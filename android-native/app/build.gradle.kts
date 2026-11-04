@@ -21,8 +21,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 8
-    versionName = "1.4.2"
+    versionCode = 9
+    versionName = "1.5.0"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 
@@ -81,6 +81,7 @@ dependencies {
   // Local tests: jUnit, coroutines, Android runner
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation("org.json:json:20240303")
 
   // Instrumented tests: jUnit rules and runners
   androidTestImplementation(libs.androidx.test.core)
