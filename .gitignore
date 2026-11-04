@@ -16,3 +16,23 @@ __pycache__/
 *.pyc
 
 .vercel
+
+
+# Android & Gradle Build Artifacts
+.gradle/
+build/
+**/build/
+app/build/
+app/release/
+local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Temporary Design Slices
+slice_*.png
+top_bar.png
