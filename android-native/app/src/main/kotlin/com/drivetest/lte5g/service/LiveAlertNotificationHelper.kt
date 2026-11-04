@@ -12,9 +12,10 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
-import android.os.Bundle
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
+import com.drivetest.lte5g.R
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
@@ -24,20 +25,16 @@ import java.util.Locale
 
 /**
  * Helper object to build Live Alerts Notifications for Drive Test LTE/5G NR.
- * Supports two distinct presentation styles:
- * 1. CAPSULE (Default & Recommended): Activates the Dynamic Island / Fluid Cloud capsule
- *    around the punch-hole front camera on ColorOS / OxygenOS (OnePlus, OPPO, Realme) and
- *    Android 16/17 Promoted Ongoing Notifications.
- *    Built on Google Maps Navigation Live Updates architecture:
- *    - Uses CATEGORY_NAVIGATION with Notification.ProgressStyle / BigTextStyle telemetry matrix.
- *    - Pure RF instrument: 0% music artifacts (no headphones icon, no audio scrubber, no pause circles).
- *    - Native utility actions: [Stop Recording] and [New Session].
- *    - Dynamic punch-hole capsule displays cellular RAT and live RSRP dBm.
- * 2. COMPACT: Standard notification drawer card with multi-line BigTextStyle.
+ * Matches pixel-for-pixel the UI designs in `designs/dashboard.figcraft`:
+ * - Collapsed: Sleek dark capsule bar with 5G badge, hero dBm, quality pill, and live speed.
+ * - Expanded: High-density RF Telemetry card with hero -78 dBm, serving sector, route progress track,
+ *   2x3 telemetry matrix (RSRQ, SINR, PCI, Speed, Points, SIM), and custom action buttons.
+ * - 0% Music Player artifacts (no headphones icon, no scrubber line, no pause circles).
+ * - NOT colorized green: maintains dark navy/charcoal styling consistent with FigCraft design.
  */
 object LiveAlertNotificationHelper {
 
-    const val CHANNEL_ID = "drive_test_live_capsule"
+    const val CHANNEL_ID = "drive_test_live_channel_v3"
     const val NOTIFICATION_ID = 1001
 
     // Custom Action identifiers
@@ -55,7 +52,6 @@ object LiveAlertNotificationHelper {
     val COLOR_BAD = 0xFFEF4444.toInt()       // < -115 dBm (Red)
     val COLOR_DEFAULT = 0xFF06B6D4.toInt()   // Scanning / No Signal (Cyan)
 
-    // Backward-compatibility stubs preserved so existing calls do not break
     fun initMediaSession(context: Context, onStop: () -> Unit, onNewSession: () -> Unit) {}
     fun releaseMediaSession() {}
     fun updatePlaybackState(isRecording: Boolean) {}
@@ -64,20 +60,22 @@ object LiveAlertNotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)
 
+            // Remove legacy channels to force ColorOS to pick up fresh banner/capsule permissions
             try {
                 manager?.deleteNotificationChannel("drive_test_channel")
+                manager?.deleteNotificationChannel("drive_test_live_capsule")
             } catch (_: Exception) {}
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Drive Test Live Alerts (Capsule)",
+                "Drive Test Live Alerts",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Live dynamic capsule around camera cutout and real-time recording controls"
                 setShowBadge(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setSound(null, null)
-                enableVibration(false)
+                enableLights(true)
+                lightColor = COLOR_EXCELLENT
             }
             manager?.createNotificationChannel(channel)
         }
@@ -154,14 +152,6 @@ object LiveAlertNotificationHelper {
         }
     }
 
-    /**
-     * Dynamically generates a high-density 256x256 square "Drive Test Telemetry HUD Tile" bitmap,
-     * rendering the full RF telemetry matrix:
-     * - Top Header: Cellular RAT and Carrier Band
-     * - Center: Prominent RSRP value in neon tier color with dBm unit and quality label
-     * - Middle Grid: Secondary RF metrics (RSRQ & SINR) in 2-column layout
-     * - Bottom Row: Speed km/h, points count, and illuminated 5-tier signal bars.
-     */
     fun generateSignalArtwork(
         metrics: CellMetrics?,
         tierColor: Int,
@@ -173,7 +163,6 @@ object LiveAlertNotificationHelper {
             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
 
-            // 1. Dark sleek background with rounded corners
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF0B1120.toInt()
                 style = Paint.Style.FILL
@@ -181,7 +170,6 @@ object LiveAlertNotificationHelper {
             val rect = RectF(0f, 0f, size.toFloat(), size.toFloat())
             canvas.drawRoundRect(rect, 28f, 28f, bgPaint)
 
-            // 2. Subtle glowing border in signal tier color
             val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = tierColor
                 alpha = 110
@@ -190,7 +178,6 @@ object LiveAlertNotificationHelper {
             }
             canvas.drawRoundRect(rect, 28f, 28f, borderPaint)
 
-            // 3. Top Header Strip (Pill)
             val headerBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF1E293B.toInt()
                 style = Paint.Style.FILL
@@ -200,14 +187,13 @@ object LiveAlertNotificationHelper {
 
             val ratText = formatRatLabel(metrics)
             val ratPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFF38BDF8.toInt() // Sky Blue
+                color = 0xFF38BDF8.toInt()
                 textSize = 19f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
             canvas.drawText(ratText, size / 2f, 35f, ratPaint)
 
-            // 4. Center RSRP Metrics
             val rsrp = getRsrp(metrics)
             val rsrpText = if (rsrp != null) "$rsrp" else "--"
             val rsrpPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -235,7 +221,6 @@ object LiveAlertNotificationHelper {
             }
             canvas.drawText(qualityLabel, size / 2f, 120f, qualityPaint)
 
-            // 5. Secondary 2-Column Telemetry Grid (RSRQ & SINR)
             val rsrq = metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq
             val sinr = metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr
 
@@ -245,7 +230,6 @@ object LiveAlertNotificationHelper {
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
-
             val subValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFE2E8F0.toInt()
                 textSize = 16f
@@ -253,26 +237,22 @@ object LiveAlertNotificationHelper {
                 textAlign = Paint.Align.CENTER
             }
 
-            // Left Column: RSRQ
             val leftColX = 70f
             canvas.drawText("RSRQ", leftColX, 148f, subLabelPaint)
             val rsrqStr = if (rsrq != null) "$rsrq dB" else "--"
             canvas.drawText(rsrqStr, leftColX, 170f, subValPaint)
 
-            // Right Column: SINR
             val rightColX = 186f
             canvas.drawText("SINR", rightColX, 148f, subLabelPaint)
             val sinrStr = if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--"
             canvas.drawText(sinrStr, rightColX, 170f, subValPaint)
 
-            // Vertical Column Divider
             val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF334155.toInt()
                 strokeWidth = 1.5f
             }
             canvas.drawLine(128f, 138f, 128f, 176f, divPaint)
 
-            // 6. Bottom Row: Stats & 5-Tier Signal Bars
             val speedFormatted = formatSpeed(speedKmh)
             val statsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFF94A3B8.toInt()
@@ -335,7 +315,6 @@ object LiveAlertNotificationHelper {
         val elapsedStr = formatElapsedTime(startTimeMillis)
         val artworkBitmap = generateSignalArtwork(metrics, tierColor, speedKmh, sampleCount)
 
-        // Pending Intents for Navigation & Action Controls
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
@@ -366,127 +345,67 @@ object LiveAlertNotificationHelper {
         val rsrq = metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq
         val sinr = metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr
         val pci = metrics?.nr?.pci ?: metrics?.lte?.pci
-        val sector = metrics?.nr?.let { "NR Cell #${it.pci} (n${it.band})" }
-            ?: metrics?.lte?.let { "LTE Cell #${it.pci} (B${it.band})" }
+        val sector = metrics?.nr?.let { "Cell #${it.pci} (n${it.band})" }
+            ?: metrics?.lte?.let { "Cell #${it.pci} (B${it.band})" }
             ?: "Serving Sector"
 
-        // Branch 1: CAPSULE Mode (Google Maps Navigation Live Updates Architecture)
-        // Activates the native Dynamic Island / Fluid Cloud capsule around punch-hole front camera
-        // on ColorOS/OxygenOS (OPPO, OnePlus, Realme) and Android 16/17 Promoted Ongoing Live Updates.
-        // Pure RF instrument: 0% music artifacts, no scrubber timeline, no headphone button.
-        if (style == LiveAlertStyle.CAPSULE) {
-            val titleText = "$ratLabel · $rsrpStr ($qualityLabel)"
-            val contentText = "📍 $sampleCount pts  |  🚗 $speedStr"
-            val subText = "Drive Test Live • ${cadence.label}"
-
-            val detailLines = buildString {
-                append("🚗 Speed: $speedStr | 📍 Points: $sampleCount pts\n")
-                append("📶 RSRQ: ${if (rsrq != null) "$rsrq dB" else "--"} | SINR: ${if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--"}\n")
-                if (pci != null) {
-                    append("📡 PCI: $pci | Sector: $sector\n")
-                }
-                append("⏱️ Elapsed: $elapsedStr | ⚙️ Cadence: ${cadence.label}")
-                if (!simDisplayName.isNullOrBlank()) {
-                    append(" | 📱 SIM: $simDisplayName")
-                }
-            }
-
-            val bigTextStyle = NotificationCompat.BigTextStyle()
-                .setBigContentTitle(titleText)
-                .setSummaryText(subText)
-                .bigText(detailLines)
-
-            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setStyle(bigTextStyle)
-                .setContentTitle(titleText)
-                .setContentText(contentText)
-                .setSubText(subText)
-                .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setColor(tierColor)
-                .setColorized(true)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setUsesChronometer(true)
-                .setWhen(startTimeMillis)
-                .setShowWhen(true)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-                .setContentIntent(pendingIntent)
-                // Linear route progress indicator (100% replacement for music scrubber)
-                .setProgress(100, (sampleCount % 100), false)
-                // Clean utility actions
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
-                .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
-
-            if (artworkBitmap != null) {
-                builder.setLargeIcon(artworkBitmap)
-            }
-
-            // Android 16 (API 36) / Android 17 (API 37) Promoted Ongoing Live Updates
-            builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
-
-            // ColorOS / OxygenOS Fluid Cloud Navigation Capsule hooks (around camera cutout)
-            builder.extras.putBoolean("oplus.notification.capsule", true)
-            builder.extras.putBoolean("coloros.notification.capsule", true)
-            builder.extras.putBoolean("com.oplus.notification.capsule", true)
-            builder.extras.putString("oplus.notification.capsule.type", "navigation")
-            builder.extras.putString("coloros.notification.capsule.type", "navigation")
-            builder.extras.putString("oplus.notification.capsule.status", "active")
-            builder.extras.putString("oplus.notification.capsule.title", "$ratLabel · $rsrpStr")
-            builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
-            builder.extras.putString("coloros.notification.capsule.title", "$ratLabel · $rsrpStr")
-            builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
-            builder.extras.putString("android.substName", "Drive Test 5G")
-
-            // Android 16 (API 36+) Notification.ProgressStyle compatibility hook
-            if (Build.VERSION.SDK_INT >= 36) {
-                try {
-                    val progressStyleClass = Class.forName("android.app.Notification\$ProgressStyle")
-                    val progressStyle = progressStyleClass.getConstructor().newInstance()
-                    progressStyleClass.getMethod("setProgress", Int::class.javaPrimitiveType)
-                        .invoke(progressStyle, sampleCount % 100)
-                } catch (_: Throwable) {}
-            }
-
-            return builder.build()
+        // =========================================================================
+        // 1. Inflate RemoteViews matching `designs/dashboard.figcraft` exactly
+        // =========================================================================
+        val rvCollapsed = RemoteViews(context.packageName, R.layout.notification_live_collapsed).apply {
+            setTextViewText(R.id.tv_collapsed_badge, ratLabel)
+            setTextViewText(R.id.tv_collapsed_rsrp, rsrpStr)
+            setTextColor(R.id.tv_collapsed_rsrp, tierColor)
+            setTextViewText(R.id.tv_collapsed_quality, qualityLabel.uppercase(Locale.US))
+            setTextColor(R.id.tv_collapsed_quality, tierColor)
+            setTextViewText(R.id.tv_collapsed_speed, "🚗 $speedStr")
+            setTextViewText(R.id.tv_collapsed_points, "📍 $sampleCount pts")
         }
 
-        // Branch 2: COMPACT Mode (Standard notification drawer card)
-        val titleText = "$ratLabel · $rsrpStr ($qualityLabel)"
-        val contentText = "$sessionName · $sampleCount pts · $speedStr"
-        val subText = "Live Alert · ${cadence.label}"
+        val rvExpanded = RemoteViews(context.packageName, R.layout.notification_live_expanded).apply {
+            val ratShort = if (metrics?.ratType == RatType.NR_NSA || metrics?.ratType == RatType.NR_SA) "5G" else "LTE"
+            setTextViewText(R.id.tv_badge_rat, ratShort)
+            setTextViewText(R.id.tv_title, "Drive Test • RF Live Tracking")
+            setTextViewText(R.id.tv_subtitle, "$sessionName ($elapsedStr)")
+            setTextViewText(R.id.tv_cadence_chip, cadence.label)
+            setTextViewText(R.id.tv_timer_chip, elapsedStr)
 
-        val detailLines = buildString {
-            append("🚗 Speed: $speedStr | 📍 Points: $sampleCount pts\n")
-            append("⏱️ Elapsed: $elapsedStr | ⚙️ Cadence: ${cadence.label} (${cadence.frequencyLabel})\n")
-            if (!simDisplayName.isNullOrBlank()) {
-                append("📱 SIM: $simDisplayName | ")
-            }
-            append("🔒 Mode: ${lockMode.name}")
+            setTextViewText(R.id.tv_hero_rsrp, rsrpStr)
+            setTextColor(R.id.tv_hero_rsrp, tierColor)
+            setTextViewText(R.id.tv_quality_pill, qualityLabel.uppercase(Locale.US))
+            setTextColor(R.id.tv_quality_pill, tierColor)
+            setTextViewText(R.id.tv_serving_sector, "Serving: $sector${if (!simDisplayName.isNullOrBlank()) " • $simDisplayName" else ""}")
+
+            setProgressBar(R.id.pb_route_progress, 100, (sampleCount % 100), false)
+            setTextViewText(R.id.tv_route_info, "🚗 $speedStr • $sampleCount pts")
+
+            setTextViewText(R.id.tv_grid_rsrq, if (rsrq != null) "$rsrq dB" else "--")
+            setTextViewText(R.id.tv_grid_sinr, if (sinr != null) String.format(Locale.US, "%.1f dB", sinr) else "--")
+            setTextViewText(R.id.tv_grid_pci, if (pci != null) "$pci" else "--")
+            setTextViewText(R.id.tv_grid_speed, speedStr)
+            setTextViewText(R.id.tv_grid_points, "$sampleCount")
+            setTextViewText(R.id.tv_grid_sim, simDisplayName ?: "SIM 1")
+
+            setOnClickPendingIntent(R.id.btn_stop, stopIntent)
+            setOnClickPendingIntent(R.id.btn_new_session, newSessionIntent)
         }
 
-        val bigTextStyle = NotificationCompat.BigTextStyle()
-            .setBigContentTitle(titleText)
-            .setSummaryText(subText)
-            .bigText(detailLines)
-
+        // =========================================================================
+        // 2. Build Notification with Custom RemoteViews (Dark Card Styling)
+        // =========================================================================
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setStyle(bigTextStyle)
-            .setContentTitle(titleText)
-            .setContentText(contentText)
-            .setSubText(subText)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
-            .setColor(tierColor)
-            .setColorized(true)
+            .setContentTitle("$ratLabel · $rsrpStr ($qualityLabel)")
+            .setContentText("📍 $sampleCount pts  |  🚗 $speedStr")
+            .setCustomContentView(rvCollapsed)
+            .setCustomBigContentView(rvExpanded)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setUsesChronometer(true)
-            .setWhen(startTimeMillis)
-            .setShowWhen(true)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColorized(false) // CRITICAL: NEVER set colorized to prevent solid green background!
+            .setColor(tierColor)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Recording", stopIntent)
             .addAction(android.R.drawable.ic_popup_sync, "New Session", newSessionIntent)
@@ -495,7 +414,20 @@ object LiveAlertNotificationHelper {
             builder.setLargeIcon(artworkBitmap)
         }
 
+        // Android 16 (API 36+) Promoted Ongoing Live Updates
         builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
+
+        // ColorOS / OxygenOS Fluid Cloud Navigation Capsule hooks (around camera cutout)
+        builder.extras.putBoolean("oplus.notification.capsule", true)
+        builder.extras.putBoolean("coloros.notification.capsule", true)
+        builder.extras.putBoolean("com.oplus.notification.capsule", true)
+        builder.extras.putString("oplus.notification.capsule.type", "navigation")
+        builder.extras.putString("coloros.notification.capsule.type", "navigation")
+        builder.extras.putString("oplus.notification.capsule.status", "active")
+        builder.extras.putString("oplus.notification.capsule.title", "$ratLabel · $rsrpStr")
+        builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
+        builder.extras.putString("coloros.notification.capsule.title", "$ratLabel · $rsrpStr")
+        builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
         builder.extras.putString("android.substName", "Drive Test 5G")
 
         return builder.build()
