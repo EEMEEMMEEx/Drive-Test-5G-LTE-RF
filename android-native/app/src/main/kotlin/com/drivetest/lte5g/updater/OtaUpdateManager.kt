@@ -73,6 +73,9 @@ object OtaUpdateManager {
     private val _state = MutableStateFlow<OtaState>(OtaState.Idle)
     val state: StateFlow<OtaState> = _state.asStateFlow()
 
+    private val _lastCheckedTimestamp = MutableStateFlow<Long?>(null)
+    val lastCheckedTimestamp: StateFlow<Long?> = _lastCheckedTimestamp.asStateFlow()
+
     fun resetState() {
         _state.value = OtaState.Idle
     }
@@ -161,6 +164,7 @@ object OtaUpdateManager {
             }
 
             val responseCode = connection.responseCode
+            _lastCheckedTimestamp.value = System.currentTimeMillis()
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
                 val releaseInfo = parseReleaseJson(responseText)
@@ -183,6 +187,7 @@ object OtaUpdateManager {
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
+            _lastCheckedTimestamp.value = System.currentTimeMillis()
             Log.e(TAG, "Failed to check for updates", e)
             val errorMsg = e.localizedMessage ?: "Failed to connect to update server"
             _state.value = OtaState.Error(errorMsg)

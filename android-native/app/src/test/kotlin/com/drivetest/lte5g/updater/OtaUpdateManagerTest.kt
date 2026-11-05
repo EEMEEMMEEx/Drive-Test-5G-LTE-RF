@@ -14,7 +14,7 @@ class OtaUpdateManagerTest {
     fun testCleanVersionString() {
         assertEquals("1.4.2", OtaUpdateManager.cleanVersionString("v1.4.2-android"))
         assertEquals("1.5.0", OtaUpdateManager.cleanVersionString("v1.5.0"))
-        assertEquals("1.9.1", OtaUpdateManager.cleanVersionString("v1.9.1-android"))
+        assertEquals("1.9.2", OtaUpdateManager.cleanVersionString("v1.9.2-android"))
         assertEquals("2.0.0", OtaUpdateManager.cleanVersionString("2.0.0-rc1"))
         assertEquals("1.0.0", OtaUpdateManager.cleanVersionString("  v1.0.0  "))
     }
@@ -24,20 +24,20 @@ class OtaUpdateManagerTest {
         // Newer versions
         assertTrue(OtaUpdateManager.compareVersions("1.5.0", "1.4.2") > 0)
         assertTrue(OtaUpdateManager.compareVersions("v1.5.0", "1.4.2") > 0)
-        assertTrue(OtaUpdateManager.compareVersions("1.9.1", "1.9.0") > 0)
-        assertTrue(OtaUpdateManager.compareVersions("v1.9.1-android", "1.9.0") > 0)
+        assertTrue(OtaUpdateManager.compareVersions("1.9.2", "1.9.0") > 0)
+        assertTrue(OtaUpdateManager.compareVersions("v1.9.2-android", "1.9.0") > 0)
         assertTrue(OtaUpdateManager.compareVersions("2.0.0", "1.9.9") > 0)
         assertTrue(OtaUpdateManager.compareVersions("1.4.10", "1.4.2") > 0)
 
         // Older versions
         assertTrue(OtaUpdateManager.compareVersions("1.4.2", "1.5.0") < 0)
-        assertTrue(OtaUpdateManager.compareVersions("1.9.0", "1.9.1") < 0)
+        assertTrue(OtaUpdateManager.compareVersions("1.9.0", "1.9.2") < 0)
         assertTrue(OtaUpdateManager.compareVersions("1.4.1", "v1.4.2-android") < 0)
 
         // Equal versions
         assertEquals(0, OtaUpdateManager.compareVersions("1.4.2", "1.4.2"))
         assertEquals(0, OtaUpdateManager.compareVersions("v1.4.2-android", "1.4.2"))
-        assertEquals(0, OtaUpdateManager.compareVersions("v1.9.1-android", "1.9.1"))
+        assertEquals(0, OtaUpdateManager.compareVersions("v1.9.2-android", "1.9.2"))
         assertEquals(0, OtaUpdateManager.compareVersions("1.5.0", "1.5.0"))
     }
 
