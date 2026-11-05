@@ -266,6 +266,7 @@ export function App() {
       timestampMs: Date.now(),
       overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
       ratMode,
+      sim2: DEFAULT_SIM_CARDS[1],
     });
   }, [
     activeCampaignId,
@@ -386,6 +387,7 @@ export function App() {
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
         ratMode,
+        sim2: DEFAULT_SIM_CARDS[1],
       });
 
       if (lightProbeEnabled) {
@@ -481,6 +483,7 @@ export function App() {
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
         ratMode,
+        sim2: DEFAULT_SIM_CARDS[1],
       });
 
       const newCampaign: Campaign = {
@@ -785,6 +788,7 @@ export function App() {
   }, []);
 
   const displayRadio = isRunning ? latestMeasurement.radio : BLANK_RADIO_INFO;
+  const displayRadioSim2 = isRunning ? latestMeasurement.radioSim2 : undefined;
   const displayGps = liveSample.gps;
 
   return (
@@ -819,6 +823,8 @@ export function App() {
             distanceMeters={currentCampaign?.distanceMeters ?? 0}
             handoverCount={currentMobility.handovers}
             currentRadio={displayRadio}
+            currentRadioSim2={displayRadioSim2}
+            dualSimEnabled
             currentGps={displayGps}
             recentMeasurements={currentMeasurements}
             availableSims={DEFAULT_SIM_CARDS}

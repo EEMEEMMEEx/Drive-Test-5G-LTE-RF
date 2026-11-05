@@ -53,6 +53,8 @@ export interface DriveTestDashboardProps {
   distanceMeters: number;
   handoverCount: number;
   currentRadio: RadioInfo;
+  currentRadioSim2?: RadioInfo;
+  dualSimEnabled?: boolean;
   currentGps: GpsInfo;
   recentMeasurements: Measurement[];
   availableSims: SimInfo[];
@@ -98,6 +100,8 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     distanceMeters,
     handoverCount,
     currentRadio,
+    currentRadioSim2,
+    dualSimEnabled = false,
     currentGps,
     recentMeasurements,
     availableSims,
@@ -562,6 +566,9 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
           icon={<Gauge className="w-4 h-4" />}
           badge={
             <div className="flex items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-tier1/15 text-tier1 border border-tier1/40">
+                SIM 1 LIVE
+              </span>
               {ratMode !== 'AUTO' && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-warning/20 text-warning border border-warning/40">
                   {ratMode === 'NR_5G_ONLY' ? '5G LOCKED' : '4G LOCKED'}
@@ -692,6 +699,43 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
             </div>
           </div>
         </OpenUiCard>
+
+        {dualSimEnabled && currentRadioSim2 && (
+          <OpenUiCard
+            title={`SIM 2 LIVE · ${currentRadioSim2.operatorName}`}
+            icon={<Radio className="w-4 h-4" />}
+            badge={
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-sim21/15 text-sim21 border border-sim21/40">
+                {currentRadioSim2.technology.replace('_', ' ')} · {currentRadioSim2.nrStatus}
+              </span>
+            }
+            className="lg:col-span-7 rf-containment-panel"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <OpenUiMetric
+                label="SIM 2 RSRP"
+                value={currentRadioSim2.rsrp}
+                unit="dBm"
+                size="lg"
+                variant="accent"
+              />
+              <OpenUiMetric
+                label="SIM 2 RSRQ"
+                value={currentRadioSim2.rsrq}
+                unit="dB"
+                size="lg"
+                variant="accent"
+              />
+              <OpenUiMetric
+                label="SIM 2 SINR"
+                value={currentRadioSim2.sinr.toFixed(1)}
+                unit="dB"
+                size="lg"
+                variant="accent"
+              />
+            </div>
+          </OpenUiCard>
+        )}
 
         {/* Column 2: Serving Cell & Carrier Aggregation */}
         <OpenUiCard
@@ -931,6 +975,16 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
           }
           className="lg:col-span-5"
         >
+          {dualSimEnabled && (
+            <div className="flex items-center gap-4 mb-2 text-[11px] font-semibold">
+              <span className="flex items-center gap-1.5 text-text">
+                <span className="w-2.5 h-2.5 rounded-full bg-tier1" /> SIM 1
+              </span>
+              <span className="flex items-center gap-1.5 text-text">
+                <span className="w-2.5 h-2.5 rounded-full bg-sim21" /> SIM 2
+              </span>
+            </div>
+          )}
           <div className="h-32 w-full">
             <svg viewBox="0 0 600 90" className="w-full h-full overflow-visible">
               <line x1="0" y1="20" x2="600" y2="20" stroke="var(--color-border)" strokeDasharray="4 4" />
@@ -938,7 +992,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
               {recentMeasurements.length > 1 && (
                 <polyline
                   fill="none"
-                  stroke="#38bdf8"
+                  stroke="var(--color-tier1)"
                   strokeWidth="2.5"
                   points={recentMeasurements
                     .slice(-40)
@@ -950,6 +1004,24 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
                     .join(' ')}
                 />
               )}
+              {dualSimEnabled &&
+                recentMeasurements.filter((m) => m.radioSim2).length > 1 && (
+                  <polyline
+                    fill="none"
+                    stroke="var(--color-sim2-1)"
+                    strokeWidth="2"
+                    strokeDasharray="2 3"
+                    points={recentMeasurements
+                      .slice(-40)
+                      .filter((m): m is Measurement & { radioSim2: RadioInfo } => !!m.radioSim2)
+                      .map((m, idx, arr) => {
+                        const x = (idx / Math.max(1, arr.length - 1)) * 590 + 5;
+                        const y = 85 - Math.max(0, Math.min(1, (m.radioSim2.rsrp + 130) / 70)) * 75;
+                        return `${x.toFixed(1)},${y.toFixed(1)}`;
+                      })
+                      .join(' ')}
+                  />
+                )}
             </svg>
           </div>
         </OpenUiCard>
