@@ -19,6 +19,7 @@ describe('Route Map Responsive Layout & Overlay Fixes', () => {
     showNeighborCells: false,
     showHandovers: true,
     showMissedHandovers: true,
+    showSim2Layer: true,
     dotSize: 8,
     rsrpGood: -90,
     rsrpPoor: -110,

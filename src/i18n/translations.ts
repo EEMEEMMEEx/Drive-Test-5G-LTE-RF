@@ -47,6 +47,7 @@ export interface TranslationDictionary {
   showNeighborCells: string;
   showHandovers: string;
   showMissedHandovers: string;
+  showSim2Layer: string;
   searchCampaigns: string;
   exportCsv: string;
   exportKml: string;
@@ -118,6 +119,7 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     showNeighborCells: 'Neighbor Candidates',
     showHandovers: 'Handover Events',
     showMissedHandovers: 'Missed Handovers',
+    showSim2Layer: 'SIM 2 Route',
     searchCampaigns: 'Filter campaigns by name or preset…',
     exportCsv: 'Export CSV',
     exportKml: 'Export KML',
@@ -187,6 +189,7 @@ export const TRANSLATIONS: Record<SupportedLocale, TranslationDictionary> = {
     showNeighborCells: 'แสดงสถานีฐานข้างเคียง',
     showHandovers: 'แสดงจุดเปลี่ยนสถานี (Handover)',
     showMissedHandovers: 'แสดงจุดพลาด Handover',
+    showSim2Layer: 'เส้นทาง SIM 2',
     searchCampaigns: 'ค้นหาชื่อแคมเปญ…',
     exportCsv: 'ส่งออก CSV',
     exportKml: 'ส่งออก KML',

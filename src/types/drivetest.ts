@@ -375,6 +375,7 @@ export interface MapOptions {
   showNeighborCells: boolean;
   showHandovers: boolean;
   showMissedHandovers: boolean;
+  showSim2Layer: boolean;
   dotSize: number;
   rsrpGood: number; // default -90 dBm
   rsrpPoor: number; // default -110 dBm
