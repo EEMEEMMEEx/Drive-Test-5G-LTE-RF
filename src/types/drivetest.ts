@@ -147,6 +147,8 @@ export interface Measurement {
   timestampMs: number;
   radio: RadioInfo;
   gps: GpsInfo;
+  /** SIM 2 live radio snapshot for dual-SIM sessions (Android parity). */
+  radioSim2?: RadioInfo;
 }
 
 export interface Campaign {

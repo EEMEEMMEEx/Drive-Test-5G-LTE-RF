@@ -328,6 +328,8 @@ export function generateSimulatedMeasurement(params: {
   overrideGps?: Partial<GpsInfo>;
   rsrpOffsetDb?: number;
   ratMode?: RatSelectionMode;
+  sim2?: SimInfo;
+  rsrpOffsetSim2Db?: number;
 }): Measurement {
   const {
     campaignId,
@@ -338,6 +340,8 @@ export function generateSimulatedMeasurement(params: {
     overrideGps,
     rsrpOffsetDb = 0,
     ratMode = 'AUTO',
+    sim2,
+    rsrpOffsetSim2Db,
   } = params;
 
   let sectors = PRESET_SECTORS[preset] ?? PRESET_SECTORS.URBAN_ROUTE;
@@ -458,6 +462,29 @@ export function generateSimulatedMeasurement(params: {
     neighborCells,
   };
 
+  let radioSim2: RadioInfo | undefined;
+  if (sim2) {
+    const sim2Offset =
+      rsrpOffsetSim2Db ?? Math.round((pseudoNoise(stepIndex * 7 + campaignId) - 0.5) * 8);
+    const rsrp2 = Math.max(-132, Math.min(-58, rsrp + sim2Offset));
+    radioSim2 = {
+      ...radio,
+      operatorName: sim2.carrierName,
+      mcc: sim2.mcc,
+      mnc: sim2.mnc,
+      simSlot: sim2.slotIndex,
+      cellId: sector.cellId + sim2.slotIndex * 1000,
+      rsrp: rsrp2,
+      rsrq: Math.max(-20, Math.min(-4, Math.round(rsrq - sim2Offset * 0.1))),
+      sinr: Number(Math.max(-6, Math.min(32, sinr - sim2Offset * 0.3)).toFixed(1)),
+      signalLevel: rsrp2 >= -85 ? 4 : rsrp2 >= -95 ? 3 : rsrp2 >= -105 ? 2 : rsrp2 >= -115 ? 1 : 0,
+      cqi: Math.max(1, Math.min(15, Math.round((sinr - sim2Offset * 0.3 + 6) / 2.4))),
+      csiRsrp: rsrp2 + 1,
+      csiRsrq: Math.max(-20, Math.min(-4, Math.round(rsrq - sim2Offset * 0.1))),
+      csiSinr: Math.round(sinr - sim2Offset * 0.3),
+    };
+  }
+
   const gps: GpsInfo = {
     latitude: lat,
     longitude: lon,
@@ -474,6 +501,7 @@ export function generateSimulatedMeasurement(params: {
     campaignId,
     timestampMs,
     radio,
+    radioSim2,
     gps,
   };
 }

@@ -15,6 +15,16 @@
   --color-danger: #f87171;
   --color-success: #4ade80;
   --color-warning: #fbbf24;
+  --color-tier1: #10b981;
+  --color-tier2: #22c55e;
+  --color-tier3: #eab308;
+  --color-tier4: #f97316;
+  --color-tier5: #ef4444;
+  --color-sim2-1: #38bdf8;
+  --color-sim2-2: #818cf8;
+  --color-sim2-3: #a78bfa;
+  --color-sim2-4: #e879f9;
+  --color-sim2-5: #f472b6;
 }
 
 .light-theme {
@@ -30,6 +40,16 @@
   --color-danger: #dc2626;
   --color-success: #15803d;
   --color-warning: #b45309;
+  --color-tier1: #059669;
+  --color-tier2: #16a34a;
+  --color-tier3: #ca8a04;
+  --color-tier4: #ea580c;
+  --color-tier5: #dc2626;
+  --color-sim2-1: #0284c7;
+  --color-sim2-2: #6366f1;
+  --color-sim2-3: #8b5cf6;
+  --color-sim2-4: #c026d3;
+  --color-sim2-5: #db2777;
 }
 
 /* Modern Web Guidance: Dialog backdrop styling */
