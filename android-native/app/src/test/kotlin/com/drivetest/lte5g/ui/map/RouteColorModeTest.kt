@@ -6,7 +6,9 @@ import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -282,5 +284,53 @@ class RouteColorModeTest {
             assertEquals("mode=$mode", true, mode.legendTitle.isNotBlank())
             assertEquals("mode=$mode", true, mode.label.isNotBlank())
         }
+    }
+
+    // ---- SIM 2 live gauge helpers -----------------------------------------
+
+    @Test
+    fun sim2RsrpOf_preferNrPrefersNrOtherwiseLte() {
+        val m = CellMetrics(lte = lte(rsrp = -100), nr = nr(ssRsrp = -80))
+
+        assertEquals(-80, sim2RsrpOf(m, preferNr = true))
+        assertEquals(-100, sim2RsrpOf(m, preferNr = false))
+    }
+
+    @Test
+    fun sim2RsrqOf_preferNrPrefersNrOtherwiseLte() {
+        val m = CellMetrics(lte = lte(rsrq = -18), nr = nr(ssRsrq = -12))
+
+        assertEquals(-12, sim2RsrqOf(m, preferNr = true))
+        assertEquals(-18, sim2RsrqOf(m, preferNr = false))
+    }
+
+    @Test
+    fun sim2SinrOf_preferNrPrefersNrOtherwiseLte() {
+        val m = CellMetrics(lte = lte(rssnr = 4.0), nr = nr(ssSinr = 22.0))
+
+        assertEquals(22.0, sim2SinrOf(m, preferNr = true)!!, 0.001)
+        assertEquals(4.0, sim2SinrOf(m, preferNr = false)!!, 0.001)
+    }
+
+    @Test
+    fun sim2GaugeHelpers_fallBackAcrossRats() {
+        val onlyLte = CellMetrics(lte = lte(rsrp = -95, rsrq = -14, rssnr = 8.0))
+        val onlyNr = CellMetrics(nr = nr(ssRsrp = -75, ssRsrq = -11, ssSinr = 30.0))
+
+        // preferNr=false with no LTE -> null, not an exception
+        assertNull(sim2RsrpOf(onlyNr, preferNr = false))
+        // preferNr=true with no NR -> falls back to LTE
+        assertEquals(-95, sim2RsrpOf(onlyLte, preferNr = true))
+        assertEquals(-75, sim2RsrpOf(onlyNr, preferNr = true))
+        assertNull(sim2RsrpOf(null, preferNr = true))
+    }
+
+    @Test
+    fun isNrMetrics_detectsNrCamping() {
+        assertTrue(isNrMetrics(CellMetrics(nr = nr(ssRsrp = -80))))
+        assertTrue(isNrMetrics(CellMetrics(ratType = RatType.NR_SA)))
+        assertTrue(isNrMetrics(CellMetrics(ratType = RatType.NR_NSA)))
+        assertFalse(isNrMetrics(CellMetrics(lte = lte(rsrp = -90))))
+        assertFalse(isNrMetrics(null))
     }
 }

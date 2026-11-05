@@ -52,6 +52,10 @@ import com.drivetest.lte5g.telephony.RatLockManager
 import com.drivetest.lte5g.telephony.RatLockStatus
 import com.drivetest.lte5g.telephony.RatLockType
 import com.drivetest.lte5g.ui.theme.*
+import com.drivetest.lte5g.ui.map.isNrMetrics
+import com.drivetest.lte5g.ui.map.sim2RsrpOf
+import com.drivetest.lte5g.ui.map.sim2RsrqOf
+import com.drivetest.lte5g.ui.map.sim2SinrOf
 
 @Composable
 fun DashboardScreen(
@@ -67,6 +71,8 @@ fun DashboardScreen(
     val selectedSimSlot by DriveTestForegroundService.selectedSimSlot.collectAsStateWithLifecycle()
     val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val liveMetrics by DriveTestForegroundService.liveMetrics.collectAsStateWithLifecycle()
+    val isDualSimMode by DriveTestForegroundService.isDualSimMode.collectAsStateWithLifecycle()
+    val liveMetricsSim2 by DriveTestForegroundService.liveMetricsSim2.collectAsStateWithLifecycle()
     val ratLockType by DriveTestForegroundService.ratLockType.collectAsStateWithLifecycle()
     val ratLockCapability by DriveTestForegroundService.ratLockCapability.collectAsStateWithLifecycle()
     val ratLockStatus by DriveTestForegroundService.ratLockStatus.collectAsStateWithLifecycle()
@@ -731,6 +737,86 @@ fun DashboardScreen(
             )
         }
 
+        // SIM 2 Live RF Gauges (dual-SIM sessions only)
+        val sim2Metrics = liveMetricsSim2
+        if (isDualSimMode && sim2Metrics != null) {
+            val m2 = sim2Metrics
+            val isNr2 = isNrMetrics(m2)
+            val rsrp2 = sim2RsrpOf(m2, isNr2)
+            val rsrq2 = sim2RsrqOf(m2, isNr2)
+            val sinr2 = sim2SinrOf(m2, isNr2)
+            val rat2Text = when {
+                m2.nr != null -> if (m2.nr.isNsa) "5G NSA" else "5G SA"
+                m2.lte != null -> "LTE 4G"
+                else -> "--"
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Sim2Tier2.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "SIM 2 LIVE \u2022 ${m2.simDisplayName ?: "SIM 2"}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Sim2Tier1
+                        )
+                        Surface(
+                            color = Color(0xFF1E3A8A),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = rat2Text,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Sim2Tier1,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SignalGaugeCard(
+                            title = if (isNr2) "SIM 2 SS-RSRP" else "SIM 2 LTE RSRP",
+                            value = rsrp2?.toString() ?: "--",
+                            unit = "dBm",
+                            qualityColor = sim2RsrpColor(rsrp2),
+                            qualityText = getRsrpTierLabel(rsrp2),
+                            modifier = Modifier.weight(1f)
+                        )
+                        SignalGaugeCard(
+                            title = if (isNr2) "SIM 2 SS-RSRQ" else "SIM 2 LTE RSRQ",
+                            value = rsrq2?.toString() ?: "--",
+                            unit = "dB",
+                            qualityColor = sim2RsrqColor(rsrq2),
+                            qualityText = getRsrqTierLabel(rsrq2),
+                            modifier = Modifier.weight(1f)
+                        )
+                        SignalGaugeCard(
+                            title = if (isNr2) "SIM 2 SS-SINR" else "SIM 2 LTE SINR",
+                            value = sinr2?.let { String.format("%.1f", it) } ?: "--",
+                            unit = "dB",
+                            qualityColor = sim2SinrColor(sinr2),
+                            qualityText = getSinrTierLabel(sinr2),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
         // 60-Second Real-Time Signal Trend Chart
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
@@ -1256,6 +1342,33 @@ fun getSinrTierLabel(sinr: Double?): String {
         sinr >= 0.0 -> "POOR"
         else -> "BAD"
     }
+}
+
+/** SIM 2 gauge colors, matching the SIM 2 map/KMZ palette. */
+fun sim2RsrpColor(rsrp: Int?): Color = when {
+    rsrp == null -> Color(0xFF64748B)
+    rsrp >= -85 -> Sim2Tier1
+    rsrp >= -95 -> Sim2Tier2
+    rsrp >= -105 -> Sim2Tier3
+    rsrp >= -115 -> Sim2Tier4
+    else -> Sim2Tier5
+}
+
+fun sim2RsrqColor(rsrq: Int?): Color = when {
+    rsrq == null -> Color(0xFF64748B)
+    rsrq >= -10 -> Sim2Tier1
+    rsrq >= -15 -> Sim2Tier2
+    rsrq >= -19 -> Sim2Tier3
+    else -> Sim2Tier5
+}
+
+fun sim2SinrColor(sinr: Double?): Color = when {
+    sinr == null -> Color(0xFF64748B)
+    sinr >= 20.0 -> Sim2Tier1
+    sinr >= 13.0 -> Sim2Tier2
+    sinr >= 5.0 -> Sim2Tier3
+    sinr >= 0.0 -> Sim2Tier4
+    else -> Sim2Tier5
 }
 
 @Composable

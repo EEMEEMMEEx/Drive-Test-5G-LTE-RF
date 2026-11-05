@@ -2,6 +2,7 @@ package com.drivetest.lte5g.ui.map
 
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
+import com.drivetest.lte5g.model.RatType
 
 /**
  * Route Map color modes, mirroring the 5 modes of the web Route Inspector.
@@ -35,6 +36,23 @@ fun rsrpOf(metrics: CellMetrics?): Int? = metrics?.nr?.ssRsrp ?: metrics?.lte?.r
 fun rsrqOf(metrics: CellMetrics?): Int? = metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq
 
 fun sinrOf(metrics: CellMetrics?): Double? = metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr
+
+/**
+ * SIM 2 live gauge values. [preferNr] mirrors the dashboard's NR/LTE title rule:
+ * when the session is locked to or camped on NR, NR metrics take precedence.
+ */
+fun sim2RsrpOf(metrics: CellMetrics?, preferNr: Boolean): Int? =
+    if (preferNr) metrics?.nr?.ssRsrp ?: metrics?.lte?.rsrp else metrics?.lte?.rsrp
+
+fun sim2RsrqOf(metrics: CellMetrics?, preferNr: Boolean): Int? =
+    if (preferNr) metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq else metrics?.lte?.rsrq
+
+fun sim2SinrOf(metrics: CellMetrics?, preferNr: Boolean): Double? =
+    if (preferNr) metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr else metrics?.lte?.rssnr
+
+/** True when SIM 2 is camped on NR (SA or NSA). */
+fun isNrMetrics(metrics: CellMetrics?): Boolean =
+    metrics?.nr != null || metrics?.ratType == RatType.NR_NSA || metrics?.ratType == RatType.NR_SA
 
 /** Derives the RAT bucket from the metrics payload (same rule as the KMZ exporter). */
 fun ratCategoryOf(metrics: CellMetrics?): RatCategory {
