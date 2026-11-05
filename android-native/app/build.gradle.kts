@@ -34,6 +34,8 @@ android {
         storePassword = "REDACTED_SECRET"
         keyAlias = "key0"
         keyPassword = "REDACTED_SECRET"
+        enableV1Signing = true
+        enableV2Signing = true
       } else {
         val debugConfig = signingConfigs.getByName("debug")
         storeFile = debugConfig.storeFile
