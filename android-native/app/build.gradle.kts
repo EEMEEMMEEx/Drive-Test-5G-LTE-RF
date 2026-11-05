@@ -34,6 +34,8 @@ android {
         storePassword = "@#@Eemeemmee006"
         keyAlias = "key0"
         keyPassword = "@#@Eemeemmee006"
+        enableV1Signing = true
+        enableV2Signing = true
       } else {
         val debugConfig = signingConfigs.getByName("debug")
         storeFile = debugConfig.storeFile
