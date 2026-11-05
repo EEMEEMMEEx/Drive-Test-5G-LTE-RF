@@ -69,7 +69,7 @@ fun MainDriveTestApp() {
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.9.2"
+    val currentVersionName = packageInfo?.versionName ?: "1.9.3"
 
     // Revalidate on resume (e.g. returning from settings permission grant)
     val lifecycleOwner = LocalLifecycleOwner.current
