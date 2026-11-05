@@ -148,6 +148,7 @@ export function App() {
 
   const [selectedSim, setSelectedSim] = useState<SimInfo>(DEFAULT_SIM_CARDS[0]);
   const [cadence, setCadence] = useState<MeasurementCadence>('STANDARD');
+  const [dualSimEnabled, setDualSimEnabled] = useState<boolean>(true);
   const [ratMode, setRatMode] = useState<RatSelectionMode>('AUTO');
   const [alertThresholdRsrp, setAlertThresholdRsrp] = useState<number | null>(-110);
   const [lightProbeEnabled, setLightProbeEnabled] = useState(true);
@@ -267,7 +268,7 @@ export function App() {
       timestampMs: Date.now(),
       overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
       ratMode,
-      sim2: DEFAULT_SIM_CARDS[1],
+      sim2: dualSimEnabled ? DEFAULT_SIM_CARDS[1] : undefined,
     });
   }, [
     activeCampaignId,
@@ -388,7 +389,7 @@ export function App() {
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
         ratMode,
-        sim2: DEFAULT_SIM_CARDS[1],
+        sim2: dualSimEnabled ? DEFAULT_SIM_CARDS[1] : undefined,
       });
 
       if (lightProbeEnabled) {
@@ -484,7 +485,7 @@ export function App() {
         timestampMs: now,
         overrideGps: useRealBrowserGps ? browserGpsOverride : undefined,
         ratMode,
-        sim2: DEFAULT_SIM_CARDS[1],
+        sim2: dualSimEnabled ? DEFAULT_SIM_CARDS[1] : undefined,
       });
 
       const newCampaign: Campaign = {
@@ -825,7 +826,8 @@ export function App() {
             handoverCount={currentMobility.handovers}
             currentRadio={displayRadio}
             currentRadioSim2={displayRadioSim2}
-            dualSimEnabled
+            dualSimEnabled={dualSimEnabled}
+            onToggleDualSim={setDualSimEnabled}
             currentGps={displayGps}
             recentMeasurements={currentMeasurements}
             availableSims={DEFAULT_SIM_CARDS}

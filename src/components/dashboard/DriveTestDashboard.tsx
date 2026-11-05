@@ -55,6 +55,7 @@ export interface DriveTestDashboardProps {
   currentRadio: RadioInfo;
   currentRadioSim2?: RadioInfo;
   dualSimEnabled?: boolean;
+  onToggleDualSim?: (enabled: boolean) => void;
   currentGps: GpsInfo;
   recentMeasurements: Measurement[];
   availableSims: SimInfo[];
@@ -102,6 +103,7 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
     currentRadio,
     currentRadioSim2,
     dualSimEnabled = false,
+    onToggleDualSim,
     currentGps,
     recentMeasurements,
     availableSims,
@@ -476,6 +478,20 @@ export function DriveTestDashboard(props: DriveTestDashboardProps) {
               ]}
               ariaLabel={t.ratSelector}
             />
+
+            {onToggleDualSim && (
+              <div className="flex items-center">
+                <RfToggleSwitch
+                  id="dual-sim-toggle"
+                  checked={dualSimEnabled}
+                  onChange={onToggleDualSim}
+                  label="Dual-SIM Benchmark"
+                  description="SIM 2 logging"
+                  size="sm"
+                  variant="accent"
+                />
+              </div>
+            )}
 
             <button
               type="button"
