@@ -15,7 +15,6 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
 import com.drivetest.lte5g.model.CellMetrics
-import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
@@ -317,7 +316,6 @@ object LiveAlertNotificationHelper {
         cadence: MeasurementCadence,
         simDisplayName: String? = null,
         lockMode: RatLockMode = RatLockMode.AUTO,
-        style: LiveAlertStyle = LiveAlertStyle.CAPSULE,
         metricsSim2: CellMetrics? = null,
         sim2DisplayName: String? = null
     ): Notification {
@@ -362,8 +360,8 @@ object LiveAlertNotificationHelper {
             if (isDualSim) {
                 val name1 = simDisplayName ?: "SIM 1"
                 val name2 = sim2DisplayName ?: "SIM 2"
-                val rsrq2 = metricsSim2?.nr?.ssRsrq ?: metricsSim2?.lte?.rsrq
-                val sinr2 = metricsSim2?.nr?.ssSinr ?: metricsSim2?.lte?.rssnr
+                val rsrq2 = metricsSim2.nr?.ssRsrq ?: metricsSim2.lte?.rsrq
+                val sinr2 = metricsSim2.nr?.ssSinr ?: metricsSim2.lte?.rssnr
                 val rsrq2Str = if (rsrq2 != null) "$rsrq2 dB" else "--"
                 val sinr2Str = if (sinr2 != null) String.format(Locale.US, "%.1f dB", sinr2) else "--"
 
@@ -412,21 +410,19 @@ object LiveAlertNotificationHelper {
         builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
 
         // ColorOS / OxygenOS Fluid Cloud Navigation Capsule Tags
-        if (style == LiveAlertStyle.CAPSULE) {
-            builder.extras.putBoolean("oplus.notification.capsule", true)
-            builder.extras.putBoolean("coloros.notification.capsule", true)
-            builder.extras.putBoolean("com.oplus.notification.capsule", true)
-            builder.extras.putString("oplus.notification.capsule.type", "navigation")
-            builder.extras.putString("coloros.notification.capsule.type", "navigation")
-            builder.extras.putString("oplus.notification.capsule.status", "navigating")
-            builder.extras.putString("coloros.notification.capsule.status", "navigating")
+        builder.extras.putBoolean("oplus.notification.capsule", true)
+        builder.extras.putBoolean("coloros.notification.capsule", true)
+        builder.extras.putBoolean("com.oplus.notification.capsule", true)
+        builder.extras.putString("oplus.notification.capsule.type", "navigation")
+        builder.extras.putString("coloros.notification.capsule.type", "navigation")
+        builder.extras.putString("oplus.notification.capsule.status", "navigating")
+        builder.extras.putString("coloros.notification.capsule.status", "navigating")
 
-            val capsuleTitle = if (isDualSim) "S1:$rsrpStr | S2:$rsrp2Str" else "$ratLabel · $rsrpStr"
-            builder.extras.putString("oplus.notification.capsule.title", capsuleTitle)
-            builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
-            builder.extras.putString("coloros.notification.capsule.title", capsuleTitle)
-            builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
-        }
+        val capsuleTitle = if (isDualSim) "S1:$rsrpStr | S2:$rsrp2Str" else "$ratLabel · $rsrpStr"
+        builder.extras.putString("oplus.notification.capsule.title", capsuleTitle)
+        builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
+        builder.extras.putString("coloros.notification.capsule.title", capsuleTitle)
+        builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
         builder.extras.putString("android.substName", "Drive Test 5G")
 
         return builder.build()

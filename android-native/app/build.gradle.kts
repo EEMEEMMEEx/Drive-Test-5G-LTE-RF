@@ -21,8 +21,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 24
-    versionName = "1.9.0"
+    versionCode = 25
+    versionName = "1.9.1"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
   }
 

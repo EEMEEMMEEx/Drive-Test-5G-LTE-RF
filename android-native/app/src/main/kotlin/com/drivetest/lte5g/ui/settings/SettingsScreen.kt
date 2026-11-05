@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
@@ -50,8 +49,9 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
-    val liveAlertStyle by DriveTestForegroundService.liveAlertStyle.collectAsStateWithLifecycle()
-    val isDualSimMode by DriveTestForegroundService.isDualSimMode.collectAsStateWithLifecycle()
+
+    val isDualSimMode by DriveTestForegroundService.isDualSimMode.collectAsStateWithLifecycle()
+
     val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -138,23 +138,38 @@ fun SettingsScreen(
                         )
                     }
 
-                    Surface(
-                        color = Color(0xFF0369A1),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "v$currentVersionName",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = Color(0xFF065F46),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "AUTO OTA: ON",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFA7F3D0),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = Color(0xFF0369A1),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "v$currentVersionName",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Check for latest releases directly from GitHub and install updates in-app without computer connection.",
+                    text = "Auto-checks GitHub on startup, downloads updates in background, and prompts to install. You can also manually trigger check and install here.",
                     fontSize = 12.sp,
                     color = Color(0xFF94A3B8)
                 )
@@ -657,149 +672,129 @@ fun SettingsScreen(
             }
         }
 
-        // Dual-SIM Simultaneous Benchmark Logging Card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, if (isDualSimMode) TelemetryCyan.copy(alpha = 0.7f) else TelemetryCardStroke, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        Text(
-                            text = "DUAL-SIM BENCHMARK LOGGING",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDualSimMode) TelemetryCyan else Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = "บันทึก 2 ซิมพร้อมกันแบบ Operator Benchmark",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                    Switch(
-                        checked = isDualSimMode,
-                        onCheckedChange = { checked ->
-                            DriveTestForegroundService.setDualSimMode(context, checked)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = TelemetryCyan,
-                            uncheckedThumbColor = Color(0xFF94A3B8),
-                            uncheckedTrackColor = Color(0xFF1E293B)
-                        )
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "บันทึกข้อมูล RF ของทั้ง SIM 1 (เช่น AIS) และ SIM 2 (เช่น TRUE) พร้อมกันในเซสชันเดียว เหมาะสำหรับการขับทดสอบเปรียบเทียบคุณภาพโครงข่ายบนเส้นทางเดียวกัน",
-                    fontSize = 11.sp,
-                    color = Color(0xFFCBD5E1),
-                    lineHeight = 15.sp
-                )
-                if (availableSims.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    availableSims.forEach { sim ->
-                        Text(
-                            text = "• ${sim.displayName}${if (sim.carrierName.isNotBlank() && !sim.displayName.contains(sim.carrierName)) " (${sim.carrierName})" else ""}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TelemetryCyan
-                        )
-                    }
-                }
-            }
-        }
-
-        // Live Alerts Notification Style Card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "LIVE ALERTS NOTIFICATION STYLE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF94A3B8)
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+        // Dual-SIM Simultaneous Benchmark Logging Card
 
-                LiveAlertStyle.values().forEach { style ->
-                    val isSelected = style == liveAlertStyle
-                    Surface(
-                        color = if (isSelected) Color(0xFF0C4A6E) else Color(0xFF1E293B),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .border(
-                                width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) Color(0xFF06B6D4) else Color(0xFF334155),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            .clickable {
-                                DriveTestForegroundService.setLiveAlertStyle(context, style)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = style.label,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else Color(0xFFE2E8F0)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
-                                        color = if (isSelected) Color(0xFF0284C7) else Color(0xFF0F172A),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = style.shortDesc,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = style.fullDesc,
-                                    fontSize = 11.sp,
-                                    color = if (isSelected) Color(0xFFA5F3FC) else Color(0xFF94A3B8)
-                                )
-                            }
-                            if (isSelected) {
-                                Text(
-                                    text = "✓",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF06B6D4)
-                                )
-                            }
-                        }
+        Card(
+
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+
+            shape = RoundedCornerShape(14.dp),
+
+            modifier = Modifier
+
+                .fillMaxWidth()
+
+                .border(1.dp, if (isDualSimMode) TelemetryCyan.copy(alpha = 0.7f) else TelemetryCardStroke, RoundedCornerShape(14.dp))
+
+        ) {
+
+            Column(modifier = Modifier.padding(16.dp)) {
+
+                Row(
+
+                    modifier = Modifier.fillMaxWidth(),
+
+                    horizontalArrangement = Arrangement.SpaceBetween,
+
+                    verticalAlignment = Alignment.CenterVertically
+
+                ) {
+
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+
+                        Text(
+
+                            text = "DUAL-SIM BENCHMARK LOGGING",
+
+                            fontSize = 11.sp,
+
+                            fontWeight = FontWeight.Bold,
+
+                            color = if (isDualSimMode) TelemetryCyan else Color(0xFF94A3B8)
+
+                        )
+
+                        Text(
+
+                            text = "บันทึก 2 ซิมพร้อมกันแบบ Operator Benchmark",
+
+                            fontSize = 13.sp,
+
+                            fontWeight = FontWeight.Bold,
+
+                            color = Color.White
+
+                        )
+
                     }
+
+                    Switch(
+
+                        checked = isDualSimMode,
+
+                        onCheckedChange = { checked ->
+
+                            DriveTestForegroundService.setDualSimMode(context, checked)
+
+                        },
+
+                        colors = SwitchDefaults.colors(
+
+                            checkedThumbColor = Color.White,
+
+                            checkedTrackColor = TelemetryCyan,
+
+                            uncheckedThumbColor = Color(0xFF94A3B8),
+
+                            uncheckedTrackColor = Color(0xFF1E293B)
+
+                        )
+
+                    )
+
                 }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+
+                    text = "บันทึกข้อมูล RF ของทั้ง SIM 1 (เช่น AIS) และ SIM 2 (เช่น TRUE) พร้อมกันในเซสชันเดียว เหมาะสำหรับการขับทดสอบเปรียบเทียบคุณภาพโครงข่ายบนเส้นทางเดียวกัน",
+
+                    fontSize = 11.sp,
+
+                    color = Color(0xFFCBD5E1),
+
+                    lineHeight = 15.sp
+
+                )
+
+                if (availableSims.isNotEmpty()) {
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    availableSims.forEach { sim ->
+
+                        Text(
+
+                            text = "• ${sim.displayName}${if (sim.carrierName.isNotBlank() && !sim.displayName.contains(sim.carrierName)) " (${sim.carrierName})" else ""}",
+
+                            fontSize = 11.sp,
+
+                            fontWeight = FontWeight.Medium,
+
+                            color = TelemetryCyan
+
+                        )
+
+                    }
+
+                }
+
             }
+
         }
+
+
 
         // Modem Radio Lock Card
         Card(
