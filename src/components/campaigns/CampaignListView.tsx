@@ -24,7 +24,12 @@ import {
   Wifi,
   X,
 } from 'lucide-react';
-import type { Campaign, CampaignPreset, Measurement } from '../../types/drivetest';
+import type {
+  Campaign,
+  CampaignPreset,
+  Measurement,
+  RadioInfo,
+} from '../../types/drivetest';
 import {
   calculateSignalStats,
   detectMobilityEvents,
@@ -37,6 +42,57 @@ import {
 } from '../../services/exportService';
 import type { TranslationDictionary } from '../../i18n/translations';
 import { RfSiteAcceptanceReportModal } from '../reports/RfSiteAcceptanceReportModal';
+
+interface DualSimBenchmarkResult {
+  hasData: boolean;
+  sim1Rsrp: number | null;
+  sim2Rsrp: number | null;
+  rsrpDeltaDb: number | null;
+  sim1Sinr: number | null;
+  sim2Sinr: number | null;
+  sinrDeltaDb: number | null;
+  winner: 1 | 2 | null;
+}
+
+function computeDualSimBenchmark(
+  measurements: Measurement[]
+): DualSimBenchmarkResult {
+  const sim2Samples = measurements.filter(
+    (m): m is Measurement & { radioSim2: RadioInfo } => m.radioSim2 !== undefined
+  );
+  const avg = (values: number[]): number | null => {
+    if (values.length === 0) return null;
+    return Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
+  };
+  const sim1Rsrp = avg(measurements.map((m) => m.radio.rsrp));
+  const sim1Sinr = avg(measurements.map((m) => m.radio.sinr));
+  const sim2Rsrp = avg(sim2Samples.map((m) => m.radioSim2.rsrp));
+  const sim2Sinr = avg(sim2Samples.map((m) => m.radioSim2.sinr));
+  const rsrpDeltaDb =
+    sim1Rsrp !== null && sim2Rsrp !== null
+      ? Number((sim1Rsrp - sim2Rsrp).toFixed(1))
+      : null;
+  const sinrDeltaDb =
+    sim1Sinr !== null && sim2Sinr !== null
+      ? Number((sim1Sinr - sim2Sinr).toFixed(1))
+      : null;
+  const winner: 1 | 2 | null =
+    rsrpDeltaDb === null ? null : rsrpDeltaDb > 0 ? 1 : rsrpDeltaDb < 0 ? 2 : null;
+  return {
+    hasData:
+      sim1Rsrp !== null ||
+      sim2Rsrp !== null ||
+      sim1Sinr !== null ||
+      sim2Sinr !== null,
+    sim1Rsrp,
+    sim2Rsrp,
+    rsrpDeltaDb,
+    sim1Sinr,
+    sim2Sinr,
+    sinrDeltaDb,
+    winner,
+  };
+}
 
 export interface CampaignListViewProps {
   campaigns: Campaign[];
@@ -425,6 +481,7 @@ export function CampaignListView({
               campaign.alertThresholdRsrp ?? -105
             );
             const mobility = detectMobilityEvents(measurements);
+            const dualSim = computeDualSimBenchmark(measurements);
             const isSelected = campaign.id === selectedCampaignId;
             const isChecked = selectedIds.includes(campaign.id);
 
@@ -592,6 +649,74 @@ export function CampaignListView({
                     </div>
                   </div>
                 </div>
+
+                {/* Dual-SIM Benchmark Summary (SIM 1 vs SIM 2) */}
+                {dualSim.hasData && (
+                  <div className="mt-3 rounded-xl border border-sim22/50 p-2.5 bg-surface-elevated/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold tracking-wider text-sim21">
+                        DUAL-SIM BENCHMARK
+                      </span>
+                      {dualSim.winner === 1 && (
+                        <span className="text-[10px] font-bold text-emerald-400">
+                          WINNER: SIM 1
+                        </span>
+                      )}
+                      {dualSim.winner === 2 && (
+                        <span className="text-[10px] font-bold text-sim21">
+                          WINNER: SIM 2
+                        </span>
+                      )}
+                      {dualSim.winner === null && (
+                        <span className="text-[10px] font-bold text-slate-400">
+                          TIE / N/A
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold text-slate-300">SIM 1</div>
+                        <div className="text-xs font-bold text-emerald-400">
+                          RSRP {dualSim.sim1Rsrp ?? 'N/A'} dBm
+                        </div>
+                        <div className="text-[11px] text-slate-300">
+                          SINR{' '}
+                          {dualSim.sim1Sinr !== null
+                            ? `${dualSim.sim1Sinr.toFixed(1)} dB`
+                            : 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-semibold text-sim21">SIM 2</div>
+                        <div className="text-xs font-bold text-sim21">
+                          RSRP {dualSim.sim2Rsrp ?? 'N/A'} dBm
+                        </div>
+                        <div className="text-[11px] text-slate-300">
+                          SINR{' '}
+                          {dualSim.sim2Sinr !== null
+                            ? `${dualSim.sim2Sinr.toFixed(1)} dB`
+                            : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-1.5 flex gap-1.5">
+                      <span className="flex-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                        RSRP Δ{' '}
+                        {dualSim.rsrpDeltaDb !== null
+                          ? `${dualSim.rsrpDeltaDb > 0 ? '+' : ''}${dualSim.rsrpDeltaDb} dB`
+                          : 'N/A'}{' '}
+                        (SIM1-SIM2)
+                      </span>
+                      <span className="flex-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold text-slate-300">
+                        SINR Δ{' '}
+                        {dualSim.sinrDeltaDb !== null
+                          ? `${dualSim.sinrDeltaDb > 0 ? '+' : ''}${dualSim.sinrDeltaDb.toFixed(1)} dB`
+                          : 'N/A'}{' '}
+                        (SIM1-SIM2)
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Bottom Action Toolbar */}
                 <div
