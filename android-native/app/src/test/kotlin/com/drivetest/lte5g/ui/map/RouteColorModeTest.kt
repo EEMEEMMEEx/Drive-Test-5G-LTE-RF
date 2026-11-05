@@ -2,6 +2,7 @@ package com.drivetest.lte5g.ui.map
 
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
+import com.drivetest.lte5g.model.DriveTestSession
 import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatType
@@ -332,5 +333,80 @@ class RouteColorModeTest {
         assertTrue(isNrMetrics(CellMetrics(ratType = RatType.NR_NSA)))
         assertFalse(isNrMetrics(CellMetrics(lte = lte(rsrp = -90))))
         assertFalse(isNrMetrics(null))
+    }
+
+    // ---- dual-SIM benchmark comparison ------------------------------------
+
+    private fun dualSimSession(
+        avgRsrp: Int? = null,
+        avgRsrpSim2: Int? = null,
+        avgSinr: Double? = null,
+        avgSinrSim2: Double? = null,
+        simDisplayName: String? = null,
+        sim2DisplayName: String? = null
+    ) = DriveTestSession(
+        avgRsrp = avgRsrp,
+        avgRsrpSim2 = avgRsrpSim2,
+        avgSinr = avgSinr,
+        avgSinrSim2 = avgSinrSim2,
+        simDisplayName = simDisplayName,
+        sim2DisplayName = sim2DisplayName
+    )
+
+    @Test
+    fun dualSimBenchmarkComparison_computesDeltasAndWinner() {
+        val c = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -90, avgRsrpSim2 = -100, avgSinr = 15.0, avgSinrSim2 = 8.0))
+
+        assertEquals(10, c.rsrpDeltaDb)
+        assertEquals(7.0, c.sinrDeltaDb!!, 0.001)
+        assertEquals(1, c.winner)
+        assertTrue(c.hasData)
+    }
+
+    @Test
+    fun dualSimBenchmarkComparison_sim2WinsWhenStronger() {
+        val c = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -105, avgRsrpSim2 = -95))
+
+        assertEquals(-10, c.rsrpDeltaDb)
+        assertEquals(2, c.winner)
+    }
+
+    @Test
+    fun dualSimBenchmarkComparison_tieYieldsNoWinner() {
+        val c = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -95, avgRsrpSim2 = -95))
+
+        assertEquals(0, c.rsrpDeltaDb)
+        assertEquals(null, c.winner)
+    }
+
+    @Test
+    fun dualSimBenchmarkComparison_missingSideYieldsNullDelta() {
+        val c = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -90, avgRsrpSim2 = null, avgSinr = 10.0, avgSinrSim2 = null))
+
+        assertEquals(null, c.rsrpDeltaDb)
+        assertEquals(null, c.sinrDeltaDb)
+        assertEquals(null, c.winner)
+        assertTrue(c.hasData)
+    }
+
+    @Test
+    fun dualSimBenchmarkComparison_allMissingHasNoData() {
+        val c = dualSimBenchmarkComparison(dualSimSession())
+
+        assertFalse(c.hasData)
+        assertEquals(null, c.winner)
+    }
+
+    @Test
+    fun dualSimBenchmarkComparison_usesSimDisplayNamesWithFallback() {
+        val named = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -90, avgRsrpSim2 = -95, simDisplayName = "AIS 5G", sim2DisplayName = "TRUE 4G"))
+
+        assertEquals("AIS 5G", named.sim1Label)
+        assertEquals("TRUE 4G", named.sim2Label)
+
+        val unnamed = dualSimBenchmarkComparison(dualSimSession(avgRsrp = -90))
+
+        assertEquals("SIM 1", unnamed.sim1Label)
+        assertEquals("SIM 2", unnamed.sim2Label)
     }
 }

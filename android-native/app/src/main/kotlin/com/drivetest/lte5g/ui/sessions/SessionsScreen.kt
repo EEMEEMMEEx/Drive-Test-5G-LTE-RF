@@ -31,6 +31,8 @@ import com.drivetest.lte5g.model.DriveTestSession
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.ui.dashboard.getRsrpColor
+import com.drivetest.lte5g.ui.dashboard.sim2RsrpColor
+import com.drivetest.lte5g.ui.map.dualSimBenchmarkComparison
 import com.drivetest.lte5g.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -599,7 +601,125 @@ fun SessionItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Dual-SIM Benchmark Summary (SIM 1 vs SIM 2)
+            if (session.isDualSimLogging) {
+                val comparison = dualSimBenchmarkComparison(session)
+                if (comparison.hasData) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Sim2Tier2.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "DUAL-SIM BENCHMARK",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Sim2Tier1
+                            )
+                            when (comparison.winner) {
+                                1 -> Text(
+                                    text = "WINNER: SIM 1",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SignalTier1
+                                )
+                                2 -> Text(
+                                    text = "WINNER: SIM 2",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Sim2Tier1
+                                )
+                                else -> Text(
+                                    text = "TIE / N/A",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = comparison.sim1Label,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                                Text(
+                                    text = "RSRP ${comparison.sim1Rsrp?.let { "$it dBm" } ?: "N/A"}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = getRsrpColor(comparison.sim1Rsrp)
+                                )
+                                Text(
+                                    text = "SINR ${comparison.sim1Sinr?.let { String.format("%.1f dB", it) } ?: "N/A"}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = comparison.sim2Label,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Sim2Tier1
+                                )
+                                Text(
+                                    text = "RSRP ${comparison.sim2Rsrp?.let { "$it dBm" } ?: "N/A"}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = sim2RsrpColor(comparison.sim2Rsrp)
+                                )
+                                Text(
+                                    text = "SINR ${comparison.sim2Sinr?.let { String.format("%.1f dB", it) } ?: "N/A"}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Surface(
+                                color = Color(0xFF1E293B),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "RSRP Δ ${comparison.rsrpDeltaDb?.let { "%+${it} dB" } ?: "N/A"} (SIM1-SIM2)",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFCBD5E1),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                            Surface(
+                                color = Color(0xFF1E293B),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "SINR Δ ${comparison.sinrDeltaDb?.let { String.format("%+.1f dB", it) } ?: "N/A"} (SIM1-SIM2)",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFCBD5E1),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
 
             // Action Buttons
             Row(
