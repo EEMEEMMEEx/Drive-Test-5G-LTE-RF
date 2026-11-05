@@ -30,6 +30,7 @@ import type {
   MapOptions,
   Measurement,
   MissedHandoverEvent,
+  RadioInfo,
   SignalPalette,
 } from '../../types/drivetest';
 import {
@@ -38,6 +39,7 @@ import {
   extractCellSites,
   getSignalColor,
   getTechnologyColor,
+  haversineDistanceMeters,
 } from '../../services/rfAnalyticsEngine';
 import type { TranslationDictionary } from '../../i18n/translations';
 import { RfToggleSwitch } from '../common/RfToggleSwitch';
@@ -133,6 +135,21 @@ function getPointColor(m: Measurement, options: MapOptions): string {
   );
 }
 
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+  if (minutes > 0) return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
+  return `${seconds}s`;
+}
+
 export function RouteMapView({
   campaigns,
   selectedCampaignId,
@@ -177,6 +194,36 @@ export function RouteMapView({
 
   const mobility = useMemo(
     () => detectMobilityEvents(sortedMeasurements),
+    [sortedMeasurements]
+  );
+
+  const routeStats = useMemo(() => {
+    if (sortedMeasurements.length < 2) {
+      return { distanceMeters: 0, durationMs: 0 };
+    }
+    let distanceMeters = 0;
+    for (let i = 1; i < sortedMeasurements.length; i++) {
+      const a = sortedMeasurements[i - 1];
+      const b = sortedMeasurements[i];
+      distanceMeters += haversineDistanceMeters(
+        a.gps.latitude,
+        a.gps.longitude,
+        b.gps.latitude,
+        b.gps.longitude
+      );
+    }
+    const durationMs =
+      sortedMeasurements[sortedMeasurements.length - 1].timestampMs -
+      sortedMeasurements[0].timestampMs;
+    return { distanceMeters, durationMs };
+  }, [sortedMeasurements]);
+
+  const sim2Measurements = useMemo(
+    () =>
+      sortedMeasurements.filter(
+        (m): m is Measurement & { radioSim2: RadioInfo } =>
+          m.radioSim2 !== undefined
+      ),
     [sortedMeasurements]
   );
 
@@ -227,12 +274,14 @@ export function RouteMapView({
     if (options.showNeighborCells) count++;
     if (options.showHandovers) count++;
     if (options.showMissedHandovers) count++;
+    if (options.showSim2Layer) count++;
     return count;
   }, [
     options.showCurrentCell,
     options.showNeighborCells,
     options.showHandovers,
     options.showMissedHandovers,
+    options.showSim2Layer,
   ]);
 
   // Initialize Leaflet map safely (guarded for jsdom environments)
@@ -374,6 +423,20 @@ export function RouteMapView({
         opacity: 0.65,
       }).addTo(group);
 
+      // Draw dual-SIM (SIM 2) route polyline overlay
+      if (options.showSim2Layer && sim2Measurements.length >= 2) {
+        const sim2LatLngs: [number, number][] = sim2Measurements.map((m) => [
+          m.gps.latitude,
+          m.gps.longitude,
+        ]);
+        L.polyline(sim2LatLngs, {
+          color: '#38bdf8',
+          weight: 2,
+          opacity: 0.6,
+          dashArray: '6, 4',
+        }).addTo(group);
+      }
+
       // Serving cell site markers and sector lines
       if (options.showCurrentCell) {
         for (const site of cellSites) {
@@ -428,6 +491,24 @@ export function RouteMapView({
         marker.addTo(group);
       }
 
+      // Draw START / END route markers
+      if (sortedMeasurements.length >= 2) {
+        const first = sortedMeasurements[0];
+        const last = sortedMeasurements[sortedMeasurements.length - 1];
+        const startMarker = L.circleMarker(
+          [first.gps.latitude, first.gps.longitude],
+          { radius: 8, color: '#ffffff', weight: 2, fillColor: '#10b981', fillOpacity: 1 }
+        );
+        startMarker.bindTooltip('START', { direction: 'top' });
+        startMarker.addTo(group);
+        const endMarker = L.circleMarker(
+          [last.gps.latitude, last.gps.longitude],
+          { radius: 8, color: '#ffffff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 }
+        );
+        endMarker.bindTooltip('END', { direction: 'top' });
+        endMarker.addTo(group);
+      }
+
       // Draw Handover markers
       if (options.showHandovers) {
         for (const ho of mobility.handoverEvents) {
@@ -472,6 +553,7 @@ export function RouteMapView({
     cellSiteById,
     selectedMeasurement,
     mobility,
+    sim2Measurements,
     currentLocation,
   ]);
 
@@ -860,12 +942,18 @@ export function RouteMapView({
                     label: t.showMissedHandovers,
                     desc: `${mobility.missedHandovers} stronger neighbor margins`,
                   },
+                  {
+                    key: 'showSim2Layer',
+                    label: t.showSim2Layer,
+                    desc: `${sim2Measurements.length} dual-SIM samples`,
+                  },
                 ] as {
                   key:
                     | 'showCurrentCell'
                     | 'showNeighborCells'
                     | 'showHandovers'
-                    | 'showMissedHandovers';
+                    | 'showMissedHandovers'
+                    | 'showSim2Layer';
                   label: string;
                   desc: string;
                 }[]
@@ -921,6 +1009,20 @@ export function RouteMapView({
                 <span className="text-text-muted font-medium">Avg RSRP:</span>
                 <span className="font-mono font-bold text-accent">
                   {signalStats.avgRsrp} dBm
+                </span>
+              </div>
+              <span className="hidden sm:inline text-border">|</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-text-muted font-medium">Dist:</span>
+                <span className="font-mono font-bold text-text">
+                  {formatDistance(routeStats.distanceMeters)}
+                </span>
+              </div>
+              <span className="hidden sm:inline text-border">|</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-text-muted font-medium">Time:</span>
+                <span className="font-mono font-bold text-text">
+                  {formatDuration(routeStats.durationMs)}
                 </span>
               </div>
               <span className="hidden sm:inline text-border">|</span>
@@ -1121,6 +1223,36 @@ export function RouteMapView({
                   />
                 );
               })}
+
+              {/* START / END route markers */}
+              {sortedMeasurements.length >= 2 && (
+                <>
+                  {(() => {
+                    const sPt = projectToSvg(
+                      sortedMeasurements[0].gps.latitude,
+                      sortedMeasurements[0].gps.longitude
+                    );
+                    return (
+                      <g>
+                        <circle cx={sPt.x} cy={sPt.y} r={9} fill="#10b981" stroke="#ffffff" strokeWidth={2} />
+                        <text x={sPt.x} y={sPt.y - 12} fontSize="9" fill="#10b981" textAnchor="middle" fontWeight="700">START</text>
+                      </g>
+                    );
+                  })()}
+                  {(() => {
+                    const ePt = projectToSvg(
+                      sortedMeasurements[sortedMeasurements.length - 1].gps.latitude,
+                      sortedMeasurements[sortedMeasurements.length - 1].gps.longitude
+                    );
+                    return (
+                      <g>
+                        <circle cx={ePt.x} cy={ePt.y} r={9} fill="#ef4444" stroke="#ffffff" strokeWidth={2} />
+                        <text x={ePt.x} y={ePt.y - 12} fontSize="9" fill="#ef4444" textAnchor="middle" fontWeight="700">END</text>
+                      </g>
+                    );
+                  })()}
+                </>
+              )}
             </svg>
           </OpenUiCard>
         </div>

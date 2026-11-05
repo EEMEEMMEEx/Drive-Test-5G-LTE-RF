@@ -177,6 +177,7 @@ export function App() {
     showNeighborCells: false,
     showHandovers: true,
     showMissedHandovers: true,
+    showSim2Layer: true,
     dotSize: 8,
     rsrpGood: -90,
     rsrpPoor: -110,
