@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -846,11 +848,17 @@ fun DashboardScreen(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Canvas line graph of recent samples
-                val recentRsrpList = remember(samplesList) {
-                    samplesList.takeLast(60).mapNotNull {
-                        it.metrics.nr?.ssRsrp ?: it.metrics.lte?.rsrp
+                // Canvas line graph of recent samples (SIM 1 + optional SIM 2 overlay)
+                val trend = remember(samplesList) { rsrpTrendSeries(samplesList) }
+                if (isDualSimMode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        TrendLegendDot(color = SignalTier1, label = "SIM 1")
+                        TrendLegendDot(color = Sim2Tier1, label = "SIM 2")
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 Canvas(
@@ -870,25 +878,12 @@ fun DashboardScreen(
                     drawLine(Color(0xFF1E2D4A), Offset(0f, y95), Offset(w, y95), 1f)
                     drawLine(Color(0xFF1E2D4A), Offset(0f, y120), Offset(w, y120), 1f)
 
-                    if (recentRsrpList.size >= 2) {
-                        val path = Path()
-                        val stepX = w / (recentRsrpList.size - 1).coerceAtLeast(1)
-
-                        recentRsrpList.forEachIndexed { index, rsrp ->
-                            // Map -130 to -60 to height
-                            val clamped = rsrp.coerceIn(-130, -60)
-                            val normY = 1f - ((clamped - (-130f)) / 70f)
-                            val px = index * stepX
-                            val py = normY * h
-
-                            if (index == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                    if (trend.sim1.size >= 2 || trend.sim2.size >= 2) {
+                        val stepX = w / (maxOf(trend.sim1.size, trend.sim2.size) - 1).coerceAtLeast(1)
+                        drawTrendPath(trend.sim1, stepX, h, SignalTier1, 3.dp.toPx())
+                        if (isDualSimMode) {
+                            drawTrendPath(trend.sim2, stepX, h, Sim2Tier1, 2.dp.toPx())
                         }
-
-                        drawPath(
-                            path = path,
-                            color = SignalTier1,
-                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                        )
                     }
                 }
             }
@@ -1429,3 +1424,54 @@ fun SimSlotButton(
         }
     }
 }
+
+@Composable
+private fun TrendLegendDot(color: Color, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape)
+        )
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF94A3B8)
+        )
+    }
+}
+
+private fun DrawScope.drawTrendPath(
+    values: List<Int?>,
+    stepX: Float,
+    h: Float,
+    color: Color,
+    strokeWidthPx: Float
+) {
+    if (values.size < 2) return
+    val path = Path()
+    var started = false
+    values.forEachIndexed { index, rsrp ->
+        if (rsrp == null) return@forEachIndexed
+        val py = trendNormY(rsrp) * h
+        val px = index * stepX
+        if (started) {
+            path.lineTo(px, py)
+        } else {
+            path.moveTo(px, py)
+            started = true
+        }
+    }
+    if (started) {
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+        )
+    }
+}
+
