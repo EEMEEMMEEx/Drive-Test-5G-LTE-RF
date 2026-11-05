@@ -1,5 +1,8 @@
 package com.drivetest.lte5g.ui.map
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -19,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +36,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
 /** Resolves the quality tier (1..5) to a color, shared by RSRP / RSRQ / SINR modes. */
 private fun qualityColorFor(key: Int): Color = when (key) {
@@ -61,6 +67,29 @@ private fun routeColorFor(mode: RouteColorMode, key: Int): Color = when (mode) {
     }
 }
 
+@Composable
+private fun circleMarkerIcon(tint: Color): BitmapDescriptor {
+    val argb = tint.toArgb()
+    val bitmap = remember(argb) {
+        val size = 48
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = argb
+            style = Paint.Style.FILL
+        }
+        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 5f, fill)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 5f, stroke)
+        bmp
+    }
+    return remember(bitmap) { BitmapDescriptorFactory.fromBitmap(bitmap) }
+}
+
 @SuppressLint("MissingPermission")
 @Composable
 fun DriveTestMapScreen(
@@ -80,6 +109,7 @@ fun DriveTestMapScreen(
 
     val displaySession = if (isRecording) activeSession else (selectedSession ?: activeSession)
     val displaySamples = displaySession?.samples ?: emptyList()
+    val stats = remember(displaySamples) { routeStats(displaySamples) }
     val hasSim2Data = displaySamples.any { it.metricsSim2 != null } || isDualSimMode
 
     val fusedClient = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -195,6 +225,24 @@ fun DriveTestMapScreen(
                     state = MarkerState(position = LatLng(s.latitude, s.longitude)),
                     title = if (isRecording) "Vehicle Position" else "End Position",
                     snippet = "Speed: ${String.format("%.1f", s.speedKmh)} km/h | RSRP: ${s.metrics.nr?.ssRsrp ?: s.metrics.lte?.rsrp ?: "--"} dBm"
+                )
+            }
+
+            // Start / End route markers (only when there is a real route)
+            if (displaySamples.size >= 2) {
+                val first = displaySamples.first()
+                val last = displaySamples.last()
+                Marker(
+                    state = MarkerState(position = LatLng(first.latitude, first.longitude)),
+                    title = "START",
+                    snippet = "Route start",
+                    icon = circleMarkerIcon(SignalTier1)
+                )
+                Marker(
+                    state = MarkerState(position = LatLng(last.latitude, last.longitude)),
+                    title = "END",
+                    snippet = "Route end",
+                    icon = circleMarkerIcon(SignalTier5)
                 )
             }
         }
@@ -347,8 +395,43 @@ fun DriveTestMapScreen(
                         }
                     }
                 }
+
+                // Route stats chips (distance, duration, average RSRP)
+                stats?.let { s ->
+                    if (s.durationMs > 0L || s.distanceMeters > 0.0) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            StatsChip("DIST ${formatDistance(s.distanceMeters)}", modifier = Modifier.weight(1f))
+                            StatsChip("TIME ${formatDuration(s.durationMs)}", modifier = Modifier.weight(1f))
+                            StatsChip(
+                                "RSRP AVG ${s.avgRsrp?.let { "$it dBm" } ?: "N/A"}",
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun StatsChip(label: String, modifier: Modifier = Modifier) {
+    Surface(
+        color = Color(0xFF1E293B),
+        shape = RoundedCornerShape(4.dp),
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TelemetryCyan,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+        )
     }
 }
 

@@ -8,6 +8,7 @@ import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -408,5 +409,71 @@ class RouteColorModeTest {
 
         assertEquals("SIM 1", unnamed.sim1Label)
         assertEquals("SIM 2", unnamed.sim2Label)
+    }
+
+    // ---- route statistics ---------------------------------------------------
+
+    @Test
+    fun haversineDistanceMeters_knownDistance() {
+        // Bangkok -> approx 1 km north (1 degree lat ~ 111.19 km)
+        val oneKmNorth = haversineDistanceMeters(13.7563, 100.5018, 13.7654, 100.5018)
+        assertEquals(1013.0, oneKmNorth, 15.0)
+    }
+
+    @Test
+    fun haversineDistanceMeters_samePointIsZero() {
+        assertEquals(0.0, haversineDistanceMeters(13.7563, 100.5018, 13.7563, 100.5018), 0.0001)
+    }
+
+    @Test
+    fun formatDistance_switchesUnitsAtOneKilometer() {
+        assertEquals("850 m", formatDistance(850.4))
+        assertEquals("1.0 km", formatDistance(1000.0))
+        assertEquals("12.3 km", formatDistance(12345.0))
+    }
+
+    @Test
+    fun formatDuration_usesHoursOnlyWhenPresent() {
+        assertEquals("1h 05m", formatDuration(3900000L))
+        assertEquals("5m 32s", formatDuration(332000L))
+        assertEquals("0m 05s", formatDuration(5000L))
+        assertEquals("0m 00s", formatDuration(-100L))
+    }
+
+    @Test
+    fun routeStats_sumsSegmentsDurationAndAverageRsrp() {
+        val s1 = sample(
+            speedKmh = 0f,
+            metrics = CellMetrics(lte = lte(rsrp = -90))
+        ).copy(id = 1, timestamp = 1000L, latitude = 13.0, longitude = 100.0)
+        val s2 = s1.copy(
+            id = 2,
+            timestamp = 3900000L,
+            latitude = 13.0091,
+            longitude = 100.0,
+            metrics = CellMetrics(lte = lte(rsrp = -100))
+        )
+        val stats = routeStats(listOf(s1, s2))
+
+        assertNotNull(stats)
+        assertEquals(1013.0, stats!!.distanceMeters, 15.0)
+        assertEquals(3899000L, stats.durationMs)
+        assertEquals(-95, stats.avgRsrp)
+    }
+
+    @Test
+    fun routeStats_emptyListReturnsNull() {
+        assertNull(routeStats(emptyList()))
+    }
+
+    @Test
+    fun routeStats_missingRsrpYieldsNullAverage() {
+        val s = sample(metrics = CellMetrics()).copy(timestamp = 1000L)
+        val stats = routeStats(listOf(s))
+
+        assertNotNull(stats)
+        assertEquals(null, stats!!.avgRsrp)
+        assertEquals(0.0, stats.distanceMeters, 0.0001)
+        assertEquals(0L, stats.durationMs)
     }
 }
