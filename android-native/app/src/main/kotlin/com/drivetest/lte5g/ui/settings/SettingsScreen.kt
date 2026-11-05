@@ -42,6 +42,17 @@ import com.drivetest.lte5g.ui.theme.TelemetryDarkBg
 import com.drivetest.lte5g.updater.OtaState
 import com.drivetest.lte5g.updater.OtaUpdateManager
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private fun formatLastChecked(timestamp: Long?): String {
+    if (timestamp == null || timestamp <= 0) return "Not checked in this session"
+    val diffMs = System.currentTimeMillis() - timestamp
+    if (diffMs < 60_000) return "Just now"
+    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return "Today at ${sdf.format(Date(timestamp))}"
+}
 
 @Composable
 fun SettingsScreen(
@@ -69,6 +80,7 @@ fun SettingsScreen(
 
     val scope = rememberCoroutineScope()
     val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
+    val lastCheckedTime by OtaUpdateManager.lastCheckedTimestamp.collectAsStateWithLifecycle()
 
     // Read authoritative package version info dynamically (Rule 10)
     val packageInfo = remember {
@@ -83,12 +95,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.8.10"
+    val currentVersionName = packageInfo?.versionName ?: "1.9.2"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 23
+        packageInfo?.longVersionCode?.toInt() ?: 26
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 23
+        packageInfo?.versionCode ?: 26
     }
 
     Column(
@@ -108,112 +120,135 @@ fun SettingsScreen(
 
         // OTA Software Update Card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFF0284C7), RoundedCornerShape(14.dp))
+                .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // Header: Spacing fixed, badge overflow eliminated, matches other cards
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Text(
+                        text = "OVER-THE-AIR (OTA) UPDATES",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF94A3B8)
+                    )
+                    Surface(
+                        color = Color(0xFF065F46),
+                        shape = RoundedCornerShape(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.SystemUpdate,
-                            contentDescription = null,
-                            tint = TelemetryCyan,
-                            modifier = Modifier.size(20.dp)
-                        )
                         Text(
-                            text = "OVER-THE-AIR (OTA) UPDATES",
-                            fontSize = 11.sp,
+                            text = "AUTO: ON",
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TelemetryCyan
+                            color = Color(0xFFA7F3D0),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = Color(0xFF065F46),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "AUTO OTA: ON",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFA7F3D0),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            color = Color(0xFF0369A1),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = "v$currentVersionName",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                // Shortened description
                 Text(
-                    text = "Auto-checks GitHub on startup, downloads updates in background, and prompts to install. You can also manually trigger check and install here.",
+                    text = "Auto-checks GitHub on startup and downloads updates in background.",
                     fontSize = 12.sp,
                     color = Color(0xFF94A3B8)
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // OTA State Display
+                // 1. STATUS
                 when (val state = otaState) {
-                    is OtaState.Idle -> {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    OtaUpdateManager.checkForUpdates(currentVersionName)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                            shape = RoundedCornerShape(10.dp),
+                    is OtaState.Checking -> {
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("CHECK FOR UPDATES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = TelemetryCyan,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Checking for Updates...",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Connecting to GitHub Releases API",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFA5F3FC)
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    is OtaState.Checking -> {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
+                    is OtaState.Downloading -> {
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = TelemetryCyan,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Checking GitHub Releases...",
-                                fontSize = 12.sp,
-                                color = Color(0xFFA5F3FC)
-                            )
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(14.dp),
+                                            color = TelemetryCyan,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Downloading in Background...",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFA5F3FC)
+                                        )
+                                    }
+                                    Text(
+                                        text = "${(state.progress * 100).toInt()}%",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TelemetryCyan
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { state.progress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp),
+                                    color = TelemetryCyan,
+                                    trackColor = Color(0xFF0F172A)
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", state.downloadedBytes / (1024f * 1024f))} / ${String.format(Locale.US, "%.1f", state.totalBytes / (1024f * 1024f))} MB",
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
                         }
                     }
 
@@ -227,8 +262,13 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SignalTier2, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = SignalTier2,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
                                         text = "App is Up to Date",
@@ -244,28 +284,15 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    OtaUpdateManager.checkForUpdates(currentVersionName)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Check Again", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                        }
                     }
 
                     is OtaState.UpdateAvailable -> {
                         val release = state.releaseInfo
                         Surface(
                             color = Color(0xFF1E293B),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, SignalTier1, RoundedCornerShape(10.dp))
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, SignalTier1),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Row(
@@ -273,276 +300,94 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "NEW VERSION AVAILABLE",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = SignalTier1
-                                    )
-                                    Text(
-                                        text = "v${release.versionName}",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.White
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.SystemUpdate,
+                                            contentDescription = null,
+                                            tint = SignalTier1,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "New Update Available",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = SignalTier1
+                                        )
+                                    }
+                                    Surface(
+                                        color = SignalTier1.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "v${release.versionName}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = SignalTier1,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
-
                                 if (release.releaseTitle.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = release.releaseTitle,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.5.sp,
                                         color = Color(0xFFE2E8F0)
                                     )
                                 }
-
-                                if (release.apkSize > 0) {
-                                    Text(
-                                        text = "Download Size: ${String.format("%.1f", release.apkSize / (1024f * 1024f))} MB",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF94A3B8)
-                                    )
-                                }
-
-                                if (release.releaseNotes.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = release.releaseNotes.take(240) + if (release.releaseNotes.length > 240) "..." else "",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFFCBD5E1),
-                                        lineHeight = 14.sp
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = {
-                                        if (!OtaUpdateManager.canRequestPackageInstalls(context)) {
-                                            OtaUpdateManager.openInstallPermissionSettings(context)
-                                        } else {
-                                            scope.launch {
-                                                val res = OtaUpdateManager.downloadApk(context, release)
-                                                res.onSuccess { apkFile ->
-                                                    OtaUpdateManager.installApk(context, apkFile)
-                                                }
-                                            }
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = if (!OtaUpdateManager.canRequestPackageInstalls(context))
-                                            "ALLOW PERMISSION & DOWNLOAD"
-                                        else
-                                            "DOWNLOAD & INSTALL UPDATE",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = Color.Black
-                                    )
-                                }
                             }
-                        }
-                    }
-
-                    is OtaState.Downloading -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Downloading APK update...",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFA5F3FC),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "${(state.progress * 100).toInt()}%",
-                                    fontSize = 11.sp,
-                                    color = TelemetryCyan,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { state.progress },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp),
-                                color = TelemetryCyan,
-                                trackColor = Color(0xFF1E293B)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${String.format("%.1f", state.downloadedBytes / (1024f * 1024f))} / ${String.format("%.1f", state.totalBytes / (1024f * 1024f))} MB",
-                                fontSize = 10.sp,
-                                color = Color(0xFF94A3B8)
-                            )
                         }
                     }
 
                     is OtaState.ReadyToInstall -> {
-                        if (!state.validation.isValid) {
-                            Surface(
-                                color = Color(0xFF450A0A),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, Color(0xFFDC2626)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                        Surface(
+                            color = if (state.validation.isValid) Color(0xFF064E3B).copy(alpha = 0.7f) else Color(0xFF450A0A),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (state.validation.isValid) SignalTier1 else Color(0xFFDC2626)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
+                                        Icon(
+                                            if (state.validation.isValid) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = if (state.validation.isValid) SignalTier1 else Color(0xFFEF4444),
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = state.validation.errorMessage ?: "ตรวจสอบการติดตั้งไม่ผ่าน",
+                                            text = if (state.validation.isValid) "Update Ready to Install" else "Validation Failed",
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.5.sp,
                                             color = Color.White
                                         )
                                     }
-                                    if (!state.validation.errorDetails.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        color = Color(0xFF0284C7),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
                                         Text(
-                                            text = state.validation.errorDetails,
+                                            text = "v${state.releaseInfo.versionName}",
                                             fontSize = 11.sp,
-                                            color = Color(0xFFFCA5A5),
-                                            lineHeight = 15.sp
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
-                                    }
-                                    if (state.validation.isSignatureMismatch) {
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Surface(
-                                            color = Color(0xFF1E293B),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Column(modifier = Modifier.padding(10.dp)) {
-                                                Text(
-                                                    text = "💡 คำแนะนำในการอัปเดต:",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 11.5.sp,
-                                                    color = TelemetryCyan
-                                                )
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = "เนื่องจากแอปเดิมและไฟล์ใหม่ลงนามด้วย Keystore ต่างกัน เพื่อความปลอดภัยของระบบ Android ให้ถอนการติดตั้ง (Uninstall) แอปเดิมออกก่อน 1 ครั้ง จากนั้นกดเปิดไฟล์ APK นี้เพื่อติดตั้งใหม่ทันที",
-                                                    fontSize = 11.sp,
-                                                    color = Color(0xFFCBD5E1),
-                                                    lineHeight = 15.sp
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Button(
-                                                onClick = {
-                                                    OtaUpdateManager.shareApkFile(context, state.apkFile)
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = TelemetryCyan),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text("เปิด / ส่งต่อไฟล์ APK", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                                            }
-                                            OutlinedButton(
-                                                onClick = {
-                                                    OtaUpdateManager.resetState()
-                                                },
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text("ยกเลิก", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                            }
-                                        }
-                                    } else {
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        OutlinedButton(
-                                            onClick = {
-                                                OtaUpdateManager.resetState()
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("ลบไฟล์และดาวน์โหลดใหม่", fontSize = 11.sp, color = Color.White)
-                                        }
                                     }
                                 }
-                            }
-                        } else if (!state.validation.canInstallPackages) {
-                            Surface(
-                                color = Color(0xFF451A03),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, Color(0xFFD97706)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "ต้องเปิดสิทธิ์ 'ติดตั้งแอปที่ไม่รู้จัก'",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.5.sp,
-                                            color = Color.White
-                                        )
-                                    }
+                                if (!state.validation.isValid) {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Android กำหนดให้แอปต้องได้รับอนุญาตสิทธิ์ก่อนเรียก Package Installer เพื่อติดตั้งไฟล์อัปเดต",
+                                        text = state.validation.errorMessage ?: "Verification failed",
                                         fontSize = 11.sp,
-                                        color = Color(0xFFFDE68A),
-                                        lineHeight = 15.sp
+                                        color = Color(0xFFFCA5A5)
                                     )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Button(
-                                        onClick = {
-                                            OtaUpdateManager.openInstallPermissionSettings(context)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("เปิดการตั้งค่าเพื่ออนุญาตสิทธิ์ ↗", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
-                                    }
-                                }
-                            }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        OtaUpdateManager.installApk(context, state.apkFile)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("INSTALL DOWNLOADED UPDATE", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black)
-                                }
-                                Surface(
-                                    color = Color(0xFF064E3B).copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "✓ ตรวจสอบไฟล์สมบูรณ์ & Keystore ตรงกัน พร้อมติดตั้งทันที",
-                                            fontSize = 10.sp,
-                                            color = Color(0xFF6EE7B7)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -552,10 +397,11 @@ fun SettingsScreen(
                         Surface(
                             color = Color(0xFF450A0A),
                             shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(10.dp),
+                                modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.Default.Warning, contentDescription = null, tint = SignalTier5, modifier = Modifier.size(18.dp))
@@ -569,21 +415,229 @@ fun SettingsScreen(
                                     )
                                     Text(
                                         text = state.message,
-                                        fontSize = 10.sp,
+                                        fontSize = 10.5.sp,
                                         color = SignalTier4
                                     )
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    is OtaState.Idle -> {
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Ready to check for latest releases",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFCBD5E1)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 2. VERSION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Current Version",
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                    Surface(
+                        color = Color(0xFF0369A1),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "v$currentVersionName (Build $currentVersionCode)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3. LAST CHECKED
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Last Checked",
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                    Text(
+                        text = formatLastChecked(lastCheckedTime),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFE2E8F0)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 4. BUTTON
+                when (val state = otaState) {
+                    is OtaState.Checking -> {
                         OutlinedButton(
-                            onClick = {
-                                OtaUpdateManager.resetState()
-                            },
+                            onClick = {},
+                            enabled = false,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Dismiss", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = TelemetryCyan)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("CHECKING...", fontSize = 12.sp, color = TelemetryCyan)
+                        }
+                    }
+
+                    is OtaState.Downloading -> {
+                        OutlinedButton(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("DOWNLOADING IN BACKGROUND...", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        }
+                    }
+
+                    is OtaState.ReadyToInstall -> {
+                        if (state.validation.isValid) {
+                            Button(
+                                onClick = {
+                                    OtaUpdateManager.installApk(context, state.apkFile)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (!state.validation.canInstallPackages) "ALLOW PERMISSION & INSTALL" else "INSTALL UPDATE NOW",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color.Black
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { OtaUpdateManager.shareApkFile(context, state.apkFile) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("SHARE APK", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = { OtaUpdateManager.resetState() },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("DISMISS", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                }
+                            }
+                        }
+                    }
+
+                    is OtaState.UpdateAvailable -> {
+                        Button(
+                            onClick = {
+                                if (!OtaUpdateManager.canRequestPackageInstalls(context)) {
+                                    OtaUpdateManager.openInstallPermissionSettings(context)
+                                } else {
+                                    scope.launch {
+                                        val res = OtaUpdateManager.downloadApk(context, state.releaseInfo)
+                                        res.onSuccess { apkFile ->
+                                            OtaUpdateManager.installApk(context, apkFile)
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "DOWNLOAD & INSTALL UPDATE",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+
+                    is OtaState.Error -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        OtaUpdateManager.checkForUpdates(currentVersionName)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("RETRY", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { OtaUpdateManager.resetState() },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("DISMISS", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                            }
+                        }
+                    }
+
+                    is OtaState.UpToDate, is OtaState.Idle -> {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    OtaUpdateManager.checkForUpdates(currentVersionName)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (state is OtaState.UpToDate) "CHECK AGAIN" else "CHECK FOR UPDATES",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
