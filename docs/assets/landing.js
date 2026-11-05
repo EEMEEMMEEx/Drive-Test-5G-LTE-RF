@@ -182,6 +182,7 @@ function initScreenGallery() {
       desc: 'Spatial route visualization powered by Google Maps SDK & Leaflet. Color-code GPS drive traces by RSRP, RSRQ, SINR, Technology, or Speed with real-time serving cell sector lines.',
       bullets: [
         '5 telemetry color modes and 4 scientific palettes (Classic, Thermique, Viridis, Ocean)',
+        'Route START/END markers with live stats chips (distance, time, average RSRP)',
         'Dynamic serving-cell vector lines, azimuth sector wedges, and neighbor candidates',
         'Automated detection of ping-pong handovers (<30s) and missed handovers (≥6 dB margin)',
         'Offline tile caching for uninterrupted rural and highway field surveys'
@@ -271,7 +272,7 @@ async function resolveLatestGitHubRelease() {
     if (!res.ok) return;
 
     const release = await res.json();
-    const tag = release.tag_name || 'v1.4.2-android';
+    const tag = release.tag_name || 'v1.9.9-android';
     const assets = Array.isArray(release.assets) ? release.assets : [];
     const apkAsset =
       assets.find((a) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.apk')) ||
