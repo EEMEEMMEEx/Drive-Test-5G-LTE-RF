@@ -7,7 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -25,12 +27,39 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.service.DriveTestForegroundService
-import com.drivetest.lte5g.ui.dashboard.getRsrpColor
 import com.drivetest.lte5g.ui.theme.*
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
+
+/** Resolves the quality tier (1..5) to a color, shared by RSRP / RSRQ / SINR modes. */
+private fun qualityColorFor(key: Int): Color = when (key) {
+    1 -> SignalTier1
+    2 -> SignalTier2
+    3 -> SignalTier3
+    4 -> SignalTier4
+    else -> SignalTier5
+}
+
+/** Maps a legend key to a map color under the selected [RouteColorMode]. */
+@Composable
+private fun routeColorFor(mode: RouteColorMode, key: Int): Color = when (mode) {
+    RouteColorMode.RSRP, RouteColorMode.RSRQ, RouteColorMode.SINR -> qualityColorFor(key)
+    RouteColorMode.TECHNOLOGY -> when (key) {
+        1 -> TechNrSa
+        2 -> TechNrNsa
+        3 -> TechLte
+        else -> TechUnknown
+    }
+    RouteColorMode.SPEED -> when (key) {
+        1 -> SpeedTier1
+        2 -> SpeedTier2
+        3 -> SpeedTier3
+        4 -> SpeedTier4
+        else -> SpeedTier5
+    }
+}
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -40,11 +69,18 @@ fun DriveTestMapScreen(
     val context = LocalContext.current
     val isRecording by DriveTestForegroundService.isRecording.collectAsStateWithLifecycle()
     val latestSample by DriveTestForegroundService.latestSample.collectAsStateWithLifecycle()
+    val isDualSimMode by DriveTestForegroundService.isDualSimMode.collectAsStateWithLifecycle()
     val activeSession by SessionRepository.activeSession.collectAsStateWithLifecycle()
     val selectedSession by SessionRepository.selectedSessionForMap.collectAsStateWithLifecycle()
 
+    // Map UI state
+    var colorMode by remember { mutableStateOf(RouteColorMode.RSRP) }
+    var showSim1 by remember { mutableStateOf(true) }
+    var showSim2 by remember { mutableStateOf(true) }
+
     val displaySession = if (isRecording) activeSession else (selectedSession ?: activeSession)
     val displaySamples = displaySession?.samples ?: emptyList()
+    val hasSim2Data = displaySamples.any { it.metricsSim2 != null } || isDualSimMode
 
     val fusedClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var hasLocationPermission by remember {
@@ -117,22 +153,38 @@ fun DriveTestMapScreen(
                 zoomControlsEnabled = false
             )
         ) {
-            // Draw route segments colored by RSRP
+            // Draw route segments colored by the selected mode.
+            // SIM 2 is drawn first (under SIM 1) with a wider stroke, mirroring the KMZ export.
             if (displaySamples.size >= 2) {
-                for (i in 0 until displaySamples.size - 1) {
-                    val p1 = displaySamples[i]
-                    val p2 = displaySamples[i + 1]
-                    val rsrp = p1.metrics.nr?.ssRsrp ?: p1.metrics.lte?.rsrp
-                    val color = getRsrpColor(rsrp)
-
-                    Polyline(
-                        points = listOf(
-                            LatLng(p1.latitude, p1.longitude),
-                            LatLng(p2.latitude, p2.longitude)
-                        ),
-                        color = color,
-                        width = 12f
-                    )
+                if (showSim2 && hasSim2Data) {
+                    for (i in 0 until displaySamples.size - 1) {
+                        val p1 = displaySamples[i]
+                        val p2 = displaySamples[i + 1]
+                        val key = legendKeyFor(p1, colorMode, 2) ?: continue
+                        Polyline(
+                            points = listOf(
+                                LatLng(p1.latitude, p1.longitude),
+                                LatLng(p2.latitude, p2.longitude)
+                            ),
+                            color = routeColorFor(colorMode, key),
+                            width = 16f
+                        )
+                    }
+                }
+                if (showSim1) {
+                    for (i in 0 until displaySamples.size - 1) {
+                        val p1 = displaySamples[i]
+                        val p2 = displaySamples[i + 1]
+                        val key = legendKeyFor(p1, colorMode, 1) ?: continue
+                        Polyline(
+                            points = listOf(
+                                LatLng(p1.latitude, p1.longitude),
+                                LatLng(p2.latitude, p2.longitude)
+                            ),
+                            color = routeColorFor(colorMode, key),
+                            width = 12f
+                        )
+                    }
                 }
             }
 
@@ -147,7 +199,7 @@ fun DriveTestMapScreen(
             }
         }
 
-        // Floating Signal Legend (Bottom-Left)
+        // Floating Signal Legend (Bottom-Left), driven by the selected color mode
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg.copy(alpha = 0.92f)),
             shape = RoundedCornerShape(10.dp),
@@ -156,19 +208,17 @@ fun DriveTestMapScreen(
                 .padding(16.dp)
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(10.dp))
         ) {
-            Column(modifier = Modifier.padding(10.dp)) {
+            Column(modifier = Modifier.padding(10.dp).widthIn(max = 220.dp)) {
                 Text(
-                    text = "RSRP SIGNAL LEVEL",
+                    text = colorMode.legendTitle,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF94A3B8)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                LegendRow(SignalTier1, "≥ -85 dBm (Excellent)")
-                LegendRow(SignalTier2, "-85 to -95 dBm (Good)")
-                LegendRow(SignalTier3, "-95 to -105 dBm (Fair)")
-                LegendRow(SignalTier4, "-105 to -115 dBm (Poor)")
-                LegendRow(SignalTier5, "< -115 dBm (Bad)")
+                legendEntries(colorMode).forEach { (key, label) ->
+                    LegendRow(color = routeColorFor(colorMode, key), label = label)
+                }
             }
         }
 
@@ -205,7 +255,7 @@ fun DriveTestMapScreen(
             }
         }
 
-        // Top Floating Stats & Session Banner
+        // Top Floating Stats & Session Banner with color mode / layer controls
         Surface(
             color = TelemetryDarkBg.copy(alpha = 0.92f),
             shape = RoundedCornerShape(10.dp),
@@ -214,45 +264,88 @@ fun DriveTestMapScreen(
                 .padding(top = 16.dp, start = 12.dp, end = 12.dp)
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(10.dp))
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    color = if (displaySession?.isRecording == true) Color(0xFF991B1B) else Color(0xFF1E293B),
-                    shape = RoundedCornerShape(4.dp)
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    Surface(
+                        color = if (displaySession?.isRecording == true) Color(0xFF991B1B) else Color(0xFF1E293B),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (displaySession?.isRecording == true) "● LIVE" else "SAVED",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (displaySession?.isRecording == true) Color.White else Color(0xFF94A3B8),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
                     Text(
-                        text = if (displaySession?.isRecording == true) "● LIVE" else "SAVED",
-                        fontSize = 9.sp,
+                        text = displaySession?.name ?: "No Route Loaded",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (displaySession?.isRecording == true) Color.White else Color(0xFF94A3B8),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        color = Color.White,
+                        maxLines = 1
                     )
+
+                    Text(
+                        text = "${displaySamples.size} pts",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TelemetryCyan
+                    )
+
+                    if (isRecording) {
+                        Text(
+                            text = "${latestSample?.let { String.format("%.1f", it.speedKmh) } ?: "0.0"} km/h",
+                            fontSize = 12.sp,
+                            color = Color(0xFFA5F3FC)
+                        )
+                    }
                 }
 
-                Text(
-                    text = displaySession?.name ?: "No Route Loaded",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1
-                )
-
-                Text(
-                    text = "${displaySamples.size} pts",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TelemetryCyan
-                )
-
-                if (isRecording) {
-                    Text(
-                        text = "${latestSample?.let { String.format("%.1f", it.speedKmh) } ?: "0.0"} km/h",
-                        fontSize = 12.sp,
-                        color = Color(0xFFA5F3FC)
-                    )
+                // Color mode selector + SIM layer toggles (SIM 2 only for dual-SIM sessions)
+                if (displaySamples.isNotEmpty() || isRecording) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        RouteColorMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = colorMode == mode,
+                                onClick = { colorMode = mode },
+                                label = {
+                                    Text(
+                                        text = mode.label,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                },
+                                modifier = Modifier.height(30.dp)
+                            )
+                        }
+                        if (hasSim2Data) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            FilterChip(
+                                selected = showSim1,
+                                onClick = { showSim1 = !showSim1 },
+                                label = { Text("SIM 1", fontSize = 10.sp) },
+                                modifier = Modifier.height(30.dp)
+                            )
+                            FilterChip(
+                                selected = showSim2,
+                                onClick = { showSim2 = !showSim2 },
+                                label = { Text("SIM 2", fontSize = 10.sp) },
+                                modifier = Modifier.height(30.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

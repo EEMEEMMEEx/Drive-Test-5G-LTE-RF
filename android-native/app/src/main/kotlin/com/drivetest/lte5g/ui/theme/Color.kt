@@ -47,6 +47,26 @@ val primaryContainerDark = Color(0xFF005C7D)
 val secondaryDark = Color(0xFFB0CADC)
 val tertiaryDark = Color(0xFFE6B5F8)
 
+// SIM 2 Tier Colors (mirrors the KMZ dual-SIM export palette)
+val Sim2Tier1 = Color(0xFF38BDF8) // >= -85 (Excellent)
+val Sim2Tier2 = Color(0xFF818CF8) // -85 to -95 (Good)
+val Sim2Tier3 = Color(0xFFA78BFA) // -95 to -105 (Fair)
+val Sim2Tier4 = Color(0xFFE879F9) // -105 to -115 (Poor)
+val Sim2Tier5 = Color(0xFFF472B6) // < -115 (Bad)
+
+// Speed Tier Colors (slow to fast ramp)
+val SpeedTier1 = Color(0xFF22D3EE) // < 20 km/h
+val SpeedTier2 = Color(0xFF34D399) // 20 to 40 km/h
+val SpeedTier3 = Color(0xFFFACC15) // 40 to 60 km/h
+val SpeedTier4 = Color(0xFFFB923C) // 60 to 80 km/h
+val SpeedTier5 = Color(0xFFEF4444) // >= 80 km/h
+
+// Radio Access Technology Colors
+val TechNrSa = Color(0xFF10B981)
+val TechNrNsa = Color(0xFF06B6D4)
+val TechLte = Color(0xFF3B82F6)
+val TechUnknown = Color(0xFF64748B)
+
 //End - Partial Color List
 
 /*
