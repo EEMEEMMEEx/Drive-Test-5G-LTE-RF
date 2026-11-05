@@ -2,6 +2,7 @@ package com.drivetest.lte5g.ui.map
 
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
+import com.drivetest.lte5g.model.DriveTestSession
 import com.drivetest.lte5g.model.RatType
 
 /**
@@ -147,5 +148,58 @@ fun legendEntries(mode: RouteColorMode): List<Pair<Int, String>> = when (mode) {
         3 to "40 to 60 km/h (Suburban)",
         4 to "60 to 80 km/h (Arterial)",
         5 to "≥ 80 km/h (Highway)"
+    )
+}
+
+
+// ---- Dual-SIM benchmark comparison -----------------------------------------
+
+/**
+ * A single RSRP/SINR row of a dual-SIM session summary, resolved for display.
+ */
+data class DualSimBenchmarkComparison(
+    val sim1Label: String,
+    val sim2Label: String,
+    val sim1Rsrp: Int?,
+    val sim2Rsrp: Int?,
+    val rsrpDeltaDb: Int?,
+    val sim1Sinr: Double?,
+    val sim2Sinr: Double?,
+    val sinrDeltaDb: Double?,
+    /** Positive when SIM 1 is stronger on RSRP, negative when SIM 2 is, null when tied or missing. */
+    val winner: Int?
+) {
+    /** True when at least one side carries RSRP or SINR data. */
+    val hasData: Boolean
+        get() = sim1Rsrp != null || sim2Rsrp != null || sim1Sinr != null || sim2Sinr != null
+}
+
+/**
+ * Builds the SIM 1 vs SIM 2 summary for a session. Delta is null when either side
+ * is missing; [DualSimBenchmarkComparison.winner] is null on a tie or missing data.
+ */
+fun dualSimBenchmarkComparison(session: DriveTestSession): DualSimBenchmarkComparison {
+    val sim1Rsrp = session.avgRsrp
+    val sim2Rsrp = session.avgRsrpSim2
+    val sim1Sinr = session.avgSinr
+    val sim2Sinr = session.avgSinrSim2
+    val rsrpDeltaDb = if (sim1Rsrp != null && sim2Rsrp != null) sim1Rsrp - sim2Rsrp else null
+    val sinrDeltaDb = if (sim1Sinr != null && sim2Sinr != null) sim1Sinr - sim2Sinr else null
+    val winner = when {
+        rsrpDeltaDb == null -> null
+        rsrpDeltaDb > 0 -> 1
+        rsrpDeltaDb < 0 -> 2
+        else -> null
+    }
+    return DualSimBenchmarkComparison(
+        sim1Label = session.simDisplayName?.ifBlank { null } ?: "SIM 1",
+        sim2Label = session.sim2DisplayName?.ifBlank { null } ?: "SIM 2",
+        sim1Rsrp = sim1Rsrp,
+        sim2Rsrp = sim2Rsrp,
+        rsrpDeltaDb = rsrpDeltaDb,
+        sim1Sinr = sim1Sinr,
+        sim2Sinr = sim2Sinr,
+        sinrDeltaDb = sinrDeltaDb,
+        winner = winner
     )
 }
