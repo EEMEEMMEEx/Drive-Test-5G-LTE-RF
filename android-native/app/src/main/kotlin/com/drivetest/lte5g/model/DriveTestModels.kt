@@ -24,22 +24,6 @@ enum class MeasurementCadence(
     PRECISE(1000L, "Precise (1 s)", "1.0 Hz", "ความละเอียดสูงสุด สำหรับ Fast Fading & Handover")
 }
 
-enum class LiveAlertStyle(
-    val label: String,
-    val shortDesc: String,
-    val fullDesc: String
-) {
-    CAPSULE(
-        label = "Navigation Live Updates",
-        shortDesc = "Google Maps Style (แนะนำ)",
-        fullDesc = "แสดงแคปซูลสดรอบรูกล้องหน้าแบบ Real-time ไร้ปุ่มเพลง ไร้หูฟัง ไร้หลอดเวลา"
-    ),
-    COMPACT(
-        label = "Standard Notification",
-        shortDesc = "การแจ้งเตือนปกติ",
-        fullDesc = "แสดงการแจ้งเตือนมาตรฐานในแถบดึงลง โดยไม่ขึ้นแคปซูลรอบกล้องหน้า"
-    )
-}
 
 data class SimSlotInfo(
     val slotIndex: Int,

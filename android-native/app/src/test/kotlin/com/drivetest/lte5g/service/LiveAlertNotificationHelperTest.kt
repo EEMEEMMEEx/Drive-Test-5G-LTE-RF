@@ -1,7 +1,6 @@
 package com.drivetest.lte5g.service
 
 import com.drivetest.lte5g.model.CellMetrics
-import com.drivetest.lte5g.model.LiveAlertStyle
 import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.NrMetrics
@@ -169,9 +168,5 @@ class LiveAlertNotificationHelperTest {
         )
     }
 
-    @Test
-    fun testLiveAlertStyles() {
-        assertEquals("Navigation Live Updates", LiveAlertStyle.CAPSULE.label)
-        assertEquals("Standard Notification", LiveAlertStyle.COMPACT.label)
-    }
+
 }

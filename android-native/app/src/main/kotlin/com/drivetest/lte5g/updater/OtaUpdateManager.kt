@@ -191,6 +191,53 @@ object OtaUpdateManager {
     }
 
     /**
+     * Automatic OTA Update Flow:
+     * 1. Checks GitHub Releases in background on app startup.
+     * 2. If a newer release is found:
+     *    - If valid APK is already cached locally, immediately transitions to ReadyToInstall.
+     *    - Otherwise, automatically downloads the APK in background.
+     * 3. Validates package name, signature, and versionCode.
+     * 4. Transitions state to ReadyToInstall so UI can prompt user with confirmation dialog.
+     */
+    suspend fun startAutoUpdateFlow(
+        context: Context,
+        currentVersion: String
+    ): Result<File?> = withContext(Dispatchers.IO) {
+        val currentState = _state.value
+        if (currentState is OtaState.Downloading) {
+            return@withContext Result.success(null)
+        }
+        if (currentState is OtaState.ReadyToInstall && currentState.validation.isValid) {
+            return@withContext Result.success(currentState.apkFile)
+        }
+
+        try {
+            val checkResult = checkForUpdates(currentVersion)
+            val release = checkResult.getOrNull()
+            if (release != null) {
+                // Check if already downloaded and valid
+                val updateDir = File(context.cacheDir, "updates")
+                val targetApk = File(updateDir, "update_${release.versionName}.apk")
+                if (targetApk.exists() && targetApk.length() > 0) {
+                    val validation = validateApkFile(context, targetApk, release.apkSize)
+                    if (validation.isValid) {
+                        _state.value = OtaState.ReadyToInstall(targetApk, release, validation)
+                        return@withContext Result.success(targetApk)
+                    }
+                }
+
+                // Not yet downloaded or corrupted cache: download in background
+                val downloadRes = downloadApk(context, release)
+                return@withContext downloadRes.map { it }
+            }
+            Result.success(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Automatic update flow error", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Downloads the APK file into app's cache directory with progress reporting
      */
     suspend fun downloadApk(
@@ -404,7 +451,7 @@ object OtaUpdateManager {
             )
 
         // Check package name
-        val updatePkg = archiveInfo.packageName ?: ""
+        val updatePkg = archiveInfo.packageName.orEmpty()
         if (updatePkg != context.packageName) {
             return ApkValidationInfo(
                 isValid = false,
