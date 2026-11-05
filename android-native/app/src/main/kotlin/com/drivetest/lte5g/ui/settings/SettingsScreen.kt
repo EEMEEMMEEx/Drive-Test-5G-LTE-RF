@@ -95,12 +95,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.9.2"
+    val currentVersionName = packageInfo?.versionName ?: "1.9.3"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 26
+        packageInfo?.longVersionCode?.toInt() ?: 27
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 26
+        packageInfo?.versionCode ?: 27
     }
 
     Column(
@@ -118,7 +118,7 @@ fun SettingsScreen(
             color = Color.White
         )
 
-        // OTA Software Update Card
+        // App Update Card
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -134,7 +134,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "OVER-THE-AIR (OTA) UPDATES",
+                        text = "APP UPDATE",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF94A3B8)
