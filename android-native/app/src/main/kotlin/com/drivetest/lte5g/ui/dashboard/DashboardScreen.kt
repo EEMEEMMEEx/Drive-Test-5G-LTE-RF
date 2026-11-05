@@ -704,39 +704,81 @@ fun DashboardScreen(
             }
         }
 
-        // RF Key Metric Gauges (RSRP, RSRQ, SINR)
+        // RF Key Metric Gauges (RSRP, RSRQ, SINR) — SIM 1 LIVE card
         val rsrpVal = if (isNr) metrics?.nr?.ssRsrp ?: metrics?.lte?.rsrp else metrics?.lte?.rsrp
         val rsrqVal = if (isNr) metrics?.nr?.ssRsrq ?: metrics?.lte?.rsrq else metrics?.lte?.rsrq
         val sinrVal = if (isNr) metrics?.nr?.ssSinr ?: metrics?.lte?.rssnr else metrics?.lte?.rssnr
+        val m1 = metrics
+        val sim1Name = m1?.simDisplayName?.takeIf { it.isNotBlank() } ?: "SIM 1"
+        val rat1Text = when {
+            m1?.nr != null -> if (m1.nr.isNsa) "5G NSA" else "5G SA"
+            m1?.lte != null -> "LTE 4G"
+            else -> "--"
+        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, SignalTier1.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
         ) {
-            SignalGaugeCard(
-                title = if (isNr) "SS-RSRP" else "LTE RSRP",
-                value = rsrpVal?.toString() ?: "--",
-                unit = "dBm",
-                qualityColor = getRsrpColor(rsrpVal),
-                qualityText = getRsrpTierLabel(rsrpVal),
-                modifier = Modifier.weight(1f)
-            )
-            SignalGaugeCard(
-                title = if (isNr) "SS-RSRQ" else "LTE RSRQ",
-                value = rsrqVal?.toString() ?: "--",
-                unit = "dB",
-                qualityColor = getRsrqColor(rsrqVal),
-                qualityText = getRsrqTierLabel(rsrqVal),
-                modifier = Modifier.weight(1f)
-            )
-            SignalGaugeCard(
-                title = if (isNr) "SS-SINR" else "LTE SINR",
-                value = sinrVal?.let { String.format("%.1f", it) } ?: "--",
-                unit = "dB",
-                qualityColor = getSinrColor(sinrVal),
-                qualityText = getSinrTierLabel(sinrVal),
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SIM 1 LIVE \u2022 $sim1Name",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SignalTier1
+                    )
+                    Surface(
+                        color = Color(0xFF14532D),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = rat1Text,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SignalTier1,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SignalGaugeCard(
+                        title = if (isNr) "SS-RSRP" else "LTE RSRP",
+                        value = rsrpVal?.toString() ?: "--",
+                        unit = "dBm",
+                        qualityColor = getRsrpColor(rsrpVal),
+                        qualityText = getRsrpTierLabel(rsrpVal),
+                        modifier = Modifier.weight(1f)
+                    )
+                    SignalGaugeCard(
+                        title = if (isNr) "SS-RSRQ" else "LTE RSRQ",
+                        value = rsrqVal?.toString() ?: "--",
+                        unit = "dB",
+                        qualityColor = getRsrqColor(rsrqVal),
+                        qualityText = getRsrqTierLabel(rsrqVal),
+                        modifier = Modifier.weight(1f)
+                    )
+                    SignalGaugeCard(
+                        title = if (isNr) "SS-SINR" else "LTE SINR",
+                        value = sinrVal?.let { String.format("%.1f", it) } ?: "--",
+                        unit = "dB",
+                        qualityColor = getSinrColor(sinrVal),
+                        qualityText = getSinrTierLabel(sinrVal),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         // SIM 2 Live RF Gauges (dual-SIM sessions only)
