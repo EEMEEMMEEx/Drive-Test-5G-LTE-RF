@@ -203,3 +203,55 @@ fun dualSimBenchmarkComparison(session: DriveTestSession): DualSimBenchmarkCompa
         winner = winner
     )
 }
+
+
+// ---- Route statistics -------------------------------------------------------
+
+/** Aggregate route statistics for the map stats chips. */
+data class RouteStats(
+    val distanceMeters: Double,
+    val durationMs: Long,
+    val avgRsrp: Int?
+)
+
+/** Great-circle distance in meters (WGS-84 sphere, R = 6371000 m). */
+fun haversineDistanceMeters(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): Double {
+    val r = 6371000.0
+    val dLat = Math.toRadians(toLat - fromLat)
+    val dLon = Math.toRadians(toLon - fromLon)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(fromLat)) * Math.cos(Math.toRadians(toLat)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    return 2 * r * Math.asin(Math.sqrt(a))
+}
+
+/** "850 m" below 1 km, "12.3 km" above. */
+fun formatDistance(meters: Double): String =
+    if (meters < 1000.0) "${meters.toLong()} m" else String.format(java.util.Locale.US, "%.1f km", meters / 1000.0)
+
+/** "1h 05m" with hours, otherwise "5m 32s"; clamped at zero. */
+fun formatDuration(ms: Long): String {
+    val totalSeconds = (ms / 1000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "${hours}h ${String.format(java.util.Locale.US, "%02d", minutes)}m"
+    else "${minutes}m ${String.format(java.util.Locale.US, "%02d", seconds)}s"
+}
+
+/**
+ * Distance (sum of segment haversine), duration (first to last timestamp) and
+ * average SIM 1 RSRP for a route. Null for an empty route.
+ */
+fun routeStats(samples: List<DriveTestSample>): RouteStats? {
+    if (samples.isEmpty()) return null
+    var distance = 0.0
+    for (i in 0 until samples.size - 1) {
+        val a = samples[i]
+        val b = samples[i + 1]
+        distance += haversineDistanceMeters(a.latitude, a.longitude, b.latitude, b.longitude)
+    }
+    val durationMs = samples.last().timestamp - samples.first().timestamp
+    val rsrps = samples.mapNotNull { rsrpOf(metricsForSim(it, 1)) }
+    return RouteStats(distance, durationMs, if (rsrps.isEmpty()) null else rsrps.average().toInt())
+}
