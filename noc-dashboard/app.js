@@ -164,7 +164,21 @@ function renderVehicleRoster() {
   kpiActive.textContent = state.vehicles.size;
 
   if (state.vehicles.size === 0) {
-    listEl.innerHTML = `<div class="empty-state">No vehicles online. Start demo simulator or configure Firebase.</div>`;
+    if (!state.isDemoMode) {
+      listEl.innerHTML = `
+        <div class="empty-state" style="padding: 24px 12px; text-align: center;">
+          <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
+          <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">FIREBASE CONNECTED</div>
+          <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
+            เชื่อมต่อ Firebase สำเร็จแล้ว!<br>
+            กำลังรอรับสัญญาณจากมือถือ...<br>
+            เปิดแอปมือถือแล้วกดปุ่ม <b>START</b> เพื่อเริ่มสตรีมข้อมูลสด
+          </div>
+        </div>
+      `;
+    } else {
+      listEl.innerHTML = `<div class="empty-state">No vehicles online. Start demo simulator or configure Firebase.</div>`;
+    }
     return;
   }
 
@@ -421,12 +435,39 @@ function runDemoSimulationStep() {
   });
 }
 
+// Clear All Fleet Markers and Trails
+function clearFleet() {
+  state.vehicles.forEach(entry => {
+    if (entry.marker) map.removeLayer(entry.marker);
+    if (entry.polyline) map.removeLayer(entry.polyline);
+  });
+  state.vehicles.clear();
+  state.selectedVehicleId = null;
+  state.alerts = [];
+  document.getElementById('kpi-active-count').textContent = '0';
+  document.getElementById('kpi-alert-count').textContent = '0';
+  document.getElementById('alerts-count-badge').textContent = '0 ALERTS';
+  document.getElementById('inspector-vehicle-badge').textContent = 'WAITING FOR DATA';
+  document.getElementById('alerts-feed').innerHTML = '<div class="empty-state">No active anomalies detected in current fleet route.</div>';
+  renderVehicleRoster();
+}
+
 function startDemoSimulator() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+  clearFleet();
   state.isDemoMode = true;
   document.getElementById('kpi-sync-mode').textContent = 'DEMO SIMULATOR';
+  document.getElementById('kpi-sync-mode').className = 'kpi-value';
   document.getElementById('btn-toggle-demo').innerHTML = `
     <span class="dot-indicator dot-active"></span>
     <span>SIMULATOR ACTIVE</span>
+  `;
+  document.getElementById('btn-firebase-modal').innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+    <span>FIREBASE SYNC</span>
   `;
   if (state.demoTimer) clearInterval(state.demoTimer);
   state.demoTimer = setInterval(runDemoSimulationStep, 1500);
@@ -446,49 +487,77 @@ function stopDemoSimulator() {
 
 // --- FIREBASE SYNC INTEGRATION ---
 function connectFirebase(url, token) {
-  const cleanUrl = url.trim().replace(/\/+$/, '');
+  const cleanUrl = url.trim().replace(/\/+$/, '').replace(/\.json$/, '');
   if (!cleanUrl.startsWith('http')) {
-    alert('Please enter a valid https:// Firebase Database URL');
+    alert('กรุณาระบุ URL ที่ขึ้นต้นด้วย https://');
     return;
   }
 
-  stopDemoSimulator();
-  document.getElementById('kpi-sync-mode').textContent = 'FIREBASE LIVE';
-
   const authParam = token ? `?auth=${token.trim()}` : '';
 
-  // Initial fetch of current fleet vehicles
+  // Test connection first
   fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      return res.json();
+    })
     .then(data => {
+      if (data && data.error) {
+        throw new Error(data.error);
+      }
+
+      // Connection succeeded! Stop demo and clear demo cars
+      stopDemoSimulator();
+      clearFleet();
+
+      // Remember URL
+      try {
+        localStorage.setItem('dt_firebase_url', cleanUrl);
+        if (token) localStorage.setItem('dt_firebase_token', token.trim());
+      } catch (_) {}
+
+      document.getElementById('kpi-sync-mode').textContent = 'FIREBASE LIVE';
+      document.getElementById('kpi-sync-mode').className = 'kpi-value text-emerald';
+      document.getElementById('btn-firebase-modal').innerHTML = `
+        <span class="dot-indicator dot-active"></span>
+        <span>FIREBASE LIVE</span>
+      `;
+
       if (data && typeof data === 'object') {
-        Object.values(data).forEach(veh => {
+        const vehicles = Object.values(data);
+        vehicles.forEach(veh => {
           if (veh && veh.vehicleId && veh.lat && veh.lon) {
             updateVehicle(veh);
           }
         });
+        if (vehicles.length > 0) {
+          const first = vehicles[0];
+          map.panTo([first.lat, first.lon]);
+        }
       }
+
+      // Setup continuous polling
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(() => {
+        fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
+          .then(res => res.json())
+          .then(liveData => {
+            if (liveData && typeof liveData === 'object' && !liveData.error) {
+              Object.values(liveData).forEach(veh => {
+                if (veh && veh.vehicleId && veh.lat && veh.lon) {
+                  updateVehicle(veh);
+                }
+              });
+            }
+          })
+          .catch(e => console.warn('Firebase live poll warning:', e));
+      }, 1500);
     })
     .catch(err => {
-      console.warn('Firebase initial fetch error:', err);
+      alert(`การเชื่อมต่อ Firebase ล้มเหลว:\n${err.message}\n\nกรุณาตรวจสอบว่า URL ถูกต้อง และ Realtime Database Rules เปิด .read: true`);
     });
-
-  // Setup periodic polling for vehicles
-  if (state.pollTimer) clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(() => {
-    fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && typeof data === 'object') {
-          Object.values(data).forEach(veh => {
-            if (veh && veh.vehicleId && veh.lat && veh.lon) {
-              updateVehicle(veh);
-            }
-          });
-        }
-      })
-      .catch(e => console.warn('Sync poll error', e));
-  }, 2000);
 }
 
 // Setup Event Listeners
@@ -523,6 +592,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Modal Controls
   const modal = document.getElementById('firebase-modal');
+  try {
+    const savedUrl = localStorage.getItem('dt_firebase_url');
+    if (savedUrl) {
+      document.getElementById('input-fb-url').value = savedUrl;
+    }
+    const savedToken = localStorage.getItem('dt_firebase_token');
+    if (savedToken) {
+      document.getElementById('input-fb-token').value = savedToken;
+    }
+  } catch (_) {}
+
   document.getElementById('btn-firebase-modal').addEventListener('click', () => {
     modal.classList.add('active');
   });
