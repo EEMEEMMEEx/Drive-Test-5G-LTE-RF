@@ -460,14 +460,10 @@ function startDemoSimulator() {
   clearFleet();
   state.isDemoMode = true;
   document.getElementById('kpi-sync-mode').textContent = 'DEMO SIMULATOR';
-  document.getElementById('kpi-sync-mode').className = 'kpi-value';
+  document.getElementById('kpi-sync-mode').className = 'kpi-value text-amber';
   document.getElementById('btn-toggle-demo').innerHTML = `
     <span class="dot-indicator dot-active"></span>
-    <span>SIMULATOR ACTIVE</span>
-  `;
-  document.getElementById('btn-firebase-modal').innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-    <span>FIREBASE SYNC</span>
+    <span>DEMO RUNNING (CLICK FOR LIVE)</span>
   `;
   if (state.demoTimer) clearInterval(state.demoTimer);
   state.demoTimer = setInterval(runDemoSimulationStep, 1500);
@@ -477,7 +473,7 @@ function stopDemoSimulator() {
   state.isDemoMode = false;
   document.getElementById('btn-toggle-demo').innerHTML = `
     <span class="dot-indicator"></span>
-    <span>SIMULATOR PAUSED</span>
+    <span>SWITCH TO DEMO</span>
   `;
   if (state.demoTimer) {
     clearInterval(state.demoTimer);
@@ -487,9 +483,9 @@ function stopDemoSimulator() {
 
 // --- FIREBASE SYNC INTEGRATION ---
 function connectFirebase(url, token) {
-  const cleanUrl = url.trim().replace(/\/+$/, '').replace(/\.json$/, '');
+  const cleanUrl = (url || '').trim().replace(/\/+$/, '').replace(/\.json$/, '');
   if (!cleanUrl.startsWith('http')) {
-    alert('กรุณาระบุ URL ที่ขึ้นต้นด้วย https://');
+    console.warn('Invalid Firebase Database URL in env.js:', cleanUrl);
     return;
   }
 
@@ -512,18 +508,8 @@ function connectFirebase(url, token) {
       stopDemoSimulator();
       clearFleet();
 
-      // Remember URL
-      try {
-        localStorage.setItem('dt_firebase_url', cleanUrl);
-        if (token) localStorage.setItem('dt_firebase_token', token.trim());
-      } catch (_) {}
-
       document.getElementById('kpi-sync-mode').textContent = 'FIREBASE LIVE';
       document.getElementById('kpi-sync-mode').className = 'kpi-value text-emerald';
-      document.getElementById('btn-firebase-modal').innerHTML = `
-        <span class="dot-indicator dot-active"></span>
-        <span>FIREBASE LIVE</span>
-      `;
 
       if (data && typeof data === 'object') {
         const vehicles = Object.values(data);
@@ -556,19 +542,34 @@ function connectFirebase(url, token) {
       }, 1500);
     })
     .catch(err => {
-      alert(`การเชื่อมต่อ Firebase ล้มเหลว:\n${err.message}\n\nกรุณาตรวจสอบว่า URL ถูกต้อง และ Realtime Database Rules เปิด .read: true`);
+      console.error('Firebase connection error:', err);
+      document.getElementById('kpi-sync-mode').textContent = 'FIREBASE ERROR';
+      document.getElementById('kpi-sync-mode').className = 'kpi-value text-rose';
+      const listEl = document.getElementById('vehicle-list');
+      listEl.innerHTML = `
+        <div class="empty-state" style="padding: 20px 12px; color: #f87171;">
+          <div style="font-weight: 700; margin-bottom: 6px;">❌ FIREBASE ERROR</div>
+          <div style="font-size: 10px; line-height: 1.5;">${err.message}<br>โปรดตรวจสอบ Rules ใน Firebase Console (.read: true)</div>
+        </div>
+      `;
     });
 }
 
 // Setup Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
-  startDemoSimulator();
 
-  // Demo toggle
+  const firebaseUrl = window.ENV?.FIREBASE_DB_URL || 'https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app';
+  const firebaseToken = window.ENV?.FIREBASE_AUTH_TOKEN || '';
+
+  // Directly connect to Firebase on startup!
+  connectFirebase(firebaseUrl, firebaseToken);
+
+  // Demo toggle: switch between Demo Simulator and Firebase Live
   document.getElementById('btn-toggle-demo').addEventListener('click', () => {
     if (state.isDemoMode) {
       stopDemoSimulator();
+      connectFirebase(firebaseUrl, firebaseToken);
     } else {
       startDemoSimulator();
     }
@@ -588,39 +589,5 @@ document.addEventListener('DOMContentLoaded', () => {
       e.trail = [];
       e.polyline.setLatLngs([]);
     });
-  });
-
-  // Modal Controls
-  const modal = document.getElementById('firebase-modal');
-  try {
-    const savedUrl = localStorage.getItem('dt_firebase_url');
-    if (savedUrl) {
-      document.getElementById('input-fb-url').value = savedUrl;
-    }
-    const savedToken = localStorage.getItem('dt_firebase_token');
-    if (savedToken) {
-      document.getElementById('input-fb-token').value = savedToken;
-    }
-  } catch (_) {}
-
-  document.getElementById('btn-firebase-modal').addEventListener('click', () => {
-    modal.classList.add('active');
-  });
-
-  document.getElementById('btn-close-modal').addEventListener('click', () => {
-    modal.classList.remove('active');
-  });
-
-  document.getElementById('btn-cancel-fb').addEventListener('click', () => {
-    modal.classList.remove('active');
-  });
-
-  document.getElementById('btn-connect-fb').addEventListener('click', () => {
-    const url = document.getElementById('input-fb-url').value;
-    const token = document.getElementById('input-fb-token').value;
-    if (url.trim()) {
-      connectFirebase(url, token);
-      modal.classList.remove('active');
-    }
   });
 });

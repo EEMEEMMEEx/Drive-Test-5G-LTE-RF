@@ -2,6 +2,7 @@ package com.drivetest.lte5g.cloud
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.drivetest.lte5g.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,11 +77,19 @@ object CloudConfigRepository {
             sp.edit().putString(KEY_VEHICLE_ID, vId).apply()
         }
         val vName = sp.getString(KEY_VEHICLE_NAME, "DT-Unit-01 (Field Test)") ?: "DT-Unit-01 (Field Test)"
-        val fbUrl = sp.getString(KEY_FIREBASE_DB_URL, "") ?: ""
+        val defaultFbUrl = BuildConfig.FIREBASE_DB_URL.ifBlank { "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app" }
+        val savedFbUrl = sp.getString(KEY_FIREBASE_DB_URL, null)
+        val fbUrl = if (savedFbUrl.isNullOrBlank()) defaultFbUrl else savedFbUrl
+
         val fbToken = sp.getString(KEY_FIREBASE_AUTH_TOKEN, "") ?: ""
-        val liveEnabled = sp.getBoolean(KEY_LIVE_TELEMETRY_ENABLED, fbUrl.isNotBlank())
-        val driveToken = sp.getString(KEY_GDRIVE_ACCESS_TOKEN, "") ?: ""
-        val driveFolder = sp.getString(KEY_GDRIVE_FOLDER_ID, "") ?: ""
+        val liveEnabled = sp.getBoolean(KEY_LIVE_TELEMETRY_ENABLED, true)
+
+        val savedDriveToken = sp.getString(KEY_GDRIVE_ACCESS_TOKEN, null)
+        val driveToken = if (savedDriveToken.isNullOrBlank()) BuildConfig.GDRIVE_ACCESS_TOKEN else savedDriveToken
+
+        val savedDriveFolder = sp.getString(KEY_GDRIVE_FOLDER_ID, null)
+        val driveFolder = if (savedDriveFolder.isNullOrBlank()) BuildConfig.GDRIVE_FOLDER_ID else savedDriveFolder
+
         val autoWifi = sp.getBoolean(KEY_AUTO_UPLOAD_ON_WIFI, true)
 
         _config.value = CloudConfig(

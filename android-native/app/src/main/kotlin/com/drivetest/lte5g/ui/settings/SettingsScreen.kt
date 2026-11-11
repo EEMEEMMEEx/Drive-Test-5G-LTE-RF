@@ -1102,7 +1102,7 @@ fun SettingsScreen(
                 HorizontalDivider(color = Color(0xFF334155), thickness = 0.8.dp)
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Firebase Realtime DB Section
+                // Firebase Realtime DB Section (Pre-configured & Auto-active)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1116,7 +1116,7 @@ fun SettingsScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "ส่งพิกัดและค่า RF RSRP/SINR สดเข้า NOC Dashboard ทุกวินาที",
+                            text = "ส่งพิกัดและค่า RF RSRP/SINR สดเข้า NOC Dashboard อัตโนมัติ",
                             fontSize = 11.sp,
                             color = Color(0xFF94A3B8)
                         )
@@ -1136,48 +1136,35 @@ fun SettingsScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = fbUrlInput,
-                    onValueChange = {
-                        fbUrlInput = it
-                        CloudConfigRepository.updateFirebaseConfig(it, fbTokenInput, liveTelemetryEnabled)
-                    },
-                    label = { Text("Firebase Realtime DB URL", fontSize = 10.sp) },
-                    placeholder = { Text("https://<project-id>-default-rtdb.asia-southeast1.firebasedatabase.app", fontSize = 10.sp, color = Color(0xFF64748B)) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelemetryCyan,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(0xFF0F172A),
-                        unfocusedContainerColor = Color(0xFF0F172A)
-                    ),
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = Color(0xFF0F172A),
                     shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFF334155)),
                     modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = fbTokenInput,
-                    onValueChange = {
-                        fbTokenInput = it
-                        CloudConfigRepository.updateFirebaseConfig(fbUrlInput, it, liveTelemetryEnabled)
-                    },
-                    label = { Text("Database Secret / Auth Token (ไม่บังคับ)", fontSize = 10.sp) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelemetryCyan,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(0xFF0F172A),
-                        unfocusedContainerColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Realtime Database", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Surface(color = Color(0xFF065F46), shape = RoundedCornerShape(4.dp)) {
+                                Text("BUILT-IN", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA7F3D0), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = fbUrlInput.ifBlank { "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app" },
+                            fontSize = 10.sp,
+                            color = TelemetryCyan,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("ภูมิภาค: Singapore (asia-southeast1) • ตั้งค่าผ่าน .env / local.properties", fontSize = 10.sp, color = Color(0xFF64748B))
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
@@ -1200,7 +1187,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("กำลังทดสอบการเชื่อมต่อ...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     } else {
-                        Text("⚡ ทดสอบการเชื่อมต่อ Firebase", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("⚡ ตรวจสอบการเชื่อมต่อ Firebase", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 

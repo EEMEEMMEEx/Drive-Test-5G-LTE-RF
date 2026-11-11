@@ -51,12 +51,8 @@
       <!-- Action Buttons -->
       <div class="header-actions">
         <button id="btn-toggle-demo" class="btn btn-secondary">
-          <span class="dot-indicator dot-active"></span>
-          <span>SIMULATOR ACTIVE</span>
-        </button>
-        <button id="btn-firebase-modal" class="btn btn-primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-          <span>FIREBASE SYNC</span>
+          <span class="dot-indicator"></span>
+          <span>DEMO SIMULATOR</span>
         </button>
       </div>
     </header>
@@ -182,36 +178,9 @@
         </div>
       </aside>
     </main>
-
-    <!-- Firebase Connection Modal -->
-    <div class="modal-overlay" id="firebase-modal">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>CONNECT FIREBASE REALTIME DATABASE</h3>
-          <button class="btn-close" id="btn-close-modal">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p class="modal-desc">
-            Enter your Firebase Realtime Database URL to stream live telemetries directly from field drive test vehicles into this NOC Console.
-          </p>
-          <div class="form-group">
-            <label>Firebase Database URL</label>
-            <input type="text" id="input-fb-url" placeholder="https://<project-id>-default-rtdb.asia-southeast1.firebasedatabase.app" />
-          </div>
-          <div class="form-group">
-            <label>Database Secret / Auth Token (Optional)</label>
-            <input type="password" id="input-fb-token" placeholder="Leave empty for public read or authenticated sessions" />
-          </div>
-          <div id="fb-connection-status" class="status-msg"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" id="btn-cancel-fb">CANCEL</button>
-          <button class="btn btn-primary" id="btn-connect-fb">CONNECT LIVE STREAM</button>
-        </div>
-      </div>
-    </div>
   </div>
 
+  <script src="env.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

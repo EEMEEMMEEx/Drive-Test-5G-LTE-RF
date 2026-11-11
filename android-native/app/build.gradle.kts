@@ -16,6 +16,15 @@ val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: System.g
 val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY")
   ?: System.getenv("GEMINI_API_KEY")
   ?: mapsApiKey
+val firebaseDbUrl: String = localProperties.getProperty("FIREBASE_DB_URL")
+  ?: System.getenv("FIREBASE_DB_URL")
+  ?: "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app"
+val gdriveAccessToken: String = localProperties.getProperty("GDRIVE_ACCESS_TOKEN")
+  ?: System.getenv("GDRIVE_ACCESS_TOKEN")
+  ?: ""
+val gdriveFolderId: String = localProperties.getProperty("GDRIVE_FOLDER_ID")
+  ?: System.getenv("GDRIVE_FOLDER_ID")
+  ?: ""
 
 android {
   namespace = "com.drivetest.lte5g"
@@ -24,10 +33,13 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 40
-    versionName = "1.12.0"
+    versionCode = 41
+    versionName = "1.12.1"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+    buildConfigField("String", "FIREBASE_DB_URL", "\"$firebaseDbUrl\"")
+    buildConfigField("String", "GDRIVE_ACCESS_TOKEN", "\"$gdriveAccessToken\"")
+    buildConfigField("String", "GDRIVE_FOLDER_ID", "\"$gdriveFolderId\"")
   }
 
   signingConfigs {
