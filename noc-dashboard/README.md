@@ -6,8 +6,8 @@ Web Console สำหรับศูนย์ปฏิบัติการโ�
 
 ## 🌟 ฟีเจอร์หลัก (Key Features)
 
-1. **Live Fleet Map (Leaflet.js + CartoDB Dark Matter):**
-   - แผนที่ธีมมืด (Dark NOC) แสดงตำแหน่งรถทดสอบทุกคันพร้อมทิศทางหัวรถ (Bearing) และแถบแสงเรืองรองตามสถานะ
+1. **Live Fleet Map (OpenStreetMap + Dark NOC Filter):**
+   - แผนที่ธีมมืด (Dark NOC) แสดงตำแหน่งรถทดสอบทุกคันพร้อมทิศทางหัวรถ (Bearing) และแถบแสงเรืองรองตามสถานะ (ไม่มี Watermark และไม่ต้องใช้ API Key)
    - เส้นทางวิ่ง (Breadcrumb Trail) แยกสีตามเกณฑ์ RSRP มาตรฐาน 3GPP / ITU-R:
      - 🟢 **≥ -80 dBm** (Excellent)
      - 🔵 **-80 ถึง -90 dBm** (Good)
@@ -23,12 +23,10 @@ Web Console สำหรับศูนย์ปฏิบัติการโ�
    - ตรวจจับจุดอับสัญญาณ (`COVERAGE_HOLE`: RSRP < -110 dBm)
    - ตรวจจับพื้นที่สัญญาณรบกวนสูง (`INTERFERENCE`: RSRP ≥ -95 dBm แต่ SINR < 0 dB)
    - คลิกที่การแจ้งเตือนเพื่อบิน (Fly-to) ไปยังพิกัดที่มีปัญหาบนแผนที่ได้ทันที
-4. **Built-in Demo Fleet Simulator:**
-   - โหมดจำลองรถวิ่ง 3 คันในกรุงเทพฯ (ดอนเมือง / สยาม / บางนา) พร้อมค่า RF จริง
-   - เปิดทดสอบหน้าจอได้ทันทีโดยไม่ต้องต่อ Backend
-5. **Real-Time Firebase Sync:**
-   - รองรับการเชื่อมต่อ **Firebase Realtime Database** (`/fleet/vehicles` และ `/fleet/trails`)
-   - รองรับทั้งการเปิดผ่าน Browser ธรรมดา (file://) หรือผ่าน Web Server (Nginx / Vercel / GitHub Pages / Vite)
+4. **Pure 100% Real-Time Firebase Sync:**
+   - เชื่อมต่อ **Firebase Realtime Database** (`/fleet/vehicles` และ `/fleet/trails`) แบบสด
+   - ตั้งค่าผ่าน `env.js` / `.env` อัตโนมัติ ไม่ต้องคลิกตั้งค่าหรือกรอก URL ซ้ำซ้อน
+   - รองรับทั้งการเปิดผ่าน Browser ธรรมดา (`file://`) หรือผ่าน Web Server (Nginx / Vercel / GitHub Pages / Vite)
 
 ---
 
@@ -49,12 +47,10 @@ python -m http.server 3000 --directory noc-dashboard
 
 ---
 
-## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.12.0)
+## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.12.1)
 
 1. เปิดแอป **Drive Test LTE/5G** บนมือถือ
-2. ไปที่แท็บ **Settings** > หมวด **LIVE CLOUD FLEET TELEMETRY & NOC**
-3. กำหนด **Vehicle ID** (เช่น `DT-01`) และ **ชื่อรถ** (เช่น `Unit 01`)
-4. ใส่ **Firebase Realtime DB URL** (เช่น `https://<project-id>-default-rtdb.asia-southeast1.firebasedatabase.app`)
-5. เปิดสวิตช์ **สตรีม Telemetry สดเข้า Firebase**
-6. บนหน้าเว็บ **NOC Dashboard** คลิกปุ่ม **"FIREBASE SYNC"** ที่มุมขวาบน แล้วใส่ URL เดียวกัน
-7. เมื่อรถเริ่มบันทึกสัญญาณ (กด Start Drive Test) พิกัดและค่า RF จะปรากฏบนหน้าจอ NOC ทันที!
+2. ระบบตั้งค่า Firebase Realtime Database และเปิดการส่ง Telemetry อัตโนมัติมาให้อยู่แล้ว
+3. (ตัวเลือก) ไปที่แท็บ **Settings** เพื่อเปลี่ยน **Vehicle ID** (เช่น `DT-01`) หรือ **ชื่อรถ** (เช่น `Unit 01`)
+4. กดปุ่ม **START** บนหน้าหลักเพื่อเริ่มทดสอบสัญญาณภาคสนาม
+5. เมื่อรถเริ่มเคลื่อนที่ พิกัด เส้นทาง และค่าสัญญาณ RF Dual-SIM จะปรากฏบนหน้าจอ NOC Dashboard สดทันที!

@@ -44,16 +44,16 @@
         </div>
         <div class="kpi-card">
           <span class="kpi-label">SYNC SOURCE</span>
-          <span class="kpi-value" id="kpi-sync-mode">DEMO MODE</span>
+          <span class="kpi-value text-emerald" id="kpi-sync-mode">FIREBASE LIVE</span>
         </div>
       </div>
 
-      <!-- Action Buttons -->
+      <!-- Action Status -->
       <div class="header-actions">
-        <button id="btn-toggle-demo" class="btn btn-secondary">
-          <span class="dot-indicator"></span>
-          <span>DEMO SIMULATOR</span>
-        </button>
+        <div class="live-status-badge">
+          <span class="dot-indicator dot-active"></span>
+          <span>LIVE NOC TELEMETRY</span>
+        </div>
       </div>
     </header>
 
@@ -66,7 +66,11 @@
           <span class="badge" id="roster-badge">0 VEHICLES</span>
         </div>
         <div class="vehicle-list" id="vehicle-list">
-          <div class="empty-state">No vehicles online. Start demo simulator or configure Firebase.</div>
+          <div class="empty-state">
+            <div style="font-size: 26px; margin-bottom: 6px;">📡</div>
+            <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">WAITING FOR FIELD VEHICLES</div>
+            <div>กำลังรอรับข้อมูลจากรถทดสอบ...<br>กดปุ่ม <b>START</b> บนแอปมือถือเพื่อเริ่มสตรีมสด</div>
+          </div>
         </div>
 
         <div class="rsrp-legend">
@@ -95,7 +99,7 @@
         <!-- Dual SIM Inspector -->
         <div class="panel-header">
           <h2>DUAL-SIM RF INSPECTOR</h2>
-          <span class="badge badge-cyan" id="inspector-vehicle-badge">SELECT VEHICLE</span>
+          <span class="badge badge-cyan" id="inspector-vehicle-badge">NO VEHICLE SELECTED</span>
         </div>
 
         <div class="inspector-card" id="inspector-card">
@@ -104,29 +108,29 @@
             <div class="sim-column">
               <div class="sim-header">
                 <span class="sim-chip sim-1">SIM 1 (PRIMARY)</span>
-                <span class="sim-op" id="sim1-op">AIS 5G</span>
+                <span class="sim-op" id="sim1-op">—</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">RAT / Band</span>
-                <span class="val text-cyan" id="sim1-rat">NR_SA (n78)</span>
+                <span class="val text-cyan" id="sim1-rat">—</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">PCI / NCI</span>
-                <span class="val" id="sim1-pci">420 / 6543210</span>
+                <span class="val" id="sim1-pci">—</span>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>RSRP</span>
-                  <span class="gauge-val" id="sim1-rsrp">-84 dBm</span>
+                  <span class="gauge-val" id="sim1-rsrp">— dBm</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill bg-tier2" id="sim1-rsrp-bar" style="width: 75%"></div></div>
+                <div class="progress-bar"><div class="progress-fill bg-tier5" id="sim1-rsrp-bar" style="width: 0%"></div></div>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>SINR</span>
-                  <span class="gauge-val" id="sim1-sinr">16.5 dB</span>
+                  <span class="gauge-val" id="sim1-sinr">— dB</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill bg-cyan" id="sim1-sinr-bar" style="width: 70%"></div></div>
+                <div class="progress-bar"><div class="progress-fill bg-cyan" id="sim1-sinr-bar" style="width: 0%"></div></div>
               </div>
             </div>
 
@@ -134,29 +138,29 @@
             <div class="sim-column">
               <div class="sim-header">
                 <span class="sim-chip sim-2">SIM 2 (BENCHMARK)</span>
-                <span class="sim-op" id="sim2-op">TRUE-H</span>
+                <span class="sim-op" id="sim2-op">—</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">RAT / Band</span>
-                <span class="val text-amber" id="sim2-rat">LTE (B3)</span>
+                <span class="val text-amber" id="sim2-rat">—</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">PCI / Cell ID</span>
-                <span class="val" id="sim2-pci">144 / 987654</span>
+                <span class="val" id="sim2-pci">—</span>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>RSRP</span>
-                  <span class="gauge-val" id="sim2-rsrp">-91 dBm</span>
+                  <span class="gauge-val" id="sim2-rsrp">— dBm</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill bg-tier3" id="sim2-rsrp-bar" style="width: 55%"></div></div>
+                <div class="progress-bar"><div class="progress-fill bg-tier5" id="sim2-rsrp-bar" style="width: 0%"></div></div>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>SINR</span>
-                  <span class="gauge-val" id="sim2-sinr">9.0 dB</span>
+                  <span class="gauge-val" id="sim2-sinr">— dB</span>
                 </div>
-                <div class="progress-bar"><div class="progress-fill bg-amber" id="sim2-sinr-bar" style="width: 50%"></div></div>
+                <div class="progress-bar"><div class="progress-fill bg-amber" id="sim2-sinr-bar" style="width: 0%"></div></div>
               </div>
             </div>
           </div>
@@ -164,7 +168,7 @@
           <!-- Benchmark Delta -->
           <div class="delta-box" id="delta-box">
             <span class="delta-title">RSRP ADVANTAGE:</span>
-            <span class="delta-value text-emerald" id="delta-val">SIM 1 +7.0 dB</span>
+            <span class="delta-value" id="delta-val">—</span>
           </div>
         </div>
 

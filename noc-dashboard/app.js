@@ -1,5 +1,6 @@
 /**
- * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.0
+ * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.1
+ * 100% Real-Time Live Telemetry (No Demo)
  */
 
 // Signal Color Palette
@@ -26,11 +27,8 @@ const state = {
   selectedVehicleId: null,
   alerts: [],
   totalSamples: 0,
-  isDemoMode: true,
-  demoTimer: null,
   firebaseUrl: '',
   firebaseToken: '',
-  sseSource: null,
   pollTimer: null
 };
 
@@ -128,7 +126,7 @@ function updateVehicle(data) {
     addAlert({
       type: 'COVERAGE_HOLE',
       title: `Coverage Hole Detected (${data.rsrp} dBm)`,
-      desc: `${vId} (${data.vehicleName}) RSRP dropped below -110 dBm at PCI ${data.pci || 'N/A'}`,
+      desc: `${vId} (${data.vehicleName || 'Field Unit'}) RSRP dropped below -110 dBm at PCI ${data.pci || 'N/A'}`,
       vehicleId: vId,
       lat: data.lat,
       lon: data.lon,
@@ -137,7 +135,7 @@ function updateVehicle(data) {
   } else if (data.alertState === 'INTERFERENCE') {
     addAlert({
       type: 'INTERFERENCE',
-      title: `High Interference Area (SINR ${data.sinr} dB)`,
+      title: `High Interference Area (SINR ${Number(data.sinr || 0).toFixed(1)} dB)`,
       desc: `${vId} Strong RSRP (${data.rsrp} dBm) but poor SINR, potential pilot pollution / cross-feeder`,
       vehicleId: vId,
       lat: data.lat,
@@ -164,21 +162,17 @@ function renderVehicleRoster() {
   kpiActive.textContent = state.vehicles.size;
 
   if (state.vehicles.size === 0) {
-    if (!state.isDemoMode) {
-      listEl.innerHTML = `
-        <div class="empty-state" style="padding: 24px 12px; text-align: center;">
-          <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
-          <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">FIREBASE CONNECTED</div>
-          <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
-            เชื่อมต่อ Firebase สำเร็จแล้ว!<br>
-            กำลังรอรับสัญญาณจากมือถือ...<br>
-            เปิดแอปมือถือแล้วกดปุ่ม <b>START</b> เพื่อเริ่มสตรีมข้อมูลสด
-          </div>
+    listEl.innerHTML = `
+      <div class="empty-state" style="padding: 24px 12px; text-align: center;">
+        <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
+        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">FIREBASE CONNECTED</div>
+        <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
+          เชื่อมต่อฐานข้อมูลสำเร็จ!<br>
+          กำลังรอรับข้อมูลจากรถทดสอบภาคสนาม...<br>
+          เปิดแอปมือถือแล้วกดปุ่ม <b>START</b> เพื่อเริ่มสตรีมสด
         </div>
-      `;
-    } else {
-      listEl.innerHTML = `<div class="empty-state">No vehicles online. Start demo simulator or configure Firebase.</div>`;
-    }
+      </div>
+    `;
     return;
   }
 
@@ -233,53 +227,86 @@ function selectVehicle(vehicleId) {
 
 // Render Dual-SIM Inspector
 function renderInspector(d) {
-  document.getElementById('inspector-vehicle-badge').textContent = `${d.vehicleId} • ${d.vehicleName || ''}`;
+  document.getElementById('inspector-vehicle-badge').textContent = `${d.vehicleId} • ${d.vehicleName || 'Vehicle'}`;
 
   // SIM 1 (Primary)
-  document.getElementById('sim1-op').textContent = d.operator || 'AIS 5G';
-  document.getElementById('sim1-rat').textContent = `${d.rat || 'NR_SA'} (${d.band || 'n78'})`;
+  document.getElementById('sim1-op').textContent = d.operator || 'Primary SIM';
+  document.getElementById('sim1-rat').textContent = d.rat ? `${d.rat} (${d.band || '—'})` : '—';
   document.getElementById('sim1-pci').textContent = `${d.pci || '—'} / ${d.cellId || '—'}`;
   
-  const rsrp1 = d.rsrp !== undefined ? d.rsrp : -95;
-  document.getElementById('sim1-rsrp').textContent = `${rsrp1} dBm`;
-  document.getElementById('sim1-rsrp').style.color = getRsrpColor(rsrp1);
-  const rsrpPercent1 = Math.max(5, Math.min(100, Math.round(((rsrp1 + 140) / 100) * 100)));
-  const bar1 = document.getElementById('sim1-rsrp-bar');
-  bar1.style.width = `${rsrpPercent1}%`;
-  bar1.style.backgroundColor = getRsrpColor(rsrp1);
-
-  const sinr1 = d.sinr !== undefined ? Number(d.sinr) : 15.0;
-  document.getElementById('sim1-sinr').textContent = `${sinr1.toFixed(1)} dB`;
-  const sinrPercent1 = Math.max(5, Math.min(100, Math.round(((sinr1 + 10) / 40) * 100)));
-  document.getElementById('sim1-sinr-bar').style.width = `${sinrPercent1}%`;
-
-  // SIM 2 (Secondary)
-  const sim2Rsrp = d.sim2Rsrp !== undefined ? Math.round(d.sim2Rsrp) : (rsrp1 - 6);
-  const sim2Sinr = d.sim2Sinr !== undefined ? Number(d.sim2Sinr) : (sinr1 - 4.5);
-  document.getElementById('sim2-op').textContent = d.sim2Operator || 'TRUE-H';
-  document.getElementById('sim2-rat').textContent = `${d.sim2Rat || 'LTE'} (${d.sim2Band || 'B3'})`;
-  document.getElementById('sim2-pci').textContent = `${d.sim2Pci || '144'}`;
-  
-  document.getElementById('sim2-rsrp').textContent = `${sim2Rsrp} dBm`;
-  document.getElementById('sim2-rsrp').style.color = getRsrpColor(sim2Rsrp);
-  const rsrpPercent2 = Math.max(5, Math.min(100, Math.round(((sim2Rsrp + 140) / 100) * 100)));
-  const bar2 = document.getElementById('sim2-rsrp-bar');
-  bar2.style.width = `${rsrpPercent2}%`;
-  bar2.style.backgroundColor = getRsrpColor(sim2Rsrp);
-
-  document.getElementById('sim2-sinr').textContent = `${sim2Sinr.toFixed(1)} dB`;
-  const sinrPercent2 = Math.max(5, Math.min(100, Math.round(((sim2Sinr + 10) / 40) * 100)));
-  document.getElementById('sim2-sinr-bar').style.width = `${sinrPercent2}%`;
-
-  // Delta
-  const delta = rsrp1 - sim2Rsrp;
-  const deltaEl = document.getElementById('delta-val');
-  if (delta >= 0) {
-    deltaEl.textContent = `SIM 1 +${delta.toFixed(1)} dB (Dominant)`;
-    deltaEl.className = 'delta-value text-emerald';
+  if (d.rsrp !== undefined && d.rsrp !== null) {
+    const rsrp1 = Number(d.rsrp);
+    document.getElementById('sim1-rsrp').textContent = `${rsrp1} dBm`;
+    document.getElementById('sim1-rsrp').style.color = getRsrpColor(rsrp1);
+    const rsrpPercent1 = Math.max(5, Math.min(100, Math.round(((rsrp1 + 140) / 100) * 100)));
+    const bar1 = document.getElementById('sim1-rsrp-bar');
+    bar1.style.width = `${rsrpPercent1}%`;
+    bar1.style.backgroundColor = getRsrpColor(rsrp1);
   } else {
-    deltaEl.textContent = `SIM 2 +${Math.abs(delta).toFixed(1)} dB`;
-    deltaEl.className = 'delta-value text-amber';
+    document.getElementById('sim1-rsrp').textContent = '— dBm';
+    document.getElementById('sim1-rsrp-bar').style.width = '0%';
+  }
+
+  if (d.sinr !== undefined && d.sinr !== null) {
+    const sinr1 = Number(d.sinr);
+    document.getElementById('sim1-sinr').textContent = `${sinr1.toFixed(1)} dB`;
+    const sinrPercent1 = Math.max(5, Math.min(100, Math.round(((sinr1 + 10) / 40) * 100)));
+    document.getElementById('sim1-sinr-bar').style.width = `${sinrPercent1}%`;
+  } else {
+    document.getElementById('sim1-sinr').textContent = '— dB';
+    document.getElementById('sim1-sinr-bar').style.width = '0%';
+  }
+
+  // SIM 2 (Secondary / Benchmark)
+  if (d.sim2Rsrp !== undefined && d.sim2Rsrp !== null) {
+    const sim2Rsrp = Math.round(Number(d.sim2Rsrp));
+    document.getElementById('sim2-op').textContent = d.sim2Operator || 'SIM 2 (Secondary)';
+    document.getElementById('sim2-rat').textContent = d.sim2Rat ? `${d.sim2Rat} (${d.sim2Band || '—'})` : (d.sim2Band ? `LTE (${d.sim2Band})` : '—');
+    document.getElementById('sim2-pci').textContent = `${d.sim2Pci || '—'}`;
+    
+    document.getElementById('sim2-rsrp').textContent = `${sim2Rsrp} dBm`;
+    document.getElementById('sim2-rsrp').style.color = getRsrpColor(sim2Rsrp);
+    const rsrpPercent2 = Math.max(5, Math.min(100, Math.round(((sim2Rsrp + 140) / 100) * 100)));
+    const bar2 = document.getElementById('sim2-rsrp-bar');
+    bar2.style.width = `${rsrpPercent2}%`;
+    bar2.style.backgroundColor = getRsrpColor(sim2Rsrp);
+
+    if (d.sim2Sinr !== undefined && d.sim2Sinr !== null) {
+      const sim2Sinr = Number(d.sim2Sinr);
+      document.getElementById('sim2-sinr').textContent = `${sim2Sinr.toFixed(1)} dB`;
+      const sinrPercent2 = Math.max(5, Math.min(100, Math.round(((sim2Sinr + 10) / 40) * 100)));
+      document.getElementById('sim2-sinr-bar').style.width = `${sinrPercent2}%`;
+    } else {
+      document.getElementById('sim2-sinr').textContent = '— dB';
+      document.getElementById('sim2-sinr-bar').style.width = '0%';
+    }
+
+    // Delta if both SIMs exist
+    if (d.rsrp !== undefined && d.rsrp !== null) {
+      const delta = Number(d.rsrp) - sim2Rsrp;
+      const deltaEl = document.getElementById('delta-val');
+      if (delta >= 0) {
+        deltaEl.textContent = `SIM 1 +${delta.toFixed(1)} dB (Dominant)`;
+        deltaEl.className = 'delta-value text-emerald';
+      } else {
+        deltaEl.textContent = `SIM 2 +${Math.abs(delta).toFixed(1)} dB (Dominant)`;
+        deltaEl.className = 'delta-value text-amber';
+      }
+    }
+  } else {
+    // Single SIM active (no SIM 2 telemetry reported)
+    document.getElementById('sim2-op').textContent = 'N/A';
+    document.getElementById('sim2-rat').textContent = 'Single SIM Mode';
+    document.getElementById('sim2-pci').textContent = '—';
+    document.getElementById('sim2-rsrp').textContent = '— dBm';
+    document.getElementById('sim2-rsrp').style.color = '#64748b';
+    document.getElementById('sim2-rsrp-bar').style.width = '0%';
+    document.getElementById('sim2-sinr').textContent = '— dB';
+    document.getElementById('sim2-sinr-bar').style.width = '0%';
+    
+    const deltaEl = document.getElementById('delta-val');
+    deltaEl.textContent = 'Single SIM Mode (No Benchmark)';
+    deltaEl.className = 'delta-value text-slate';
   }
 }
 
@@ -332,109 +359,6 @@ function flyToCoords(lat, lon) {
   map.flyTo([lat, lon], 16, { duration: 1.2 });
 }
 
-// --- BANGKOK MULTI-VEHICLE DEMO SIMULATOR ---
-const DEMO_ROUTES = [
-  {
-    vehicleId: 'DT-01',
-    vehicleName: 'Unit 01 (Don Mueang / Vibhavadi)',
-    lat: 13.8850,
-    lon: 100.5900,
-    bearing: 195,
-    speed: 72,
-    rat: 'NR_SA',
-    band: 'n78',
-    pci: 420,
-    operator: 'AIS 5G',
-    deltaLat: -0.0006,
-    deltaLon: -0.0002
-  },
-  {
-    vehicleId: 'DT-02',
-    vehicleName: 'Unit 02 (Siam / Silom / Rama IV)',
-    lat: 13.7460,
-    lon: 100.5340,
-    bearing: 110,
-    speed: 34,
-    rat: 'NR_SA',
-    band: 'n78',
-    pci: 312,
-    operator: 'AIS 5G',
-    deltaLat: -0.0002,
-    deltaLon: 0.0005
-  },
-  {
-    vehicleId: 'DT-03',
-    vehicleName: 'Unit 03 (Sukhumvit / Bangna Highway)',
-    lat: 13.6820,
-    lon: 100.6120,
-    bearing: 135,
-    speed: 68,
-    rat: 'LTE',
-    band: 'B3',
-    pci: 104,
-    operator: 'TRUE-H',
-    deltaLat: -0.0004,
-    deltaLon: 0.0006
-  }
-];
-
-function runDemoSimulationStep() {
-  if (!state.isDemoMode) return;
-
-  DEMO_ROUTES.forEach((r, idx) => {
-    r.lat += r.deltaLat + (Math.random() - 0.5) * 0.0001;
-    r.lon += r.deltaLon + (Math.random() - 0.5) * 0.0001;
-
-    // Boundary bounces around Bangkok
-    if (r.lat < 13.60 || r.lat > 13.95) r.deltaLat = -r.deltaLat;
-    if (r.lon < 100.45 || r.lon > 100.75) r.deltaLon = -r.deltaLon;
-
-    // Simulate fluctuating RF metrics
-    let baseRsrp = idx === 0 ? -78 : (idx === 1 ? -92 : -86);
-    let noise = Math.floor((Math.random() - 0.48) * 12);
-    let currentRsrp = baseRsrp + noise;
-
-    // Periodic Coverage Hole or Interference simulation
-    let alertState = 'NORMAL';
-    if (Math.random() < 0.04) {
-      currentRsrp = -115;
-      alertState = 'COVERAGE_HOLE';
-    } else if (Math.random() < 0.03) {
-      alertState = 'INTERFERENCE';
-    }
-
-    let sinr = alertState === 'INTERFERENCE' ? -2.5 : +(10 + Math.random() * 12).toFixed(1);
-
-    const payload = {
-      vehicleId: r.vehicleId,
-      vehicleName: r.vehicleName,
-      sessionId: 'demo_session',
-      isRecording: true,
-      updatedAt: Date.now(),
-      lat: r.lat,
-      lon: r.lon,
-      bearing: r.bearing + Math.floor((Math.random() - 0.5) * 15),
-      speedKmh: Math.max(15, r.speed + Math.floor((Math.random() - 0.5) * 10)),
-      rat: r.rat,
-      band: r.band,
-      pci: r.pci,
-      cellId: '6543' + idx,
-      operator: r.operator,
-      rsrp: currentRsrp,
-      sinr: sinr,
-      sim2Operator: 'TRUE-H',
-      sim2Rat: 'LTE',
-      sim2Band: 'B3',
-      sim2Pci: 150 + idx * 2,
-      sim2Rsrp: currentRsrp - 7,
-      sim2Sinr: Math.max(1, sinr - 5),
-      alertState: alertState
-    };
-
-    updateVehicle(payload);
-  });
-}
-
 // Clear All Fleet Markers and Trails
 function clearFleet() {
   state.vehicles.forEach(entry => {
@@ -452,36 +376,7 @@ function clearFleet() {
   renderVehicleRoster();
 }
 
-function startDemoSimulator() {
-  if (state.pollTimer) {
-    clearInterval(state.pollTimer);
-    state.pollTimer = null;
-  }
-  clearFleet();
-  state.isDemoMode = true;
-  document.getElementById('kpi-sync-mode').textContent = 'DEMO SIMULATOR';
-  document.getElementById('kpi-sync-mode').className = 'kpi-value text-amber';
-  document.getElementById('btn-toggle-demo').innerHTML = `
-    <span class="dot-indicator dot-active"></span>
-    <span>DEMO RUNNING (CLICK FOR LIVE)</span>
-  `;
-  if (state.demoTimer) clearInterval(state.demoTimer);
-  state.demoTimer = setInterval(runDemoSimulationStep, 1500);
-}
-
-function stopDemoSimulator() {
-  state.isDemoMode = false;
-  document.getElementById('btn-toggle-demo').innerHTML = `
-    <span class="dot-indicator"></span>
-    <span>SWITCH TO DEMO</span>
-  `;
-  if (state.demoTimer) {
-    clearInterval(state.demoTimer);
-    state.demoTimer = null;
-  }
-}
-
-// --- FIREBASE SYNC INTEGRATION ---
+// --- FIREBASE LIVE TELEMETRY ---
 function connectFirebase(url, token) {
   const cleanUrl = (url || '').trim().replace(/\/+$/, '').replace(/\.json$/, '');
   if (!cleanUrl.startsWith('http')) {
@@ -491,7 +386,7 @@ function connectFirebase(url, token) {
 
   const authParam = token ? `?auth=${token.trim()}` : '';
 
-  // Test connection first
+  // Initial fetch of current fleet vehicles
   fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
     .then(res => {
       if (!res.ok) {
@@ -504,10 +399,7 @@ function connectFirebase(url, token) {
         throw new Error(data.error);
       }
 
-      // Connection succeeded! Stop demo and clear demo cars
-      stopDemoSimulator();
       clearFleet();
-
       document.getElementById('kpi-sync-mode').textContent = 'FIREBASE LIVE';
       document.getElementById('kpi-sync-mode').className = 'kpi-value text-emerald';
 
@@ -524,7 +416,7 @@ function connectFirebase(url, token) {
         }
       }
 
-      // Setup continuous polling
+      // Setup continuous live polling (every 1.5 seconds)
       if (state.pollTimer) clearInterval(state.pollTimer);
       state.pollTimer = setInterval(() => {
         fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
@@ -562,18 +454,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const firebaseUrl = window.ENV?.FIREBASE_DB_URL || 'https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app';
   const firebaseToken = window.ENV?.FIREBASE_AUTH_TOKEN || '';
 
-  // Directly connect to Firebase on startup!
+  // Directly connect to Firebase live telemetries on startup
   connectFirebase(firebaseUrl, firebaseToken);
-
-  // Demo toggle: switch between Demo Simulator and Firebase Live
-  document.getElementById('btn-toggle-demo').addEventListener('click', () => {
-    if (state.isDemoMode) {
-      stopDemoSimulator();
-      connectFirebase(firebaseUrl, firebaseToken);
-    } else {
-      startDemoSimulator();
-    }
-  });
 
   // Map Controls
   document.getElementById('btn-center-fleet').addEventListener('click', () => {
