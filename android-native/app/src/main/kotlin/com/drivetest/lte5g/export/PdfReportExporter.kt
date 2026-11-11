@@ -267,9 +267,9 @@ object PdfReportExporter {
         drawSectionTitle(canvas, "4. Route Trajectory Map Snapshot (Vector GPS Plotted)", currentY)
         currentY += 14f
 
-        val mapHeight = 150f
+        val mapHeight = 170f
         renderRouteMapVector(canvas, session.samples, RectF(MARGIN_X, currentY, MARGIN_X + CONTENT_WIDTH, currentY + mapHeight))
-        currentY += mapHeight + 14f
+        currentY += mapHeight + 16f
 
         // 2. SECTION 5: CDF DISTRIBUTION & TOP DEFECTS (Side-by-Side)
         drawSectionTitle(canvas, "5. Cumulative Distribution Function (CDF) & Critical Weak Spots", currentY)
@@ -280,19 +280,19 @@ object PdfReportExporter {
 
         // Render CDF Curve
         analytics.rsrpCdf?.let { cdf ->
-            renderCdfCanvas(canvas, cdf, RectF(MARGIN_X, currentY, MARGIN_X + cdfWidth, currentY + 115f))
+            renderCdfCanvas(canvas, cdf, RectF(MARGIN_X, currentY, MARGIN_X + cdfWidth, currentY + 125f))
         }
 
         // Render Defects Table
-        renderDefectsTable(canvas, analytics, RectF(MARGIN_X + cdfWidth + 12f, currentY, MARGIN_X + CONTENT_WIDTH, currentY + 115f))
+        renderDefectsTable(canvas, analytics, RectF(MARGIN_X + cdfWidth + 12f, currentY, MARGIN_X + CONTENT_WIDTH, currentY + 125f))
 
-        currentY += 126f
+        currentY += 141f
 
         // 3. SECTION 6: GEMINI AI RF OPTIMIZATION ADVISOR REPORT
         drawSectionTitle(canvas, "6. Gemini AI RF Optimization Advisor (Virtual Senior Engineer)", currentY)
         currentY += 14f
 
-        val aiCardHeight = 110f
+        val aiCardHeight = 220f
         fillPaint.color = Color.rgb(240, 249, 255) // Sky 50 #F0F9FF
         strokePaint.color = Color.rgb(2, 132, 199)  // Sky 600 #0284C7
         strokePaint.strokeWidth = 1f
@@ -311,12 +311,7 @@ object PdfReportExporter {
         textPaint.color = Color.rgb(30, 41, 59)
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         textPaint.textSize = 8.5f
-        drawMultilineText(canvas, reportContent, MARGIN_X + 12f, currentY + 34f, CONTENT_WIDTH - 24f, 5, textPaint)
-
-        currentY += aiCardHeight + 20f
-
-        // 4. SECTION 7: FORMAL SIGNATURES BLOCK (Matching user's style guide)
-        renderSignatureBlock(canvas, currentY)
+        drawMultilineText(canvas, reportContent, MARGIN_X + 12f, currentY + 34f, CONTENT_WIDTH - 24f, 12, textPaint)
 
         // FOOTER PAGE 2
         drawFooter(canvas, 2, 2)
@@ -747,55 +742,6 @@ object PdfReportExporter {
         }
     }
 
-    private fun renderSignatureBlock(canvas: Canvas, startY: Float) {
-        val y = startY
-        val boxW = (CONTENT_WIDTH - 24f) / 2f
-        val box1X = MARGIN_X
-        val box2X = MARGIN_X + boxW + 24f
-
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(248, 250, 252) }
-        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(203, 213, 225)
-            style = Paint.Style.STROKE
-            strokeWidth = 1f
-        }
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 8.5f }
-
-        // Box 1: Field RF Test Engineer
-        canvas.drawRoundRect(RectF(box1X, y, box1X + boxW, y + 80f), 6f, 6f, fillPaint)
-        canvas.drawRoundRect(RectF(box1X, y, box1X + boxW, y + 80f), 6f, 6f, strokePaint)
-
-        textPaint.color = Color.rgb(71, 85, 105)
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("ลงชื่อผู้ทดสอบสัญญาณ (Field RF Test Engineer):", box1X + 10f, y + 16f, textPaint)
-
-        canvas.drawLine(box1X + 16f, y + 46f, box1X + boxW - 16f, y + 46f, strokePaint)
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = Color.rgb(15, 23, 42)
-        canvas.drawText("วิศวกรผู้ควบคุมการขับทดสอบโครงข่าย", box1X + 16f, y + 58f, textPaint)
-
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        textPaint.color = Color.rgb(100, 116, 139)
-        canvas.drawText("วันที่: ______ / ______ / _________", box1X + 16f, y + 72f, textPaint)
-
-        // Box 2: Quality Assurance Manager
-        canvas.drawRoundRect(RectF(box2X, y, box2X + boxW, y + 80f), 6f, 6f, fillPaint)
-        canvas.drawRoundRect(RectF(box2X, y, box2X + boxW, y + 80f), 6f, 6f, strokePaint)
-
-        textPaint.color = Color.rgb(71, 85, 105)
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("ลงชื่อผู้ตรวจรับรองคุณภาพ (QA Manager):", box2X + 10f, y + 16f, textPaint)
-
-        canvas.drawLine(box2X + 16f, y + 46f, box2X + boxW - 16f, y + 46f, strokePaint)
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        textPaint.color = Color.rgb(15, 23, 42)
-        canvas.drawText("ผู้จัดการฝ่ายตรวจสอบและตรวจรับสถานีฐาน", box2X + 16f, y + 58f, textPaint)
-
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        textPaint.color = Color.rgb(100, 116, 139)
-        canvas.drawText("วันที่: ______ / ______ / _________", box2X + 16f, y + 72f, textPaint)
-    }
-
     private fun drawFooter(canvas: Canvas, pageNum: Int, totalPages: Int) {
         val y = PAGE_HEIGHT - 22f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -803,7 +749,7 @@ object PdfReportExporter {
             textSize = 7.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         }
-        canvas.drawText("Confidential — Generated by Drive Test LTE/5G v1.11.1 Android Native", MARGIN_X, y, paint)
+        canvas.drawText("Confidential — Generated by Drive Test LTE/5G v1.11.2 Android Native", MARGIN_X, y, paint)
 
         val pageStr = "Page $pageNum of $totalPages"
         val pw = paint.measureText(pageStr)
