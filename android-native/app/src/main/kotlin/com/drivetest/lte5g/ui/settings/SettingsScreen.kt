@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drivetest.lte5g.BuildConfig
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
@@ -95,12 +97,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.9.11"
+    val currentVersionName = packageInfo?.versionName ?: "1.10.0"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 35
+        packageInfo?.longVersionCode?.toInt() ?: 36
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 35
+        packageInfo?.versionCode ?: 36
     }
 
     Column(
@@ -924,6 +926,58 @@ fun SettingsScreen(
                 ) {
                     Text("⚙ OPEN APP BATTERY SETTINGS", fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+
+        // Gemini AI Optimization Engine Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF60A5FA), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "GEMINI AI OPTIMIZATION ENGINE",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+                    val hasKey = BuildConfig.GEMINI_API_KEY.isNotBlank()
+                    Surface(
+                        color = if (hasKey) Color(0xFF065F46) else Color(0xFF7F1D1D),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (hasKey) "ACTIVE" else "KEY MISSING",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasKey) Color(0xFFA7F3D0) else Color(0xFFFCA5A5),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                SettingItem(title = "AI Model", value = "gemini-3.8-flash")
+                SettingItem(title = "API Key Source", value = "local.properties (Compile-time Injected)")
+                SettingItem(title = "RF Heuristic Engine", value = "CDF, Problem Detection & Handover Analysis")
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "ระบบจะส่งข้อมูลสรุปสถิติ Telemetry ไปยัง Gemini 3.8 Flash เพื่อวิเคราะห์ Root Cause และสร้างคำแนะนำปรับแต่งโครงข่าย (Tilt, Power, HO Margin)",
+                    fontSize = 11.sp,
+                    color = Color(0xFF94A3B8),
+                    lineHeight = 15.sp
+                )
             }
         }
 

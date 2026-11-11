@@ -13,6 +13,9 @@ val localProperties = Properties().apply {
   }
 }
 val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: System.getenv("MAPS_API_KEY") ?: ""
+val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY")
+  ?: System.getenv("GEMINI_API_KEY")
+  ?: mapsApiKey
 
 android {
   namespace = "com.drivetest.lte5g"
@@ -21,9 +24,10 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 35
-    versionName = "1.9.11"
+    versionCode = 36
+    versionName = "1.10.0"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
   }
 
   signingConfigs {
@@ -59,8 +63,8 @@ android {
   }
   buildFeatures {
     compose = true
+    buildConfig = true
     aidl = false
-    buildConfig = false
     shaders = false
   }
 

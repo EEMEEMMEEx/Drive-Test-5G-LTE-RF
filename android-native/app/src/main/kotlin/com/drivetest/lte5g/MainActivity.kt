@@ -11,8 +11,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
@@ -27,6 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drivetest.lte5g.ui.analytics.AnalyticsScreen
 import com.drivetest.lte5g.ui.dashboard.DashboardScreen
 import com.drivetest.lte5g.ui.map.DriveTestMapScreen
 import com.drivetest.lte5g.ui.sessions.SessionsScreen
@@ -69,7 +71,7 @@ fun MainDriveTestApp() {
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.9.11"
+    val currentVersionName = packageInfo?.versionName ?: "1.10.0"
 
     // Revalidate on resume (e.g. returning from settings permission grant)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -103,8 +105,8 @@ fun MainDriveTestApp() {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.Analytics, contentDescription = "Dashboard") },
-                    label = { Text("Dashboard", fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.Sensors, contentDescription = "Dashboard") },
+                    label = { Text("Dashboard", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = TelemetryCyan,
                         selectedTextColor = TelemetryCyan,
@@ -117,7 +119,7 @@ fun MainDriveTestApp() {
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     icon = { Icon(Icons.Default.Map, contentDescription = "Map") },
-                    label = { Text("Route Map", fontSize = 11.sp) },
+                    label = { Text("Route Map", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = TelemetryCyan,
                         selectedTextColor = TelemetryCyan,
@@ -130,7 +132,7 @@ fun MainDriveTestApp() {
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
                     icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Sessions") },
-                    label = { Text("Sessions", fontSize = 11.sp) },
+                    label = { Text("Sessions", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = TelemetryCyan,
                         selectedTextColor = TelemetryCyan,
@@ -142,8 +144,21 @@ fun MainDriveTestApp() {
                 NavigationBarItem(
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 },
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "AI Analytics") },
+                    label = { Text("AI Analytics", fontSize = 10.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = TelemetryCyan,
+                        selectedTextColor = TelemetryCyan,
+                        unselectedIconColor = Color(0xFF64748B),
+                        unselectedTextColor = Color(0xFF64748B),
+                        indicatorColor = Color(0xFF1E293B)
+                    )
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings", fontSize = 11.sp) },
+                    label = { Text("Settings", fontSize = 10.sp) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = TelemetryCyan,
                         selectedTextColor = TelemetryCyan,
@@ -163,8 +178,12 @@ fun MainDriveTestApp() {
             when (selectedTab) {
                 0 -> DashboardScreen()
                 1 -> DriveTestMapScreen()
-                2 -> SessionsScreen(onNavigateToMap = { selectedTab = 1 })
-                3 -> SettingsScreen()
+                2 -> SessionsScreen(
+                    onNavigateToMap = { selectedTab = 1 },
+                    onNavigateToAnalytics = { selectedTab = 3 }
+                )
+                3 -> AnalyticsScreen(onNavigateToMap = { selectedTab = 1 })
+                4 -> SettingsScreen()
             }
         }
     }

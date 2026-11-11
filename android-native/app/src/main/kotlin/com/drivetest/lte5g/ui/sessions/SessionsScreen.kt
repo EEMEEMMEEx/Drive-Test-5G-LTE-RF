@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Map
@@ -41,7 +42,8 @@ import java.util.Locale
 @Composable
 fun SessionsScreen(
     modifier: Modifier = Modifier,
-    onNavigateToMap: (() -> Unit)? = null
+    onNavigateToMap: (() -> Unit)? = null,
+    onNavigateToAnalytics: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val isRecording by DriveTestForegroundService.isRecording.collectAsStateWithLifecycle()
@@ -285,6 +287,25 @@ fun SessionsScreen(
                     ) {
                         Text("📊 EXPORT CSV", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
+
+                    Button(
+                        onClick = {
+                            val session = activeSession
+                            if (session == null || session.samples.isEmpty()) {
+                                Toast.makeText(context, "No samples to analyze! Start drive test first.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                SessionRepository.selectSessionForMap(session)
+                                onNavigateToAnalytics?.invoke()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("AI", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -346,6 +367,10 @@ fun SessionsScreen(
                         SessionRepository.selectSessionForMap(session)
                         onNavigateToMap?.invoke()
                         Toast.makeText(context, "Selected ${session.name} on Route Map", Toast.LENGTH_SHORT).show()
+                    },
+                    onAnalyze = {
+                        SessionRepository.selectSessionForMap(session)
+                        onNavigateToAnalytics?.invoke()
                     },
                     onRename = {
                         sessionToRename = session
@@ -498,6 +523,7 @@ fun SessionItemCard(
     onExportKmz: () -> Unit,
     onExportCsv: () -> Unit,
     onViewMap: () -> Unit,
+    onAnalyze: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -759,6 +785,19 @@ fun SessionItemCard(
                     Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("MAP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onAnalyze,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF818CF8)),
+                    border = BorderStroke(1.dp, Color(0xFF818CF8).copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.weight(0.8f)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("AI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
