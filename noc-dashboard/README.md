@@ -47,7 +47,7 @@ python -m http.server 3000 --directory noc-dashboard
 
 ---
 
-## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.12.1)
+## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.12.2)
 
 1. เปิดแอป **Drive Test LTE/5G** บนมือถือ
 2. ระบบตั้งค่า Firebase Realtime Database และเปิดการส่ง Telemetry อัตโนมัติมาให้อยู่แล้ว

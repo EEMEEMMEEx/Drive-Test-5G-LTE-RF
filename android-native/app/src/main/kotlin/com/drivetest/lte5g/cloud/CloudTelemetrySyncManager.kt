@@ -82,7 +82,6 @@ object CloudTelemetrySyncManager {
 
         val root = JSONObject().apply {
             put("vehicleId", config.vehicleId)
-            put("vehicleName", config.vehicleName)
             put("sessionId", session.id.toString())
             put("isRecording", true)
             put("updatedAt", sample.timestamp)

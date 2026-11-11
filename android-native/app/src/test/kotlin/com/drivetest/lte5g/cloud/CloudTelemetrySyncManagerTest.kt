@@ -140,7 +140,6 @@ class CloudTelemetrySyncManagerTest {
     fun buildVehicleHeartbeatJson_serializesExpectedFields() {
         val config = CloudConfig(
             vehicleId = "DT-V01",
-            vehicleName = "Test Unit 01",
             firebaseDbUrl = "https://example-firebase.io",
             firebaseAuthToken = "secret123",
             liveTelemetryEnabled = true,
@@ -162,7 +161,6 @@ class CloudTelemetrySyncManagerTest {
         val json = JSONObject(jsonStr)
 
         assertEquals("DT-V01", json.getString("vehicleId"))
-        assertEquals("Test Unit 01", json.getString("vehicleName"))
         assertEquals("1762849200000", json.getString("sessionId"))
         assertTrue(json.getBoolean("isRecording"))
         assertEquals(13.7563, json.getDouble("lat"), 0.0001)

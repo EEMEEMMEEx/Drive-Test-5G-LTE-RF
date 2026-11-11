@@ -19,6 +19,9 @@ val geminiApiKey: String = localProperties.getProperty("GEMINI_API_KEY")
 val firebaseDbUrl: String = localProperties.getProperty("FIREBASE_DB_URL")
   ?: System.getenv("FIREBASE_DB_URL")
   ?: "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app"
+val firebaseAuthToken: String = localProperties.getProperty("FIREBASE_AUTH_TOKEN")
+  ?: System.getenv("FIREBASE_AUTH_TOKEN")
+  ?: ""
 val gdriveAccessToken: String = localProperties.getProperty("GDRIVE_ACCESS_TOKEN")
   ?: System.getenv("GDRIVE_ACCESS_TOKEN")
   ?: ""
@@ -33,11 +36,12 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 41
-    versionName = "1.12.1"
+    versionCode = 42
+    versionName = "1.12.2"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     buildConfigField("String", "FIREBASE_DB_URL", "\"$firebaseDbUrl\"")
+    buildConfigField("String", "FIREBASE_AUTH_TOKEN", "\"$firebaseAuthToken\"")
     buildConfigField("String", "GDRIVE_ACCESS_TOKEN", "\"$gdriveAccessToken\"")
     buildConfigField("String", "GDRIVE_FOLDER_ID", "\"$gdriveFolderId\"")
   }
@@ -136,4 +140,8 @@ dependencies {
   implementation(libs.play.services.maps)
   implementation(libs.maps.compose)
   implementation(libs.androidx.compose.material.icons.extended)
+
+  // WorkManager (Background Cloud Uploads on Wi-Fi)
+  implementation(libs.androidx.work.runtime.ktx)
+  testImplementation("androidx.work:work-testing:2.10.0")
 }

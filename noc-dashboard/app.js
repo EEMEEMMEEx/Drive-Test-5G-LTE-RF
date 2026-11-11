@@ -1,5 +1,5 @@
 /**
- * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.1
+ * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.2
  * 100% Real-Time Live Telemetry (No Demo)
  */
 

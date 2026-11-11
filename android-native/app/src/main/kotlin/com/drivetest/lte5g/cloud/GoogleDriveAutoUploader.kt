@@ -75,7 +75,7 @@ object GoogleDriveAutoUploader {
     }
 
     /**
-     * Enqueue a session when recording finishes.
+     * Enqueue a session when recording finishes via WorkManager (UNMETERED constraint + no duplicates).
      */
     fun enqueueSessionForWifiUpload(session: DriveTestSession) {
         val config = CloudConfigRepository.config.value
@@ -83,18 +83,9 @@ object GoogleDriveAutoUploader {
             return
         }
 
-        val context = appContext
-        val isWifi = context != null && isWifiConnected(context)
-
-        if (config.autoUploadOnWifi) {
-            if (isWifi) {
-                CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.PENDING_WIFI)
-                uploadSessionAsync(session)
-            } else {
-                CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.PENDING_WIFI)
-                Log.d(TAG, "Session #${session.sessionNumber} queued, waiting for Wi-Fi connection.")
-            }
-        }
+        val context = appContext ?: return
+        CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.PENDING_WIFI)
+        GoogleDriveUploadWorker.enqueueUpload(context, session.id)
     }
 
     /**
@@ -128,7 +119,7 @@ object GoogleDriveAutoUploader {
         val config = CloudConfigRepository.config.value
 
         if (config.googleDriveAccessToken.isBlank()) {
-            onComplete?.invoke(false, "ยังไม่ได้ระบุ Google Drive Access Token ในหน้าตั้งค่า")
+            onComplete?.invoke(false, "ยังไม่ได้ระบุ Google Drive Access Token ใน local.properties")
             return
         }
 

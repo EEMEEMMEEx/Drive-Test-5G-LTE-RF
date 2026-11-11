@@ -2,10 +2,17 @@ package com.drivetest.lte5g.cloud
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.drivetest.lte5g.BuildConfig
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Locale
 import java.util.UUID
 
 enum class CloudUploadStatus(val label: String) {
@@ -18,26 +25,20 @@ enum class CloudUploadStatus(val label: String) {
 
 data class CloudConfig(
     val vehicleId: String,
-    val vehicleName: String,
     val firebaseDbUrl: String,
     val firebaseAuthToken: String,
-    val liveTelemetryEnabled: Boolean,
+    val liveTelemetryEnabled: Boolean = true,
     val googleDriveAccessToken: String,
     val googleDriveFolderId: String,
-    val autoUploadOnWifi: Boolean
+    val autoUploadOnWifi: Boolean = true
 )
 
 object CloudConfigRepository {
+    private const val TAG = "CloudConfigRepo"
     private const val PREF_NAME = "dt_cloud_config"
 
     private const val KEY_VEHICLE_ID = "cloud_vehicle_id"
-    private const val KEY_VEHICLE_NAME = "cloud_vehicle_name"
-    private const val KEY_FIREBASE_DB_URL = "cloud_firebase_db_url"
-    private const val KEY_FIREBASE_AUTH_TOKEN = "cloud_firebase_auth_token"
-    private const val KEY_LIVE_TELEMETRY_ENABLED = "cloud_live_telemetry_enabled"
-    private const val KEY_GDRIVE_ACCESS_TOKEN = "cloud_gdrive_access_token"
-    private const val KEY_GDRIVE_FOLDER_ID = "cloud_gdrive_folder_id"
-    private const val KEY_AUTO_UPLOAD_ON_WIFI = "cloud_auto_upload_on_wifi"
+    private const val KEY_DEVICE_INSTALL_ID = "cloud_device_install_id"
     private const val KEY_UPLOAD_STATUS_PREFIX = "upload_status_session_"
 
     private var prefs: SharedPreferences? = null
@@ -45,12 +46,11 @@ object CloudConfigRepository {
     private val _config = MutableStateFlow(
         CloudConfig(
             vehicleId = "DT-01",
-            vehicleName = "DT-Unit-01 (Field Test)",
-            firebaseDbUrl = "",
-            firebaseAuthToken = "",
-            liveTelemetryEnabled = false,
-            googleDriveAccessToken = "",
-            googleDriveFolderId = "",
+            firebaseDbUrl = BuildConfig.FIREBASE_DB_URL,
+            firebaseAuthToken = BuildConfig.FIREBASE_AUTH_TOKEN,
+            liveTelemetryEnabled = true,
+            googleDriveAccessToken = BuildConfig.GDRIVE_ACCESS_TOKEN,
+            googleDriveFolderId = BuildConfig.GDRIVE_FOLDER_ID,
             autoUploadOnWifi = true
         )
     )
@@ -69,38 +69,35 @@ object CloudConfigRepository {
         loadConfig()
     }
 
+    fun getDeviceInstallId(): String {
+        val sp = prefs ?: return UUID.randomUUID().toString()
+        var id = sp.getString(KEY_DEVICE_INSTALL_ID, null)
+        if (id.isNullOrBlank()) {
+            id = UUID.randomUUID().toString()
+            sp.edit().putString(KEY_DEVICE_INSTALL_ID, id).apply()
+        }
+        return id
+    }
+
     private fun loadConfig() {
         val sp = prefs ?: return
-        var vId = sp.getString(KEY_VEHICLE_ID, null)
-        if (vId.isNullOrBlank()) {
-            vId = "DT-" + UUID.randomUUID().toString().substring(0, 6).uppercase()
-            sp.edit().putString(KEY_VEHICLE_ID, vId).apply()
+        val vId = sp.getString(KEY_VEHICLE_ID, null) ?: "DT-01"
+
+        val defaultFbUrl = BuildConfig.FIREBASE_DB_URL.ifBlank {
+            "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app"
         }
-        val vName = sp.getString(KEY_VEHICLE_NAME, "DT-Unit-01 (Field Test)") ?: "DT-Unit-01 (Field Test)"
-        val defaultFbUrl = BuildConfig.FIREBASE_DB_URL.ifBlank { "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app" }
-        val savedFbUrl = sp.getString(KEY_FIREBASE_DB_URL, null)
-        val fbUrl = if (savedFbUrl.isNullOrBlank()) defaultFbUrl else savedFbUrl
-
-        val fbToken = sp.getString(KEY_FIREBASE_AUTH_TOKEN, "") ?: ""
-        val liveEnabled = sp.getBoolean(KEY_LIVE_TELEMETRY_ENABLED, true)
-
-        val savedDriveToken = sp.getString(KEY_GDRIVE_ACCESS_TOKEN, null)
-        val driveToken = if (savedDriveToken.isNullOrBlank()) BuildConfig.GDRIVE_ACCESS_TOKEN else savedDriveToken
-
-        val savedDriveFolder = sp.getString(KEY_GDRIVE_FOLDER_ID, null)
-        val driveFolder = if (savedDriveFolder.isNullOrBlank()) BuildConfig.GDRIVE_FOLDER_ID else savedDriveFolder
-
-        val autoWifi = sp.getBoolean(KEY_AUTO_UPLOAD_ON_WIFI, true)
+        val fbToken = BuildConfig.FIREBASE_AUTH_TOKEN
+        val driveToken = BuildConfig.GDRIVE_ACCESS_TOKEN
+        val driveFolder = BuildConfig.GDRIVE_FOLDER_ID
 
         _config.value = CloudConfig(
             vehicleId = vId,
-            vehicleName = vName,
-            firebaseDbUrl = fbUrl,
+            firebaseDbUrl = defaultFbUrl,
             firebaseAuthToken = fbToken,
-            liveTelemetryEnabled = liveEnabled,
+            liveTelemetryEnabled = true,
             googleDriveAccessToken = driveToken,
             googleDriveFolderId = driveFolder,
-            autoUploadOnWifi = autoWifi
+            autoUploadOnWifi = true
         )
 
         // Load all session statuses
@@ -119,51 +116,147 @@ object CloudConfigRepository {
         _sessionStatuses.value = statusMap
     }
 
-    fun updateVehicleInfo(vehicleId: String, vehicleName: String) {
-        val current = _config.value
-        val updated = current.copy(
-            vehicleId = vehicleId.trim().ifBlank { current.vehicleId },
-            vehicleName = vehicleName.trim().ifBlank { current.vehicleName }
-        )
-        _config.value = updated
-        prefs?.edit()?.apply {
-            putString(KEY_VEHICLE_ID, updated.vehicleId)
-            putString(KEY_VEHICLE_NAME, updated.vehicleName)
-            apply()
+    /**
+     * Query existing vehicle IDs from Firebase Realtime Database
+     * and auto-generate the next sequential ID: DT-01, DT-02, DT-03...
+     */
+    suspend fun queryNextAvailableVehicleId(): Result<String> = withContext(Dispatchers.IO) {
+        val fbUrl = _config.value.firebaseDbUrl.trimEnd('/')
+        if (fbUrl.isBlank()) return@withContext Result.success("DT-01")
+
+        try {
+            val authParam = if (_config.value.firebaseAuthToken.isNotBlank()) "?auth=${_config.value.firebaseAuthToken}" else ""
+            val url = URL("$fbUrl/fleet/vehicles.json$authParam")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 6000
+                readTimeout = 6000
+            }
+
+            if (conn.responseCode in 200..299) {
+                val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+
+                if (responseText.isBlank() || responseText.trim() == "null") {
+                    return@withContext Result.success("DT-01")
+                }
+
+                val json = JSONObject(responseText)
+                var maxNum = 0
+                val pattern = Regex("""DT-(\d+)""", RegexOption.IGNORE_CASE)
+
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val match = pattern.matchEntire(key)
+                    if (match != null) {
+                        val num = match.groupValues[1].toIntOrNull() ?: 0
+                        if (num > maxNum) maxNum = num
+                    }
+                }
+
+                val nextId = String.format(Locale.US, "DT-%02d", maxNum + 1)
+                Result.success(nextId)
+            } else {
+                conn.disconnect()
+                Result.success("DT-01")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to query Firebase for sequential vehicle ID: ${e.message}")
+            Result.success("DT-01")
         }
     }
 
-    fun updateFirebaseConfig(dbUrl: String, authToken: String, liveEnabled: Boolean) {
-        val current = _config.value
-        val cleanUrl = dbUrl.trim().trimEnd('/')
-        val updated = current.copy(
-            firebaseDbUrl = cleanUrl,
-            firebaseAuthToken = authToken.trim(),
-            liveTelemetryEnabled = liveEnabled
-        )
-        _config.value = updated
-        prefs?.edit()?.apply {
-            putString(KEY_FIREBASE_DB_URL, updated.firebaseDbUrl)
-            putString(KEY_FIREBASE_AUTH_TOKEN, updated.firebaseAuthToken)
-            putBoolean(KEY_LIVE_TELEMETRY_ENABLED, updated.liveTelemetryEnabled)
-            apply()
+    /**
+     * Validate whether candidate Vehicle ID is unique across Firebase fleet.
+     * Returns true if available, false if already in use by another vehicle.
+     */
+    suspend fun validateVehicleId(candidateId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        val normalized = candidateId.trim().uppercase(Locale.US)
+        if (normalized.isBlank()) return@withContext Result.success(false)
+
+        val currentId = _config.value.vehicleId
+        if (normalized == currentId) {
+            // Already owned by this local device
+            return@withContext Result.success(true)
+        }
+
+        val fbUrl = _config.value.firebaseDbUrl.trimEnd('/')
+        if (fbUrl.isBlank()) return@withContext Result.success(true)
+
+        try {
+            val authParam = if (_config.value.firebaseAuthToken.isNotBlank()) "?auth=${_config.value.firebaseAuthToken}" else ""
+            val url = URL("$fbUrl/fleet/vehicles/$normalized.json$authParam")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+
+            if (conn.responseCode in 200..299) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val isAvailable = body.isBlank() || body.trim() == "null"
+                Result.success(isAvailable)
+            } else {
+                conn.disconnect()
+                Result.success(true)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not reach Firebase to validate vehicle ID: ${e.message}")
+            Result.success(true) // Allow if offline
         }
     }
 
-    fun updateGoogleDriveConfig(accessToken: String, folderId: String, autoUploadOnWifi: Boolean) {
+    /**
+     * Set and persist Vehicle ID locally and claim it in Firebase.
+     */
+    suspend fun saveVehicleId(newId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val normalized = newId.trim().uppercase(Locale.US)
+        if (normalized.isBlank()) return@withContext Result.failure(IllegalArgumentException("Vehicle ID cannot be blank"))
+
+        val validation = validateVehicleId(normalized)
+        if (validation.isSuccess && !validation.getOrDefault(true)) {
+            return@withContext Result.failure(IllegalStateException("This Vehicle ID is already in use"))
+        }
+
         val current = _config.value
-        val updated = current.copy(
-            googleDriveAccessToken = accessToken.trim(),
-            googleDriveFolderId = folderId.trim(),
-            autoUploadOnWifi = autoUploadOnWifi
-        )
-        _config.value = updated
+        _config.value = current.copy(vehicleId = normalized)
         prefs?.edit()?.apply {
-            putString(KEY_GDRIVE_ACCESS_TOKEN, updated.googleDriveAccessToken)
-            putString(KEY_GDRIVE_FOLDER_ID, updated.googleDriveFolderId)
-            putBoolean(KEY_AUTO_UPLOAD_ON_WIFI, updated.autoUploadOnWifi)
+            putString(KEY_VEHICLE_ID, normalized)
             apply()
         }
+
+        // Register / claim vehicle in Firebase Realtime Database
+        try {
+            val fbUrl = current.firebaseDbUrl.trimEnd('/')
+            if (fbUrl.isNotBlank()) {
+                val authParam = if (current.firebaseAuthToken.isNotBlank()) "?auth=${current.firebaseAuthToken}" else ""
+                val url = URL("$fbUrl/fleet/vehicles/$normalized/vehicleId.json$authParam")
+                val conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "PUT"
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                }
+                conn.outputStream.use { os ->
+                    os.write("\"$normalized\"".toByteArray(Charsets.UTF_8))
+                }
+                conn.responseCode
+                conn.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to sync claimed vehicle ID to Firebase: ${e.message}")
+        }
+
+        Result.success(Unit)
+    }
+
+    fun setVehicleIdImmediate(id: String) {
+        val normalized = id.trim().uppercase(Locale.US)
+        _config.value = _config.value.copy(vehicleId = normalized)
+        prefs?.edit()?.putString(KEY_VEHICLE_ID, normalized)?.apply()
     }
 
     fun setSessionUploadStatus(sessionId: Long, status: CloudUploadStatus) {
@@ -185,10 +278,9 @@ object CloudConfigRepository {
         prefs = null
         _config.value = CloudConfig(
             vehicleId = "DT-TEST",
-            vehicleName = "Test Unit",
             firebaseDbUrl = "",
             firebaseAuthToken = "",
-            liveTelemetryEnabled = false,
+            liveTelemetryEnabled = true,
             googleDriveAccessToken = "",
             googleDriveFolderId = "",
             autoUploadOnWifi = true

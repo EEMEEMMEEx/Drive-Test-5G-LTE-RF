@@ -31,18 +31,15 @@ class GoogleDriveAutoUploaderTest {
 
     @Test
     fun cloudConfig_updatesCorrectly() {
-        CloudConfigRepository.updateVehicleInfo("DT-BKK-02", "Unit BKK North")
+        CloudConfigRepository.setVehicleIdImmediate("dt-bkk-02")
         assertEquals("DT-BKK-02", CloudConfigRepository.config.value.vehicleId)
-        assertEquals("Unit BKK North", CloudConfigRepository.config.value.vehicleName)
-
-        CloudConfigRepository.updateFirebaseConfig("https://my-rtdb.firebaseio.com", "secret456", true)
-        assertEquals("https://my-rtdb.firebaseio.com", CloudConfigRepository.config.value.firebaseDbUrl)
-        assertEquals("secret456", CloudConfigRepository.config.value.firebaseAuthToken)
         assertTrue(CloudConfigRepository.config.value.liveTelemetryEnabled)
+        assertTrue(CloudConfigRepository.config.value.autoUploadOnWifi)
+    }
 
-        CloudConfigRepository.updateGoogleDriveConfig("ya29.test", "folder_xyz", false)
-        assertEquals("ya29.test", CloudConfigRepository.config.value.googleDriveAccessToken)
-        assertEquals("folder_xyz", CloudConfigRepository.config.value.googleDriveFolderId)
-        assertEquals(false, CloudConfigRepository.config.value.autoUploadOnWifi)
+    @Test
+    fun vehicleId_normalizesTrimAndUppercase() {
+        CloudConfigRepository.setVehicleIdImmediate("  dt-07  ")
+        assertEquals("DT-07", CloudConfigRepository.config.value.vehicleId)
     }
 }

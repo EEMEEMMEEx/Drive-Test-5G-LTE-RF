@@ -116,18 +116,9 @@ fun SettingsScreen(
 
     val cloudConfig by CloudConfigRepository.config.collectAsStateWithLifecycle()
     var vehicleIdInput by remember(cloudConfig.vehicleId) { mutableStateOf(cloudConfig.vehicleId) }
-    var vehicleNameInput by remember(cloudConfig.vehicleName) { mutableStateOf(cloudConfig.vehicleName) }
-    var fbUrlInput by remember(cloudConfig.firebaseDbUrl) { mutableStateOf(cloudConfig.firebaseDbUrl) }
-    var fbTokenInput by remember(cloudConfig.firebaseAuthToken) { mutableStateOf(cloudConfig.firebaseAuthToken) }
-    var liveTelemetryEnabled by remember(cloudConfig.liveTelemetryEnabled) { mutableStateOf(cloudConfig.liveTelemetryEnabled) }
-    var driveTokenInput by remember(cloudConfig.googleDriveAccessToken) { mutableStateOf(cloudConfig.googleDriveAccessToken) }
-    var driveFolderInput by remember(cloudConfig.googleDriveFolderId) { mutableStateOf(cloudConfig.googleDriveFolderId) }
-    var autoUploadOnWifi by remember(cloudConfig.autoUploadOnWifi) { mutableStateOf(cloudConfig.autoUploadOnWifi) }
-
-    var fbTestResult by remember { mutableStateOf<String?>(null) }
-    var fbTesting by remember { mutableStateOf(false) }
-    var driveTestResult by remember { mutableStateOf<String?>(null) }
-    var driveTesting by remember { mutableStateOf(false) }
+    var vehicleIdError by remember { mutableStateOf<String?>(null) }
+    var isValidatingId by remember { mutableStateOf(false) }
+    var isIdSavedSuccess by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -1005,7 +996,7 @@ fun SettingsScreen(
             }
         }
 
-        // Cloud Fleet Telemetry & Google Drive Auto-Upload Card
+        // Cloud Fleet Telemetry & Google Drive Auto-Upload Card (Minimal & Unslop)
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -1014,13 +1005,19 @@ fun SettingsScreen(
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // Header with status badge
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CloudSync, contentDescription = null, tint = TelemetryCyan, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.CloudSync,
+                            contentDescription = null,
+                            tint = TelemetryCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "LIVE CLOUD FLEET TELEMETRY & NOC",
@@ -1029,46 +1026,109 @@ fun SettingsScreen(
                             color = Color(0xFF94A3B8)
                         )
                     }
-                    val isLiveActive = cloudConfig.liveTelemetryEnabled && cloudConfig.firebaseDbUrl.isNotBlank()
                     Surface(
-                        color = if (isLiveActive) Color(0xFF065F46) else Color(0xFF334155),
+                        color = Color(0xFF065F46),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = if (isLiveActive) "LIVE STREAM ON" else "STANDALONE",
+                            text = "ACTIVE",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isLiveActive) Color(0xFFA7F3D0) else Color(0xFF94A3B8),
+                            color = Color(0xFFA7F3D0),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Vehicle Identification
-                Text(
-                    text = "ข้อมูลประจำรถทดสอบ (Vehicle Identity)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+                // Vehicle Identification Section
                 Row(
                     modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ข้อมูลประจำรถทดสอบ (Vehicle Identity)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+
+                    // Auto-generate next ID button
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                isValidatingId = true
+                                vehicleIdError = null
+                                isIdSavedSuccess = false
+                                val nextRes = CloudConfigRepository.queryNextAvailableVehicleId()
+                                val nextId = nextRes.getOrDefault("DT-01")
+                                vehicleIdInput = nextId
+                                val saveRes = CloudConfigRepository.saveVehicleId(nextId)
+                                isValidatingId = false
+                                if (saveRes.isSuccess) {
+                                    isIdSavedSuccess = true
+                                } else {
+                                    vehicleIdError = saveRes.exceptionOrNull()?.message
+                                }
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = TelemetryCyan,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Auto ID",
+                            fontSize = 11.sp,
+                            color = TelemetryCyan,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = vehicleIdInput,
-                        onValueChange = {
-                            vehicleIdInput = it
-                            CloudConfigRepository.updateVehicleInfo(it, vehicleNameInput)
+                        onValueChange = { raw ->
+                            val norm = raw.trim().uppercase(Locale.US)
+                            vehicleIdInput = norm
+                            isIdSavedSuccess = false
+                            if (norm.isBlank()) {
+                                vehicleIdError = "Vehicle ID cannot be blank"
+                            } else {
+                                vehicleIdError = null
+                                scope.launch {
+                                    isValidatingId = true
+                                    val valRes = CloudConfigRepository.validateVehicleId(norm)
+                                    isValidatingId = false
+                                    if (valRes.isSuccess && !valRes.getOrDefault(true)) {
+                                        vehicleIdError = "This Vehicle ID is already in use"
+                                    } else {
+                                        vehicleIdError = null
+                                    }
+                                }
+                            }
                         },
-                        label = { Text("Vehicle ID (เช่น DT-01)", fontSize = 10.sp) },
+                        label = { Text("Vehicle ID (เช่น DT-01)", fontSize = 11.sp) },
                         singleLine = true,
+                        isError = vehicleIdError != null,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TelemetryCyan,
-                            unfocusedBorderColor = Color(0xFF334155),
+                            focusedBorderColor = if (vehicleIdError != null) SignalTier5 else TelemetryCyan,
+                            unfocusedBorderColor = if (vehicleIdError != null) SignalTier5 else Color(0xFF334155),
+                            errorBorderColor = SignalTier5,
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
                             focusedContainerColor = Color(0xFF0F172A),
@@ -1077,242 +1137,109 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
-                        value = vehicleNameInput,
-                        onValueChange = {
-                            vehicleNameInput = it
-                            CloudConfigRepository.updateVehicleInfo(vehicleIdInput, it)
+
+                    Button(
+                        onClick = {
+                            val norm = vehicleIdInput.trim().uppercase(Locale.US)
+                            scope.launch {
+                                isValidatingId = true
+                                vehicleIdError = null
+                                isIdSavedSuccess = false
+                                val saveRes = CloudConfigRepository.saveVehicleId(norm)
+                                isValidatingId = false
+                                if (saveRes.isSuccess) {
+                                    isIdSavedSuccess = true
+                                } else {
+                                    vehicleIdError = saveRes.exceptionOrNull()?.message ?: "Failed to save ID"
+                                }
+                            }
                         },
-                        label = { Text("ชื่อรถ / ทีมงาน", fontSize = 10.sp) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TelemetryCyan,
-                            unfocusedBorderColor = Color(0xFF334155),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = Color(0xFF0F172A),
-                            unfocusedContainerColor = Color(0xFF0F172A)
+                        enabled = !isValidatingId && vehicleIdError == null && vehicleIdInput.isNotBlank() && vehicleIdInput != cloudConfig.vehicleId,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TelemetryCyan,
+                            contentColor = Color(0xFF0F172A),
+                            disabledContainerColor = Color(0xFF1E293B),
+                            disabledContentColor = Color(0xFF64748B)
                         ),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.5f)
-                    )
+                        modifier = Modifier.height(50.dp)
+                    ) {
+                        if (isValidatingId) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color(0xFF334155), thickness = 0.8.dp)
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Firebase Realtime DB Section (Pre-configured & Auto-active)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "สตรีม Telemetry สดเข้า Firebase",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                // Inline validation status
+                if (isValidatingId) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Checking ID availability in fleet...",
+                        fontSize = 11.sp,
+                        color = TelemetryCyan
+                    )
+                } else if (vehicleIdError != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = SignalTier5,
+                            modifier = Modifier.size(14.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "ส่งพิกัดและค่า RF RSRP/SINR สดเข้า NOC Dashboard อัตโนมัติ",
+                            text = vehicleIdError ?: "",
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = SignalTier5,
+                            fontWeight = FontWeight.Medium
                         )
                     }
-                    Switch(
-                        checked = liveTelemetryEnabled,
-                        onCheckedChange = { checked ->
-                            liveTelemetryEnabled = checked
-                            CloudConfigRepository.updateFirebaseConfig(fbUrlInput, fbTokenInput, checked)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = TelemetryCyan,
-                            uncheckedThumbColor = Color(0xFF94A3B8),
-                            uncheckedTrackColor = Color(0xFF334155)
+                } else if (isIdSavedSuccess || vehicleIdInput == cloudConfig.vehicleId) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = SignalTier1,
+                            modifier = Modifier.size(14.dp)
                         )
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Vehicle ID registered & active for this device",
+                            fontSize = 11.sp,
+                            color = SignalTier1,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 0.8.dp)
                 Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    color = Color(0xFF0F172A),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color(0xFF334155)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Realtime Database", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            Surface(color = Color(0xFF065F46), shape = RoundedCornerShape(4.dp)) {
-                                Text("BUILT-IN", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA7F3D0), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = fbUrlInput.ifBlank { "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app" },
-                            fontSize = 10.sp,
-                            color = TelemetryCyan,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("ภูมิภาค: Singapore (asia-southeast1) • ตั้งค่าผ่าน .env / local.properties", fontSize = 10.sp, color = Color(0xFF64748B))
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        scope.launch {
-                            fbTesting = true
-                            fbTestResult = null
-                            val res = CloudTelemetrySyncManager.testFirebaseConnection(fbUrlInput, fbTokenInput)
-                            fbTesting = false
-                            fbTestResult = if (res.isSuccess) res.getOrNull() else res.exceptionOrNull()?.message
-                        }
-                    },
-                    enabled = !fbTesting && fbUrlInput.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (fbTesting) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("กำลังทดสอบการเชื่อมต่อ...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    } else {
-                        Text("⚡ ตรวจสอบการเชื่อมต่อ Firebase", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                fbTestResult?.let { msg ->
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = msg,
-                        fontSize = 11.sp,
-                        color = if (msg.contains("สำเร็จ")) SignalTier1 else SignalTier5,
-                        lineHeight = 14.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color(0xFF334155), thickness = 0.8.dp)
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Google Drive Auto-Upload Section
+                // Minimal status info (unslop)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "อัปโหลดอัตโนมัติขึ้น Google Drive เมื่อต่อ Wi-Fi",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "ส่งออกไฟล์ KMZ, CSV, GeoJSON, MapInfo และ PDF ทันทีที่ต่อ Wi-Fi",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Switch(
-                        checked = autoUploadOnWifi,
-                        onCheckedChange = { checked ->
-                            autoUploadOnWifi = checked
-                            CloudConfigRepository.updateGoogleDriveConfig(driveTokenInput, driveFolderInput, checked)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = TelemetryCyan,
-                            uncheckedThumbColor = Color(0xFF94A3B8),
-                            uncheckedTrackColor = Color(0xFF334155)
-                        )
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = null,
+                        tint = Color(0xFF64748B),
+                        modifier = Modifier.size(14.dp)
                     )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = driveTokenInput,
-                    onValueChange = {
-                        driveTokenInput = it
-                        CloudConfigRepository.updateGoogleDriveConfig(it, driveFolderInput, autoUploadOnWifi)
-                    },
-                    label = { Text("Google Drive OAuth Access Token (Bearer)", fontSize = 10.sp) },
-                    placeholder = { Text("ya29.a0AfH6SM...", fontSize = 10.sp, color = Color(0xFF64748B)) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelemetryCyan,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(0xFF0F172A),
-                        unfocusedContainerColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = driveFolderInput,
-                    onValueChange = {
-                        driveFolderInput = it
-                        CloudConfigRepository.updateGoogleDriveConfig(driveTokenInput, it, autoUploadOnWifi)
-                    },
-                    label = { Text("Google Drive Folder ID (ไม่บังคับ, ปล่อยว่างจะบันทึกใน My Drive)", fontSize = 10.sp) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = TelemetryCyan,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(0xFF0F172A),
-                        unfocusedContainerColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        scope.launch {
-                            driveTesting = true
-                            driveTestResult = null
-                            val res = GoogleDriveAutoUploader.testDriveConnection(driveTokenInput)
-                            driveTesting = false
-                            driveTestResult = if (res.isSuccess) res.getOrNull() else res.exceptionOrNull()?.message
-                        }
-                    },
-                    enabled = !driveTesting && driveTokenInput.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (driveTesting) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("กำลังทดสอบ Google Drive...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    } else {
-                        Text("☁️ ทดสอบเชื่อมต่อ Google Drive", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                driveTestResult?.let { msg ->
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = msg,
-                        fontSize = 11.sp,
-                        color = if (msg.contains("สำเร็จ")) SignalTier1 else SignalTier5,
+                        text = "Telemetry streams live to Firebase • Auto-uploading KMZ, CSV, GeoJSON, MapInfo, PDF to Google Drive on Wi-Fi",
+                        fontSize = 10.sp,
+                        color = Color(0xFF64748B),
                         lineHeight = 14.sp
                     )
                 }
