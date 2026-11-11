@@ -15,7 +15,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,8 +31,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drivetest.lte5g.ai.GeminiAdvisorState
+import com.drivetest.lte5g.ai.GeminiRfAdvisor
 import com.drivetest.lte5g.data.SessionRepository
+import com.drivetest.lte5g.data.analytics.RfAnalyticsEngine
+import com.drivetest.lte5g.export.GisExporter
 import com.drivetest.lte5g.export.KmlExporter
+import com.drivetest.lte5g.export.PdfReportExporter
 import com.drivetest.lte5g.model.DriveTestSession
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.service.DriveTestForegroundService
@@ -54,6 +64,10 @@ fun SessionsScreen(
 
     var sessionToExportKmz by remember { mutableStateOf<DriveTestSession?>(null) }
     var sessionToExportCsv by remember { mutableStateOf<DriveTestSession?>(null) }
+    var sessionToExportPdf by remember { mutableStateOf<DriveTestSession?>(null) }
+    var sessionToExportGeoJson by remember { mutableStateOf<DriveTestSession?>(null) }
+    var sessionToExportMapInfo by remember { mutableStateOf<DriveTestSession?>(null) }
+    var sessionForExportMenu by remember { mutableStateOf<DriveTestSession?>(null) }
 
     var showNewSessionDialog by remember { mutableStateOf(false) }
     var sessionNameInput by remember { mutableStateOf("") }
@@ -101,6 +115,69 @@ fun SessionsScreen(
                 Toast.makeText(context, "CSV exported successfully! (${samples.size} points)", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Failed to export CSV: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri != null) {
+            val session = sessionToExportPdf ?: activeSession
+            if (session == null || session.samples.isEmpty()) {
+                Toast.makeText(context, "No samples to generate PDF report!", Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+            try {
+                val analytics = RfAnalyticsEngine.analyze(session)
+                val aiState = GeminiRfAdvisor.state.value
+                val aiReport = if (aiState is GeminiAdvisorState.Success) aiState.report else null
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    PdfReportExporter.exportPdfReport(session, analytics, aiReport, os)
+                }
+                Toast.makeText(context, "PDF Report exported successfully!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val geoJsonLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/geo+json")
+    ) { uri ->
+        if (uri != null) {
+            val session = sessionToExportGeoJson ?: activeSession
+            if (session == null || session.samples.isEmpty()) {
+                Toast.makeText(context, "No samples to export GeoJSON!", Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    GisExporter.exportGeoJson(session, os)
+                }
+                Toast.makeText(context, "GeoJSON exported successfully!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export GeoJSON: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val mapInfoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) {
+            val session = sessionToExportMapInfo ?: activeSession
+            if (session == null || session.samples.isEmpty()) {
+                Toast.makeText(context, "No samples to export MapInfo!", Toast.LENGTH_SHORT).show()
+                return@rememberLauncherForActivityResult
+            }
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    GisExporter.exportMapInfoMifMid(session, os)
+                }
+                Toast.makeText(context, "MapInfo MIF/MID ZIP exported successfully!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export MapInfo: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -256,36 +333,16 @@ fun SessionsScreen(
                             if (session == null || session.samples.isEmpty()) {
                                 Toast.makeText(context, "No samples to export! Start drive test first.", Toast.LENGTH_SHORT).show()
                             } else {
-                                sessionToExportKmz = session
-                                val cleanName = session.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                                val filename = "${cleanName}_${session.id}.kmz"
-                                kmzLauncher.launch(filename)
+                                sessionForExportMenu = session
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1.2f)
                     ) {
-                        Text("💾 EXPORT KMZ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-
-                    Button(
-                        onClick = {
-                            val session = activeSession
-                            if (session == null || session.samples.isEmpty()) {
-                                Toast.makeText(context, "No samples to export! Start drive test first.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                sessionToExportCsv = session
-                                val cleanName = session.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                                val filename = "${cleanName}_${session.id}.csv"
-                                csvLauncher.launch(filename)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("📊 EXPORT CSV", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("EXPORT DATA...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
 
                     Button(
@@ -351,17 +408,8 @@ fun SessionsScreen(
             completedSessions.forEach { session ->
                 SessionItemCard(
                     session = session,
-                    onExportKmz = {
-                        sessionToExportKmz = session
-                        val cleanName = session.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                        val filename = "${cleanName}_${session.id}.kmz"
-                        kmzLauncher.launch(filename)
-                    },
-                    onExportCsv = {
-                        sessionToExportCsv = session
-                        val cleanName = session.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                        val filename = "${cleanName}_${session.id}.csv"
-                        csvLauncher.launch(filename)
+                    onExport = {
+                        sessionForExportMenu = session
                     },
                     onViewMap = {
                         SessionRepository.selectSessionForMap(session)
@@ -514,14 +562,101 @@ fun SessionsScreen(
                 containerColor = Color(0xFF1E293B)
             )
         }
+
+        // EXPORT OPTIONS DIALOG
+        sessionForExportMenu?.let { session ->
+            val cleanName = session.name.replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "drivetest_${session.id}" }
+            AlertDialog(
+                onDismissRequest = { sessionForExportMenu = null },
+                title = {
+                    Column {
+                        Text("Export Drive Test Data", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${session.name} (${session.sampleCount} samples)",
+                            color = TelemetryCyan,
+                            fontSize = 12.sp
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ExportOptionItem(
+                            icon = Icons.Default.PictureAsPdf,
+                            iconTint = Color(0xFF38BDF8),
+                            title = "Site Acceptance PDF Report",
+                            description = "Standard A4 Vector, Scorecard, KPI, Map Snapshot, AI & Signatures",
+                            onClick = {
+                                sessionToExportPdf = session
+                                sessionForExportMenu = null
+                                pdfLauncher.launch("${cleanName}_${session.id}_acceptance.pdf")
+                            }
+                        )
+                        ExportOptionItem(
+                            icon = Icons.Default.Public,
+                            iconTint = Color(0xFF14B8A6),
+                            title = "Google Earth KMZ",
+                            description = "3D Point Towers & RSRP Color-Coded Route Track",
+                            onClick = {
+                                sessionToExportKmz = session
+                                sessionForExportMenu = null
+                                kmzLauncher.launch("${cleanName}_${session.id}.kmz")
+                            }
+                        )
+                        ExportOptionItem(
+                            icon = Icons.Default.TableChart,
+                            iconTint = Color(0xFFF59E0B),
+                            title = "Engineering CSV",
+                            description = "Full Raw Drive Test Metrics (RSRP, SINR, PCI, GPS) for Excel",
+                            onClick = {
+                                sessionToExportCsv = session
+                                sessionForExportMenu = null
+                                csvLauncher.launch("${cleanName}_${session.id}.csv")
+                            }
+                        )
+                        ExportOptionItem(
+                            icon = Icons.Default.Map,
+                            iconTint = Color(0xFF10B981),
+                            title = "GIS GeoJSON (RFC 7946)",
+                            description = "Survey Points & Route LineString for QGIS, ArcGIS & Web GIS",
+                            onClick = {
+                                sessionToExportGeoJson = session
+                                sessionForExportMenu = null
+                                geoJsonLauncher.launch("${cleanName}_${session.id}.geojson")
+                            }
+                        )
+                        ExportOptionItem(
+                            icon = Icons.Default.FolderZip,
+                            iconTint = Color(0xFFA855F7),
+                            title = "MapInfo Interchange (MIF/MID ZIP)",
+                            description = "Packaged ZIP with .mif/.mid for Forsk Atoll & InfoVista Planet",
+                            onClick = {
+                                sessionToExportMapInfo = session
+                                sessionForExportMenu = null
+                                mapInfoLauncher.launch("${cleanName}_${session.id}_mapinfo.zip")
+                            }
+                        )
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { sessionForExportMenu = null }) {
+                        Text("CANCEL", color = Color(0xFF94A3B8))
+                    }
+                },
+                containerColor = Color(0xFF1E293B)
+            )
+        }
     }
 }
 
 @Composable
 fun SessionItemCard(
     session: DriveTestSession,
-    onExportKmz: () -> Unit,
-    onExportCsv: () -> Unit,
+    onExport: () -> Unit,
     onViewMap: () -> Unit,
     onAnalyze: () -> Unit,
     onRename: () -> Unit,
@@ -752,26 +887,16 @@ fun SessionItemCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = onExportKmz,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF14B8A6)),
-                    border = BorderStroke(1.dp, Color(0xFF14B8A6).copy(alpha = 0.5f)),
+                Button(
+                    onClick = onExport,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.3f)
                 ) {
-                    Text("💾 KMZ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-
-                OutlinedButton(
-                    onClick = onExportCsv,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF59E0B)),
-                    border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("📊 CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("EXPORT...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -799,6 +924,45 @@ fun SessionItemCard(
                     Spacer(modifier = Modifier.width(3.dp))
                     Text("AI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExportOptionItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = Color(0xFF0F172A),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, Color(0xFF334155)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                color = iconTint.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(description, color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp)
             }
         }
     }

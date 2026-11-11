@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -38,6 +40,7 @@ import com.drivetest.lte5g.ai.GeminiRfAdvisor
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.data.analytics.*
 import com.drivetest.lte5g.model.DriveTestSession
+import com.drivetest.lte5g.export.PdfReportExporter
 import com.drivetest.lte5g.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -80,6 +83,22 @@ fun AnalyticsScreen(
     var showSessionPicker by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf(0) } // 0: All, 1: Coverage, 2: Interference, 3: Mobility
 
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri != null && currentSession != null && analytics != null) {
+            try {
+                val aiReport = if (geminiState is GeminiAdvisorState.Success) (geminiState as GeminiAdvisorState.Success).report else null
+                context.contentResolver.openOutputStream(uri)?.use { os ->
+                    PdfReportExporter.exportPdfReport(currentSession, analytics, aiReport, os)
+                }
+                Toast.makeText(context, "PDF Report exported successfully!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to export PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,6 +118,18 @@ fun AnalyticsScreen(
                     }
                 },
                 actions = {
+                    if (currentSession != null && analytics != null && analytics.totalSamples > 0) {
+                        IconButton(onClick = {
+                            val cleanName = currentSession.name.replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "drivetest_${currentSession.id}" }
+                            pdfLauncher.launch("${cleanName}_${currentSession.id}_acceptance.pdf")
+                        }) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = "Export PDF Report",
+                                tint = TelemetryCyan
+                            )
+                        }
+                    }
                     IconButton(onClick = { showSessionPicker = true }) {
                         Icon(
                             Icons.AutoMirrored.Filled.List,
@@ -152,7 +183,13 @@ fun AnalyticsScreen(
 
                 // 1. ROUTE HEALTH SCORE & SUMMARY CARD
                 item {
-                    RouteHealthCard(analytics = analytics)
+                    RouteHealthCard(
+                        analytics = analytics,
+                        onExportPdf = {
+                            val cleanName = currentSession.name.replace(Regex("[^a-zA-Z0-9_-]"), "_").ifBlank { "drivetest_${currentSession.id}" }
+                            pdfLauncher.launch("${cleanName}_${currentSession.id}_acceptance.pdf")
+                        }
+                    )
                 }
 
                 // 2. GEMINI AI RF OPTIMIZATION ADVISOR CARD
@@ -340,7 +377,10 @@ private fun SessionPickerItem(
 }
 
 @Composable
-private fun RouteHealthCard(analytics: RfSessionAnalytics) {
+private fun RouteHealthCard(
+    analytics: RfSessionAnalytics,
+    onExportPdf: (() -> Unit)? = null
+) {
     Card(
         colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
         border = BorderStroke(1.dp, TelemetryCardStroke),
@@ -424,6 +464,22 @@ private fun RouteHealthCard(analytics: RfSessionAnalytics) {
                     color = TelemetryCyan,
                     fontFamily = FontFamily.Monospace
                 )
+            }
+
+            if (onExportPdf != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onExportPdf,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("EXPORT PDF ACCEPTANCE REPORT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
     }
