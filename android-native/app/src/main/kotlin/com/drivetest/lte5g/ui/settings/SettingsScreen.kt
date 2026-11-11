@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.BuildConfig
+import com.drivetest.lte5g.ai.GeminiRfAdvisor
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
@@ -97,12 +98,12 @@ fun SettingsScreen(
             null
         }
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.11.0"
+    val currentVersionName = packageInfo?.versionName ?: "1.11.1"
     val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 37
+        packageInfo?.longVersionCode?.toInt() ?: 38
     } else {
         @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 37
+        packageInfo?.versionCode ?: 38
     }
 
     Column(
@@ -968,12 +969,12 @@ fun SettingsScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                SettingItem(title = "AI Model", value = "gemini-3.8-flash")
+                SettingItem(title = "AI Model", value = GeminiRfAdvisor.MODEL_NAME)
                 SettingItem(title = "API Key Source", value = "local.properties (Compile-time Injected)")
                 SettingItem(title = "RF Heuristic Engine", value = "CDF, Problem Detection & Handover Analysis")
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "ระบบจะส่งข้อมูลสรุปสถิติ Telemetry ไปยัง Gemini 3.8 Flash เพื่อวิเคราะห์ Root Cause และสร้างคำแนะนำปรับแต่งโครงข่าย (Tilt, Power, HO Margin)",
+                    text = "ระบบจะส่งข้อมูลสรุปสถิติ Telemetry ไปยัง ${GeminiRfAdvisor.MODEL_NAME} เพื่อวิเคราะห์ Root Cause และสร้างคำแนะนำปรับแต่งโครงข่าย (Tilt, Power, HO Margin)",
                     fontSize = 11.sp,
                     color = Color(0xFF94A3B8),
                     lineHeight = 15.sp

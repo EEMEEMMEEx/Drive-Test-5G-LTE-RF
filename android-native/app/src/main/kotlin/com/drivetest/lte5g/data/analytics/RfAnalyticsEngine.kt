@@ -348,7 +348,7 @@ object RfAnalyticsEngine {
             rsrpObj.put("p90_dbm", cdf.p90)
             rsrpObj.put("min_dbm", cdf.min)
             rsrpObj.put("max_dbm", cdf.max)
-            rsrpObj.put("avg_dbm", String.format("%.1f", cdf.avg).toDoubleOrNull() ?: cdf.avg)
+            rsrpObj.put("avg_dbm", String.format(java.util.Locale.US, "%.1f", cdf.avg).toDoubleOrNull() ?: cdf.avg)
             root.put("rsrp_statistics", rsrpObj)
         }
 
@@ -357,7 +357,7 @@ object RfAnalyticsEngine {
             sinrObj.put("p10_db", cdf.p10)
             sinrObj.put("p50_median_db", cdf.p50)
             sinrObj.put("p90_db", cdf.p90)
-            sinrObj.put("avg_db", String.format("%.1f", cdf.avg).toDoubleOrNull() ?: cdf.avg)
+            sinrObj.put("avg_db", String.format(java.util.Locale.US, "%.1f", cdf.avg).toDoubleOrNull() ?: cdf.avg)
             root.put("sinr_statistics", sinrObj)
         }
 

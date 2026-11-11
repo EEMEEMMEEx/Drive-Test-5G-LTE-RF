@@ -204,4 +204,31 @@ class RfAnalyticsEngineTest {
         assertTrue(json.has("rsrp_statistics"))
         assertTrue(json.has("mobility_summary"))
     }
+
+    @Test
+    fun buildGeminiPromptPayload_localeWithComma_preservesValidJsonNumbers() {
+        val originalLocale = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.GERMANY)
+            val samples = listOf(
+                createSample(1, 1000L, rsrp = -83, sinr = 14.5),
+                createSample(2, 2000L, rsrp = -87, sinr = 11.2)
+            )
+            val session = DriveTestSession(
+                id = 12345,
+                name = "German Locale Route",
+                startTime = 1000L,
+                endTime = 2000L,
+                samples = samples
+            )
+            val analytics = RfAnalyticsEngine.analyze(session)
+            val payloadStr = RfAnalyticsEngine.buildGeminiPromptPayload(session, analytics)
+
+            val json = JSONObject(payloadStr)
+            val rsrpStats = json.getJSONObject("rsrp_statistics")
+            assertTrue(rsrpStats.getDouble("avg_dbm") < 0)
+        } finally {
+            java.util.Locale.setDefault(originalLocale)
+        }
+    }
 }

@@ -24,7 +24,7 @@ sealed interface GeminiAdvisorState {
 
 object GeminiRfAdvisor {
     private const val TAG = "GeminiRfAdvisor"
-    private const val MODEL_NAME = "gemini-3.8-flash"
+    const val MODEL_NAME = "gemini-3.5-flash"
     private const val ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent"
 
     private val _state = MutableStateFlow<GeminiAdvisorState>(GeminiAdvisorState.Idle)
@@ -50,7 +50,7 @@ object GeminiRfAdvisor {
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 30_000
-                    readTimeout = 60_000
+                    readTimeout = 90_000
                     doInput = true
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=UTF-8")
@@ -78,7 +78,12 @@ object GeminiRfAdvisor {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Gemini request failed", e)
-                val msg = "การเชื่อมต่อล้มเหลว: ${e.localizedMessage ?: e.message}"
+                val rawMsg = e.localizedMessage ?: e.message ?: "Unknown error"
+                val msg = when (e) {
+                    is java.net.SocketTimeoutException -> "การเชื่อมต่อหมดเวลา (Timeout) โปรดลองใหม่อีกครั้ง"
+                    is java.net.UnknownHostException -> "ไม่สามารถเชื่อมต่ออินเทอร์เน็ตได้ กรุณาตรวจสอบการเชื่อมต่อ"
+                    else -> "การเชื่อมต่อล้มเหลว: $rawMsg"
+                }
                 _state.value = GeminiAdvisorState.Error(msg)
                 Result.failure(e)
             }

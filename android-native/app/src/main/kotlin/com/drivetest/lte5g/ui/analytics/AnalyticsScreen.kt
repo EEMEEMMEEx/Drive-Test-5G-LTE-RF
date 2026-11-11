@@ -11,9 +11,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -227,40 +229,100 @@ fun AnalyticsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val totalCount = analytics.problemAreas.size + analytics.mobilityEvents.size
+                        val coverageCount = analytics.problemAreas.count { it.type == RfProblemType.COVERAGE_HOLE }
+                        val interferenceCount = analytics.problemAreas.count {
+                            it.type == RfProblemType.PILOT_POLLUTION_INTERFERENCE ||
+                            it.type == RfProblemType.WEAK_DOMINANCE ||
+                            it.type == RfProblemType.OVERSHOOTING
+                        }
+                        val handoverCount = analytics.mobilityEvents.size
+
                         FilterChip(
                             selected = selectedFilter == 0,
                             onClick = { selectedFilter = 0 },
-                            label = { Text("All (${analytics.problemAreas.size + analytics.mobilityEvents.size})", fontSize = 11.sp) }
+                            label = { Text("All ($totalCount)", fontSize = 12.sp, maxLines = 1, softWrap = false) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1E3A8A),
+                                selectedLabelColor = Color(0xFF93C5FD),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = Color(0xFF94A3B8)
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == 0,
+                                borderColor = Color(0xFF334155),
+                                selectedBorderColor = Color(0xFF3B82F6)
+                            )
                         )
                         FilterChip(
                             selected = selectedFilter == 1,
                             onClick = { selectedFilter = 1 },
-                            label = {
-                                Text("Coverage (${analytics.problemAreas.count { it.type == RfProblemType.COVERAGE_HOLE }})", fontSize = 11.sp)
-                            }
+                            label = { Text("Coverage ($coverageCount)", fontSize = 12.sp, maxLines = 1, softWrap = false) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1E3A8A),
+                                selectedLabelColor = Color(0xFF93C5FD),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = Color(0xFF94A3B8)
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == 1,
+                                borderColor = Color(0xFF334155),
+                                selectedBorderColor = Color(0xFF3B82F6)
+                            )
                         )
                         FilterChip(
                             selected = selectedFilter == 2,
                             onClick = { selectedFilter = 2 },
-                            label = {
-                                Text("Interference (${analytics.problemAreas.count { it.type == RfProblemType.PILOT_POLLUTION_INTERFERENCE }})", fontSize = 11.sp)
-                            }
+                            label = { Text("Interference ($interferenceCount)", fontSize = 12.sp, maxLines = 1, softWrap = false) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1E3A8A),
+                                selectedLabelColor = Color(0xFF93C5FD),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = Color(0xFF94A3B8)
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == 2,
+                                borderColor = Color(0xFF334155),
+                                selectedBorderColor = Color(0xFF3B82F6)
+                            )
                         )
                         FilterChip(
                             selected = selectedFilter == 3,
                             onClick = { selectedFilter = 3 },
-                            label = { Text("Handover (${analytics.mobilityEvents.size})", fontSize = 11.sp) }
+                            label = { Text("Handover ($handoverCount)", fontSize = 12.sp, maxLines = 1, softWrap = false) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF1E3A8A),
+                                selectedLabelColor = Color(0xFF93C5FD),
+                                containerColor = Color(0xFF0F172A),
+                                labelColor = Color(0xFF94A3B8)
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == 3,
+                                borderColor = Color(0xFF334155),
+                                selectedBorderColor = Color(0xFF3B82F6)
+                            )
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
                 }
 
                 // 5. PROBLEM AREAS / MOBILITY ITEMS LIST
                 val filteredProblems = when (selectedFilter) {
                     1 -> analytics.problemAreas.filter { it.type == RfProblemType.COVERAGE_HOLE }
-                    2 -> analytics.problemAreas.filter { it.type == RfProblemType.PILOT_POLLUTION_INTERFERENCE }
+                    2 -> analytics.problemAreas.filter {
+                        it.type == RfProblemType.PILOT_POLLUTION_INTERFERENCE ||
+                        it.type == RfProblemType.WEAK_DOMINANCE ||
+                        it.type == RfProblemType.OVERSHOOTING
+                    }
                     3 -> emptyList()
                     else -> analytics.problemAreas
                 }
@@ -531,8 +593,9 @@ private fun GeminiAdvisorCard(
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "gemini-3.8-flash",
+                        text = GeminiRfAdvisor.MODEL_NAME,
                         fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
                         color = Color(0xFF93C5FD),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
@@ -577,7 +640,7 @@ private fun GeminiAdvisorCard(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "กำลังส่งข้อมูลวิเคราะห์ผ่าน Gemini 3.8 Flash...",
+                            text = "กำลังส่งข้อมูลวิเคราะห์ผ่าน ${GeminiRfAdvisor.MODEL_NAME}...",
                             color = Color(0xFF93C5FD),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
@@ -645,14 +708,31 @@ private fun GeminiAdvisorCard(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Button(
                         onClick = onAnalyzeClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2563EB),
+                            contentColor = Color.White
+                        ),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
                     ) {
-                        Text("ลองใหม่อีกครั้ง", fontSize = 12.sp)
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "ลองใหม่อีกครั้ง",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }
@@ -804,20 +884,66 @@ private fun ProblemAreaCard(problem: RfProblemArea) {
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = problem.description,
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Color(0xFFCBD5E1),
                     lineHeight = 15.sp
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${problem.metricSummary} · ${String.format("%.5f, %.5f", problem.latitude, problem.longitude)}",
-                    fontSize = 10.sp,
-                    color = Color(0xFF64748B),
-                    fontFamily = FontFamily.Monospace
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    color = Color(0xFF0B1220),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.QueryStats,
+                                contentDescription = null,
+                                tint = TelemetryCyan,
+                                modifier = Modifier
+                                    .size(13.dp)
+                                    .padding(top = 1.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = problem.metricSummary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TelemetryCyan,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 15.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.Place,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = String.format(Locale.US, "%.5f, %.5f", problem.latitude, problem.longitude),
+                                fontSize = 10.5.sp,
+                                color = Color(0xFF94A3B8),
+                                fontFamily = FontFamily.Monospace,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -865,14 +991,15 @@ private fun MobilityEventCard(event: MobilityEvent) {
                     Text(
                         text = formatTime(event.timestamp),
                         fontSize = 10.sp,
-                        color = Color(0xFF64748B)
+                        color = Color(0xFF94A3B8)
                     )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = event.details,
                     fontSize = 11.sp,
-                    color = Color(0xFFCBD5E1)
+                    color = Color(0xFFE2E8F0),
+                    lineHeight = 15.sp
                 )
             }
         }

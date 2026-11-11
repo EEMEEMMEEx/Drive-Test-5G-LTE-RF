@@ -22,4 +22,9 @@ class GeminiRfAdvisorTest {
         GeminiRfAdvisor.reset()
         assertTrue(GeminiRfAdvisor.state.value is GeminiAdvisorState.Idle)
     }
+
+    @Test
+    fun modelName_isGemini35Flash() {
+        assertEquals("gemini-3.5-flash", GeminiRfAdvisor.MODEL_NAME)
+    }
 }
