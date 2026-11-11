@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "drivetest-noc",
+  "compatibility_date": "2026-10-12",
+  "account_id": "60355536714e27ee2e51aca4ba6ecc8a",
+  "assets": {
+    "directory": "./noc-dashboard"
+  }
+}
