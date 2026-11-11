@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
@@ -33,6 +34,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.ai.GeminiAdvisorState
 import com.drivetest.lte5g.ai.GeminiRfAdvisor
+import com.drivetest.lte5g.cloud.CloudConfigRepository
+import com.drivetest.lte5g.cloud.CloudUploadStatus
+import com.drivetest.lte5g.cloud.GoogleDriveAutoUploader
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.data.analytics.RfAnalyticsEngine
 import com.drivetest.lte5g.export.GisExporter
@@ -45,6 +49,8 @@ import com.drivetest.lte5g.ui.dashboard.getRsrpColor
 import com.drivetest.lte5g.ui.dashboard.sim2RsrpColor
 import com.drivetest.lte5g.ui.map.dualSimBenchmarkComparison
 import com.drivetest.lte5g.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -61,6 +67,8 @@ fun SessionsScreen(
     val measurementCadence by DriveTestForegroundService.measurementCadence.collectAsStateWithLifecycle()
     val activeSession by SessionRepository.activeSession.collectAsStateWithLifecycle()
     val allSessions by SessionRepository.sessions.collectAsStateWithLifecycle()
+    val sessionStatuses by CloudConfigRepository.sessionStatuses.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     var sessionToExportKmz by remember { mutableStateOf<DriveTestSession?>(null) }
     var sessionToExportCsv by remember { mutableStateOf<DriveTestSession?>(null) }
@@ -408,6 +416,7 @@ fun SessionsScreen(
             completedSessions.forEach { session ->
                 SessionItemCard(
                     session = session,
+                    cloudStatus = sessionStatuses[session.id] ?: CloudUploadStatus.NONE,
                     onExport = {
                         sessionForExportMenu = session
                     },
@@ -639,6 +648,22 @@ fun SessionsScreen(
                                 mapInfoLauncher.launch("${cleanName}_${session.id}_mapinfo.zip")
                             }
                         )
+                        HorizontalDivider(color = Color(0xFF334155), thickness = 0.8.dp)
+                        ExportOptionItem(
+                            icon = Icons.Default.CloudUpload,
+                            iconTint = Color(0xFF38BDF8),
+                            title = "Upload All 5 Formats to Google Drive",
+                            description = "Bundle KMZ, CSV, GeoJSON, MapInfo & PDF and upload to Cloud now",
+                            onClick = {
+                                sessionForExportMenu = null
+                                Toast.makeText(context, "กำลังเตรียมชุดไฟล์และอัปโหลดขึ้น Google Drive...", Toast.LENGTH_SHORT).show()
+                                GoogleDriveAutoUploader.uploadSessionAsync(session) { success, msg ->
+                                    scope.launch(Dispatchers.Main) {
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                        )
                     }
                 },
                 confirmButton = {},
@@ -656,6 +681,7 @@ fun SessionsScreen(
 @Composable
 fun SessionItemCard(
     session: DriveTestSession,
+    cloudStatus: CloudUploadStatus = CloudUploadStatus.NONE,
     onExport: () -> Unit,
     onViewMap: () -> Unit,
     onAnalyze: () -> Unit,
@@ -750,6 +776,39 @@ fun SessionItemCard(
                     fontSize = 11.sp,
                     color = Color(0xFFCBD5E1)
                 )
+
+                if (cloudStatus != CloudUploadStatus.NONE) {
+                    Surface(
+                        color = when (cloudStatus) {
+                            CloudUploadStatus.UPLOADED -> Color(0xFF065F46)
+                            CloudUploadStatus.UPLOADING -> Color(0xFF0369A1)
+                            CloudUploadStatus.PENDING_WIFI -> Color(0xFF78350F)
+                            CloudUploadStatus.FAILED -> Color(0xFF7F1D1D)
+                            else -> Color.Transparent
+                        },
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = when (cloudStatus) {
+                                CloudUploadStatus.UPLOADED -> "☁️ UPLOADED"
+                                CloudUploadStatus.UPLOADING -> "🔄 UPLOADING..."
+                                CloudUploadStatus.PENDING_WIFI -> "⏳ WAITING WI-FI"
+                                CloudUploadStatus.FAILED -> "⚠️ FAILED"
+                                else -> ""
+                            },
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = when (cloudStatus) {
+                                CloudUploadStatus.UPLOADED -> Color(0xFFA7F3D0)
+                                CloudUploadStatus.UPLOADING -> Color(0xFFBAE6FD)
+                                CloudUploadStatus.PENDING_WIFI -> Color(0xFFFDE68A)
+                                CloudUploadStatus.FAILED -> Color(0xFFFCA5A5)
+                                else -> Color.White
+                            },
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
                 session.avgRsrp?.let { rsrp ->
                     Spacer(modifier = Modifier.weight(1f))

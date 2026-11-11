@@ -13,6 +13,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.drivetest.lte5g.MainActivity
+import com.drivetest.lte5g.cloud.CloudTelemetrySyncManager
+import com.drivetest.lte5g.cloud.GoogleDriveAutoUploader
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.location.LocationCollector
 import com.drivetest.lte5g.model.CellMetrics
@@ -47,6 +49,8 @@ class DriveTestForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         SessionRepository.initStorage(applicationContext)
+        CloudTelemetrySyncManager.init(applicationContext)
+        GoogleDriveAutoUploader.init(applicationContext)
         createNotificationChannel()
 
         // Navigation Live Updates (Google Maps Architecture) uses native CATEGORY_NAVIGATION
@@ -331,9 +335,13 @@ class DriveTestForegroundService : Service() {
                     )
                     _latestSample.value = sample
                     SessionRepository.addSample(sample)
-                    val currentSamples = SessionRepository.activeSession.value?.samples ?: emptyList()
+                    val currentSession = SessionRepository.activeSession.value
+                    val currentSamples = currentSession?.samples ?: emptyList()
                     _samplesList.value = currentSamples
 
+                    if (currentSession != null) {
+                        CloudTelemetrySyncManager.enqueueSample(currentSession, sample)
+                    }
                 }
                 updateNotification()
             }
@@ -344,7 +352,13 @@ class DriveTestForegroundService : Service() {
         collectionJob?.cancel()
         collectionJob = null
         locationCollector.stopTracking()
+        val sessionToFinish = SessionRepository.activeSession.value
         SessionRepository.finishCurrentSession()
+        if (sessionToFinish != null) {
+            val finalized = SessionRepository.sessions.value.firstOrNull { it.id == sessionToFinish.id } ?: sessionToFinish
+            CloudTelemetrySyncManager.markSessionStopped()
+            GoogleDriveAutoUploader.enqueueSessionForWifiUpload(finalized)
+        }
         _isRecording.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)
     }

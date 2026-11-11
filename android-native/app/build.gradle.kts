@@ -24,8 +24,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 39
-    versionName = "1.11.2"
+    versionCode = 40
+    versionName = "1.12.0"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
   }

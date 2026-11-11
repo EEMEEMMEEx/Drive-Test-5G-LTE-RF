@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOC Fleet Telemetry & Live Map — Drive Test LTE/5G</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top NOC Navigation Bar -->
+    <header class="noc-header">
+      <div class="brand">
+        <div class="radar-pulse"></div>
+        <div>
+          <h1>DRIVE TEST LTE / 5G</h1>
+          <span class="sub-brand">NOC REAL-TIME FLEET TELEMETRY CONSOLE v1.12.0</span>
+        </div>
+      </div>
+
+      <!-- Live KPI Badges -->
+      <div class="kpi-group">
+        <div class="kpi-card">
+          <span class="kpi-label">ACTIVE FLEET</span>
+          <span class="kpi-value text-cyan" id="kpi-active-count">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">TOTAL SAMPLES</span>
+          <span class="kpi-value text-emerald" id="kpi-sample-count">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">ANOMALIES</span>
+          <span class="kpi-value text-rose" id="kpi-alert-count">0</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">SYNC SOURCE</span>
+          <span class="kpi-value" id="kpi-sync-mode">DEMO MODE</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="header-actions">
+        <button id="btn-toggle-demo" class="btn btn-secondary">
+          <span class="dot-indicator dot-active"></span>
+          <span>SIMULATOR ACTIVE</span>
+        </button>
+        <button id="btn-firebase-modal" class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          <span>FIREBASE SYNC</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main NOC Workspace -->
+    <main class="noc-workspace">
+      <!-- Left Panel: Fleet Roster -->
+      <aside class="panel panel-left">
+        <div class="panel-header">
+          <h2>FLEET ROSTER</h2>
+          <span class="badge" id="roster-badge">0 VEHICLES</span>
+        </div>
+        <div class="vehicle-list" id="vehicle-list">
+          <div class="empty-state">No vehicles online. Start demo simulator or configure Firebase.</div>
+        </div>
+
+        <div class="rsrp-legend">
+          <div class="legend-title">RSRP SIGNAL TIERS (3GPP / ITU-R)</div>
+          <div class="legend-scale">
+            <div class="scale-item"><span class="swatch bg-tier1"></span> ≥ -80 dBm (Excellent)</div>
+            <div class="scale-item"><span class="swatch bg-tier2"></span> -80 to -90 dBm (Good)</div>
+            <div class="scale-item"><span class="swatch bg-tier3"></span> -90 to -100 dBm (Fair)</div>
+            <div class="scale-item"><span class="swatch bg-tier4"></span> -100 to -110 dBm (Poor)</div>
+            <div class="scale-item"><span class="swatch bg-tier5"></span> < -110 dBm (Coverage Hole)</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Fullscreen Dark GIS Map -->
+      <section class="map-container">
+        <div id="map"></div>
+        <div class="map-controls">
+          <button id="btn-center-fleet" class="map-btn" title="Fit all fleet vehicles">🎯 FIT ALL</button>
+          <button id="btn-clear-trails" class="map-btn" title="Clear breadcrumb trails">🧹 CLEAR TRAILS</button>
+        </div>
+      </section>
+
+      <!-- Right Panel: Dual-SIM Telemetry & Anomaly Alerts -->
+      <aside class="panel panel-right">
+        <!-- Dual SIM Inspector -->
+        <div class="panel-header">
+          <h2>DUAL-SIM RF INSPECTOR</h2>
+          <span class="badge badge-cyan" id="inspector-vehicle-badge">SELECT VEHICLE</span>
+        </div>
+
+        <div class="inspector-card" id="inspector-card">
+          <div class="sim-comparison">
+            <!-- SIM 1 Primary -->
+            <div class="sim-column">
+              <div class="sim-header">
+                <span class="sim-chip sim-1">SIM 1 (PRIMARY)</span>
+                <span class="sim-op" id="sim1-op">AIS 5G</span>
+              </div>
+              <div class="sim-metric-row">
+                <span class="lbl">RAT / Band</span>
+                <span class="val text-cyan" id="sim1-rat">NR_SA (n78)</span>
+              </div>
+              <div class="sim-metric-row">
+                <span class="lbl">PCI / NCI</span>
+                <span class="val" id="sim1-pci">420 / 6543210</span>
+              </div>
+              <div class="sim-gauge">
+                <div class="gauge-labels">
+                  <span>RSRP</span>
+                  <span class="gauge-val" id="sim1-rsrp">-84 dBm</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill bg-tier2" id="sim1-rsrp-bar" style="width: 75%"></div></div>
+              </div>
+              <div class="sim-gauge">
+                <div class="gauge-labels">
+                  <span>SINR</span>
+                  <span class="gauge-val" id="sim1-sinr">16.5 dB</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill bg-cyan" id="sim1-sinr-bar" style="width: 70%"></div></div>
+              </div>
+            </div>
+
+            <!-- SIM 2 Secondary -->
+            <div class="sim-column">
+              <div class="sim-header">
+                <span class="sim-chip sim-2">SIM 2 (BENCHMARK)</span>
+                <span class="sim-op" id="sim2-op">TRUE-H</span>
+              </div>
+              <div class="sim-metric-row">
+                <span class="lbl">RAT / Band</span>
+                <span class="val text-amber" id="sim2-rat">LTE (B3)</span>
+              </div>
+              <div class="sim-metric-row">
+                <span class="lbl">PCI / Cell ID</span>
+                <span class="val" id="sim2-pci">144 / 987654</span>
+              </div>
+              <div class="sim-gauge">
+                <div class="gauge-labels">
+                  <span>RSRP</span>
+                  <span class="gauge-val" id="sim2-rsrp">-91 dBm</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill bg-tier3" id="sim2-rsrp-bar" style="width: 55%"></div></div>
+              </div>
+              <div class="sim-gauge">
+                <div class="gauge-labels">
+                  <span>SINR</span>
+                  <span class="gauge-val" id="sim2-sinr">9.0 dB</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill bg-amber" id="sim2-sinr-bar" style="width: 50%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Benchmark Delta -->
+          <div class="delta-box" id="delta-box">
+            <span class="delta-title">RSRP ADVANTAGE:</span>
+            <span class="delta-value text-emerald" id="delta-val">SIM 1 +7.0 dB</span>
+          </div>
+        </div>
+
+        <!-- Anomaly Alert Feed -->
+        <div class="panel-header alerts-header">
+          <h2>LIVE RF ANOMALIES</h2>
+          <span class="badge badge-rose" id="alerts-count-badge">0 ALERTS</span>
+        </div>
+        <div class="alerts-feed" id="alerts-feed">
+          <div class="empty-state">No active anomalies detected in current fleet route.</div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Firebase Connection Modal -->
+    <div class="modal-overlay" id="firebase-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>CONNECT FIREBASE REALTIME DATABASE</h3>
+          <button class="btn-close" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Enter your Firebase Realtime Database URL to stream live telemetries directly from field drive test vehicles into this NOC Console.
+          </p>
+          <div class="form-group">
+            <label>Firebase Database URL</label>
+            <input type="text" id="input-fb-url" placeholder="https://<project-id>-default-rtdb.asia-southeast1.firebasedatabase.app" />
+          </div>
+          <div class="form-group">
+            <label>Database Secret / Auth Token (Optional)</label>
+            <input type="password" id="input-fb-token" placeholder="Leave empty for public read or authenticated sessions" />
+          </div>
+          <div id="fb-connection-status" class="status-msg"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="btn-cancel-fb">CANCEL</button>
+          <button class="btn btn-primary" id="btn-connect-fb">CONNECT LIVE STREAM</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
