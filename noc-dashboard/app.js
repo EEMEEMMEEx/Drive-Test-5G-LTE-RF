@@ -43,11 +43,11 @@ function initMap() {
     zoomControl: true
   });
 
-  // CartoDB Dark Matter Tiles (High performance, dark NOC styling)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+  // OpenStreetMap with Dark NOC Styling (100% Free, No Watermark, No API Key Required)
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
-    subdomains: 'abcd'
+    className: 'dark-noc-tile'
   }).addTo(map);
 }
 
@@ -234,14 +234,14 @@ function renderInspector(d) {
   bar1.style.width = `${rsrpPercent1}%`;
   bar1.style.backgroundColor = getRsrpColor(rsrp1);
 
-  const sinr1 = d.sinr !== undefined ? d.sinr : 15.0;
-  document.getElementById('sim1-sinr').textContent = `${sinr1} dB`;
+  const sinr1 = d.sinr !== undefined ? Number(d.sinr) : 15.0;
+  document.getElementById('sim1-sinr').textContent = `${sinr1.toFixed(1)} dB`;
   const sinrPercent1 = Math.max(5, Math.min(100, Math.round(((sinr1 + 10) / 40) * 100)));
   document.getElementById('sim1-sinr-bar').style.width = `${sinrPercent1}%`;
 
   // SIM 2 (Secondary)
-  const sim2Rsrp = d.sim2Rsrp !== undefined ? d.sim2Rsrp : (rsrp1 - 6);
-  const sim2Sinr = d.sim2Sinr !== undefined ? d.sim2Sinr : (sinr1 - 4.5);
+  const sim2Rsrp = d.sim2Rsrp !== undefined ? Math.round(d.sim2Rsrp) : (rsrp1 - 6);
+  const sim2Sinr = d.sim2Sinr !== undefined ? Number(d.sim2Sinr) : (sinr1 - 4.5);
   document.getElementById('sim2-op').textContent = d.sim2Operator || 'TRUE-H';
   document.getElementById('sim2-rat').textContent = `${d.sim2Rat || 'LTE'} (${d.sim2Band || 'B3'})`;
   document.getElementById('sim2-pci').textContent = `${d.sim2Pci || '144'}`;
@@ -253,7 +253,7 @@ function renderInspector(d) {
   bar2.style.width = `${rsrpPercent2}%`;
   bar2.style.backgroundColor = getRsrpColor(sim2Rsrp);
 
-  document.getElementById('sim2-sinr').textContent = `${sim2Sinr} dB`;
+  document.getElementById('sim2-sinr').textContent = `${sim2Sinr.toFixed(1)} dB`;
   const sinrPercent2 = Math.max(5, Math.min(100, Math.round(((sim2Sinr + 10) / 40) * 100)));
   document.getElementById('sim2-sinr-bar').style.width = `${sinrPercent2}%`;
 

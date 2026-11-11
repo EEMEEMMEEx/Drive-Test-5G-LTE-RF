@@ -384,6 +384,11 @@ body {
   height: 100%;
 }
 
+/* High-performance Dark NOC Tile Filter: 100% Free OpenStreetMap with zero API Key and zero Watermark */
+.dark-noc-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(82%) contrast(95%);
+}
+
 .map-controls {
   position: absolute;
   top: 16px;

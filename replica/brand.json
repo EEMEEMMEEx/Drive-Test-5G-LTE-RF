@@ -1,7 +1,0 @@
-{
-  "name": "RF Field Suite",
-  "avoid": ["com.drivetest.app"],
-  "domains": ["gsmfieldsuite.example.com"],
-  "colors": []
-}
-
