@@ -158,14 +158,14 @@ function renderVehicleRoster() {
   const countEl = document.getElementById('roster-badge');
   const kpiActive = document.getElementById('kpi-active-count');
 
-  countEl.textContent = `${state.vehicles.size} VEHICLES`;
+  countEl.textContent = `${state.vehicles.size} ACTIVE`;
   kpiActive.textContent = state.vehicles.size;
 
   if (state.vehicles.size === 0) {
     listEl.innerHTML = `
       <div class="empty-state" style="padding: 24px 12px; text-align: center;">
         <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
-        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">FIREBASE CONNECTED</div>
+        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">WAITING FOR FIELD VEHICLES</div>
         <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
           เชื่อมต่อฐานข้อมูลสำเร็จ!<br>
           กำลังรอรับข้อมูลจากรถทดสอบภาคสนาม...<br>
@@ -180,18 +180,17 @@ function renderVehicleRoster() {
   state.vehicles.forEach((entry, vId) => {
     const d = entry.data;
     const isSelected = state.selectedVehicleId === vId;
-    const isRecording = d.isRecording !== false;
     const rsrpColor = getRsrpColor(d.rsrp);
 
     html += `
       <div class="vehicle-card ${isSelected ? 'selected' : ''}" onclick="selectVehicle('${vId}')">
         <div class="veh-top">
           <span class="veh-id">${d.vehicleId}</span>
-          <span class="veh-status ${isRecording ? 'status-recording' : 'status-idle'}">
-            ${isRecording ? '● STREAMING' : 'IDLE'}
+          <span class="veh-status status-recording">
+            ● STREAMING
           </span>
         </div>
-        <div class="veh-name">${d.vehicleName || 'Field Drive Unit'}</div>
+        <div class="veh-name">${d.operator || 'Field Unit'} • ${d.rat || '5G/LTE'}</div>
         <div class="veh-metrics-row">
           <div class="veh-metrics-item">
             <span class="lbl">RAT / BAND</span>
@@ -222,6 +221,51 @@ function selectVehicle(vehicleId) {
   if (entry) {
     renderInspector(entry.data);
     map.panTo([entry.data.lat, entry.data.lon]);
+  }
+}
+
+// Reset Dual-SIM Inspector
+function resetInspector() {
+  document.getElementById('sim1-op').textContent = '—';
+  document.getElementById('sim1-rat').textContent = '—';
+  document.getElementById('sim1-pci').textContent = '—';
+  document.getElementById('sim1-rsrp').textContent = '— dBm';
+  document.getElementById('sim1-rsrp').style.color = '#94a3b8';
+  document.getElementById('sim1-rsrp-bar').style.width = '0%';
+  document.getElementById('sim1-sinr').textContent = '— dB';
+  document.getElementById('sim1-sinr-bar').style.width = '0%';
+
+  document.getElementById('sim2-op').textContent = '—';
+  document.getElementById('sim2-rat').textContent = '—';
+  document.getElementById('sim2-pci').textContent = '—';
+  document.getElementById('sim2-rsrp').textContent = '— dBm';
+  document.getElementById('sim2-rsrp').style.color = '#94a3b8';
+  document.getElementById('sim2-rsrp-bar').style.width = '0%';
+  document.getElementById('sim2-sinr').textContent = '— dB';
+  document.getElementById('sim2-sinr-bar').style.width = '0%';
+
+  const deltaEl = document.getElementById('delta-val');
+  deltaEl.textContent = '—';
+  deltaEl.className = 'delta-value text-slate';
+}
+
+// Remove Single Vehicle From Map & State
+function removeVehicle(vId) {
+  const entry = state.vehicles.get(vId);
+  if (!entry) return;
+  if (entry.marker) map.removeLayer(entry.marker);
+  if (entry.polyline) map.removeLayer(entry.polyline);
+  state.vehicles.delete(vId);
+
+  if (state.selectedVehicleId === vId) {
+    state.selectedVehicleId = null;
+    const remaining = Array.from(state.vehicles.keys());
+    if (remaining.length > 0) {
+      selectVehicle(remaining[0]);
+    } else {
+      document.getElementById('inspector-vehicle-badge').textContent = 'NO ACTIVE FLEET';
+      resetInspector();
+    }
   }
 }
 
@@ -374,6 +418,52 @@ function clearFleet() {
   document.getElementById('inspector-vehicle-badge').textContent = 'WAITING FOR DATA';
   document.getElementById('alerts-feed').innerHTML = '<div class="empty-state">No active anomalies detected in current fleet route.</div>';
   renderVehicleRoster();
+  resetInspector();
+}
+
+// Sync Live Fleet (Strict filter: Only actively recording vehicles with fresh heartbeat)
+function syncLiveFleet(liveData) {
+  if (!liveData || typeof liveData !== 'object' || liveData.error) {
+    clearFleet();
+    return;
+  }
+
+  const now = Date.now();
+  const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
+  const activeIncomingMap = new Map();
+  Object.values(liveData).forEach(veh => {
+    if (veh && veh.vehicleId && veh.lat && veh.lon) {
+      // Must be actively recording (isRecording === true) AND have recent heartbeat
+      const isRecording = veh.isRecording === true;
+      const isFresh = veh.updatedAt ? (now - veh.updatedAt < HEARTBEAT_TIMEOUT_MS) : false;
+
+      if (isRecording && isFresh) {
+        activeIncomingMap.set(veh.vehicleId, veh);
+      }
+    }
+  });
+
+  // Remove stale or stopped vehicles from the map
+  const toRemove = [];
+  state.vehicles.forEach((_, vId) => {
+    if (!activeIncomingMap.has(vId)) {
+      toRemove.push(vId);
+    }
+  });
+  toRemove.forEach(vId => removeVehicle(vId));
+
+  // Add or update active streaming vehicles
+  activeIncomingMap.forEach(veh => {
+    updateVehicle(veh);
+  });
+
+  renderVehicleRoster();
+
+  if (state.vehicles.size === 0) {
+    document.getElementById('inspector-vehicle-badge').textContent = 'NO ACTIVE FLEET';
+    resetInspector();
+  }
 }
 
 // --- FIREBASE LIVE TELEMETRY ---
@@ -384,6 +474,8 @@ function connectFirebase(url, token) {
     return;
   }
 
+  state.firebaseUrl = cleanUrl;
+  state.firebaseToken = token || '';
   const authParam = token ? `?auth=${token.trim()}` : '';
 
   // Initial fetch of current fleet vehicles
@@ -399,21 +491,14 @@ function connectFirebase(url, token) {
         throw new Error(data.error);
       }
 
-      clearFleet();
       document.getElementById('kpi-sync-mode').textContent = 'FIREBASE LIVE';
       document.getElementById('kpi-sync-mode').className = 'kpi-value text-emerald';
 
-      if (data && typeof data === 'object') {
-        const vehicles = Object.values(data);
-        vehicles.forEach(veh => {
-          if (veh && veh.vehicleId && veh.lat && veh.lon) {
-            updateVehicle(veh);
-          }
-        });
-        if (vehicles.length > 0) {
-          const first = vehicles[0];
-          map.panTo([first.lat, first.lon]);
-        }
+      syncLiveFleet(data);
+
+      if (state.vehicles.size > 0) {
+        const first = Array.from(state.vehicles.values())[0];
+        map.panTo([first.data.lat, first.data.lon]);
       }
 
       // Setup continuous live polling (every 1.5 seconds)
@@ -422,13 +507,7 @@ function connectFirebase(url, token) {
         fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
           .then(res => res.json())
           .then(liveData => {
-            if (liveData && typeof liveData === 'object' && !liveData.error) {
-              Object.values(liveData).forEach(veh => {
-                if (veh && veh.vehicleId && veh.lat && veh.lon) {
-                  updateVehicle(veh);
-                }
-              });
-            }
+            syncLiveFleet(liveData);
           })
           .catch(e => console.warn('Firebase live poll warning:', e));
       }, 1500);
@@ -445,6 +524,37 @@ function connectFirebase(url, token) {
         </div>
       `;
     });
+}
+
+// Purge Offline / Stopped Vehicles from Firebase
+function purgeOfflineVehicles() {
+  const cleanUrl = state.firebaseUrl;
+  if (!cleanUrl) return;
+
+  const authParam = state.firebaseToken ? `?auth=${state.firebaseToken.trim()}` : '';
+
+  fetch(`${cleanUrl}/fleet/vehicles.json${authParam}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data || typeof data !== 'object') return;
+      const now = Date.now();
+      const HEARTBEAT_TIMEOUT_MS = 2 * 60 * 1000;
+
+      Object.entries(data).forEach(([vId, veh]) => {
+        const isRecording = veh?.isRecording === true;
+        const isFresh = veh?.updatedAt ? (now - veh.updatedAt < HEARTBEAT_TIMEOUT_MS) : false;
+
+        // If stopped or stale, delete from Firebase
+        if (!isRecording || !isFresh) {
+          fetch(`${cleanUrl}/fleet/vehicles/${vId}.json${authParam}`, { method: 'DELETE' })
+            .then(() => console.log(`Purged stale vehicle ${vId} from Firebase`))
+            .catch(e => console.warn(`Failed to purge ${vId}:`, e));
+        }
+      });
+
+      clearFleet();
+    })
+    .catch(e => console.warn('Purge failed:', e));
 }
 
 // Setup Event Listeners
@@ -471,5 +581,9 @@ document.addEventListener('DOMContentLoaded', () => {
       e.trail = [];
       e.polyline.setLatLngs([]);
     });
+  });
+
+  document.getElementById('btn-purge-offline').addEventListener('click', () => {
+    purgeOfflineVehicles();
   });
 });
