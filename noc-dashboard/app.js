@@ -164,8 +164,13 @@ function renderVehicleRoster() {
   if (state.vehicles.size === 0) {
     listEl.innerHTML = `
       <div class="empty-state" style="padding: 24px 12px; text-align: center;">
-        <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
-        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">WAITING FOR FIELD VEHICLES</div>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px;">
+          <path d="M4.93 4.93a10 10 0 0 1 14.14 0"/>
+          <path d="M7.76 7.76a6 6 0 0 1 8.48 0"/>
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M12 14v8"/>
+        </svg>
+        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.5px;">WAITING FOR FIELD VEHICLES</div>
         <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">
           เชื่อมต่อฐานข้อมูลสำเร็จ!<br>
           กำลังรอรับข้อมูลจากรถทดสอบภาคสนาม...<br>
@@ -519,7 +524,10 @@ function connectFirebase(url, token) {
       const listEl = document.getElementById('vehicle-list');
       listEl.innerHTML = `
         <div class="empty-state" style="padding: 20px 12px; color: #f87171;">
-          <div style="font-weight: 700; margin-bottom: 6px;">❌ FIREBASE ERROR</div>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div style="font-weight: 700; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.5px;">FIREBASE CONNECTION ERROR</div>
           <div style="font-size: 10px; line-height: 1.5;">${err.message}<br>โปรดตรวจสอบ Rules ใน Firebase Console (.read: true)</div>
         </div>
       `;

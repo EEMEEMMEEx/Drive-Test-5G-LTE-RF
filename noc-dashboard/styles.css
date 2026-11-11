@@ -414,21 +414,30 @@ body {
 }
 
 .map-btn {
-  background: rgba(14, 21, 38, 0.85);
+  background: rgba(14, 21, 38, 0.9);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   color: #ffffff;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   transition: all 0.2s ease;
 }
 
 .map-btn:hover {
   border-color: var(--cyan);
   background: var(--bg-card);
+}
+
+.map-btn-danger:hover {
+  border-color: var(--rose);
+  color: #fca5a5;
 }
 
 /* Right Inspector Card */
@@ -597,106 +606,6 @@ body {
   text-align: center;
   padding: 24px 16px;
   font-style: italic;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.modal-overlay.active {
-  display: flex;
-}
-
-.modal-card {
-  width: 480px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  font-size: 13px;
-  font-weight: 800;
-  color: #ffffff;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.modal-body {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.modal-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.form-group input {
-  background: #080d19;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 10px 12px;
-  color: #ffffff;
-  font-size: 12px;
-  outline: none;
-}
-
-.form-group input:focus {
-  border-color: var(--cyan);
-}
-
-.status-msg {
-  font-size: 11px;
-  margin-top: 4px;
-}
-
-.modal-footer {
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 /* Custom Vehicle Marker */
