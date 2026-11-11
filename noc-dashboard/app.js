@@ -1,5 +1,5 @@
 /**
- * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.2
+ * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.12.3
  * 100% Real-Time Live Telemetry (No Demo)
  */
 
@@ -157,9 +157,11 @@ function renderVehicleRoster() {
   const listEl = document.getElementById('vehicle-list');
   const countEl = document.getElementById('roster-badge');
   const kpiActive = document.getElementById('kpi-active-count');
+  const mobFleetCount = document.getElementById('mobile-fleet-count');
 
   countEl.textContent = `${state.vehicles.size} ACTIVE`;
   kpiActive.textContent = state.vehicles.size;
+  if (mobFleetCount) mobFleetCount.textContent = state.vehicles.size;
 
   if (state.vehicles.size === 0) {
     listEl.innerHTML = `
@@ -226,6 +228,11 @@ function selectVehicle(vehicleId) {
   if (entry) {
     renderInspector(entry.data);
     map.panTo([entry.data.lat, entry.data.lon]);
+
+    // If mobile user selects a vehicle from the fleet roster tab, switch view back to map
+    if (window.innerWidth <= 1024 && window.switchMobileTab) {
+      window.switchMobileTab('map');
+    }
   }
 }
 
@@ -252,6 +259,11 @@ function resetInspector() {
   const deltaEl = document.getElementById('delta-val');
   deltaEl.textContent = '—';
   deltaEl.className = 'delta-value text-slate';
+
+  const mobDrawer = document.getElementById('mobile-bottom-drawer');
+  if (mobDrawer && state.vehicles.size === 0) {
+    mobDrawer.classList.remove('visible');
+  }
 }
 
 // Remove Single Vehicle From Map & State
@@ -357,6 +369,41 @@ function renderInspector(d) {
     deltaEl.textContent = 'Single SIM Mode (No Benchmark)';
     deltaEl.className = 'delta-value text-slate';
   }
+
+  // Update Mobile Floating Bottom Drawer
+  const mobDrawer = document.getElementById('mobile-bottom-drawer');
+  if (mobDrawer) {
+    mobDrawer.classList.add('visible');
+    const idEl = document.getElementById('mob-drawer-id');
+    const opEl = document.getElementById('mob-drawer-op');
+    const ratEl = document.getElementById('mob-drawer-rat');
+    const rsrpEl = document.getElementById('mob-drawer-rsrp');
+    const sinrEl = document.getElementById('mob-drawer-sinr');
+    const speedEl = document.getElementById('mob-drawer-speed');
+
+    if (idEl) idEl.textContent = d.vehicleId || 'DT-UNIT';
+    if (opEl) opEl.textContent = d.operator || 'Primary SIM';
+    if (ratEl) ratEl.textContent = `${d.rat || '—'} ${d.band || ''}`.trim() || '—';
+    if (rsrpEl) {
+      if (d.rsrp !== undefined && d.rsrp !== null) {
+        rsrpEl.textContent = `${d.rsrp} dBm`;
+        rsrpEl.style.color = getRsrpColor(Number(d.rsrp));
+      } else {
+        rsrpEl.textContent = '— dBm';
+        rsrpEl.style.color = '#94a3b8';
+      }
+    }
+    if (sinrEl) {
+      if (d.sinr !== undefined && d.sinr !== null) {
+        sinrEl.textContent = `${Number(d.sinr).toFixed(1)} dB`;
+      } else {
+        sinrEl.textContent = '— dB';
+      }
+    }
+    if (speedEl) {
+      speedEl.textContent = `${Math.round(d.speedKmh || 0)} km/h`;
+    }
+  }
 }
 
 // Add Anomaly Alert
@@ -422,6 +469,10 @@ function clearFleet() {
   document.getElementById('alerts-count-badge').textContent = '0 ALERTS';
   document.getElementById('inspector-vehicle-badge').textContent = 'WAITING FOR DATA';
   document.getElementById('alerts-feed').innerHTML = '<div class="empty-state">No active anomalies detected in current fleet route.</div>';
+  const mobDrawer = document.getElementById('mobile-bottom-drawer');
+  if (mobDrawer) mobDrawer.classList.remove('visible');
+  const mobFleetCount = document.getElementById('mobile-fleet-count');
+  if (mobFleetCount) mobFleetCount.textContent = '0';
   renderVehicleRoster();
   resetInspector();
 }
@@ -565,9 +616,54 @@ function purgeOfflineVehicles() {
     .catch(e => console.warn('Purge failed:', e));
 }
 
+// Mobile Segmented Navigation Controller
+function initMobileNav() {
+  const tabButtons = document.querySelectorAll('.mobile-tab-btn');
+  const panelLeft = document.querySelector('.panel-left');
+  const panelRight = document.querySelector('.panel-right');
+  const detailsBtn = document.getElementById('mob-btn-details');
+
+  function switchTab(tab) {
+    tabButtons.forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+    });
+
+    if (tab === 'map') {
+      if (panelLeft) panelLeft.classList.remove('active-view');
+      if (panelRight) panelRight.classList.remove('active-view');
+      if (map) {
+        setTimeout(() => map.invalidateSize(), 150);
+      }
+    } else if (tab === 'fleet') {
+      if (panelLeft) panelLeft.classList.add('active-view');
+      if (panelRight) panelRight.classList.remove('active-view');
+    } else if (tab === 'inspector') {
+      if (panelRight) panelRight.classList.add('active-view');
+      if (panelLeft) panelLeft.classList.remove('active-view');
+    }
+  }
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      switchTab(targetTab);
+    });
+  });
+
+  if (detailsBtn) {
+    detailsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchTab('inspector');
+    });
+  }
+
+  window.switchMobileTab = switchTab;
+}
+
 // Setup Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
+  initMobileNav();
 
   const firebaseUrl = window.ENV?.FIREBASE_DB_URL || 'https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app';
   const firebaseToken = window.ENV?.FIREBASE_AUTH_TOKEN || '';
