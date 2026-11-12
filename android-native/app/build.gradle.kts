@@ -28,6 +28,20 @@ val gdriveAccessToken: String = localProperties.getProperty("GDRIVE_ACCESS_TOKEN
 val gdriveFolderId: String = localProperties.getProperty("GDRIVE_FOLDER_ID")
   ?: System.getenv("GDRIVE_FOLDER_ID")
   ?: ""
+// Release signing material lives outside VCS (local.properties or CI env vars).
+// Never commit the keystore path, store password, alias or key password.
+val releaseStorePath: String = localProperties.getProperty("RELEASE_KEYSTORE_PATH")
+  ?: System.getenv("RELEASE_KEYSTORE_PATH")
+  ?: ""
+val releaseStorePassword: String = localProperties.getProperty("RELEASE_KEYSTORE_PASSWORD")
+  ?: System.getenv("RELEASE_KEYSTORE_PASSWORD")
+  ?: ""
+val releaseKeyAlias: String = localProperties.getProperty("RELEASE_KEY_ALIAS")
+  ?: System.getenv("RELEASE_KEY_ALIAS")
+  ?: ""
+val releaseKeyPassword: String = localProperties.getProperty("RELEASE_KEY_PASSWORD")
+  ?: System.getenv("RELEASE_KEY_PASSWORD")
+  ?: ""
 
 android {
   namespace = "com.drivetest.lte5g"
@@ -36,8 +50,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 44
-    versionName = "1.13.0"
+    versionCode = 45
+    versionName = "1.13.1"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     buildConfigField("String", "FIREBASE_DB_URL", "\"$firebaseDbUrl\"")
@@ -48,15 +62,21 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystoreFile = file("D:/EEMEEMMEEx")
-      if (keystoreFile.exists()) {
+      val keystoreFile = releaseStorePath.takeIf { it.isNotBlank() }?.let { file(it) }
+      val hasReleaseSigning = keystoreFile != null &&
+        keystoreFile.exists() &&
+        releaseStorePassword.isNotBlank() &&
+        releaseKeyAlias.isNotBlank() &&
+        releaseKeyPassword.isNotBlank()
+      if (hasReleaseSigning) {
         storeFile = keystoreFile
-        storePassword = "REDACTED_SECRET"
-        keyAlias = "key0"
-        keyPassword = "REDACTED_SECRET"
+        storePassword = releaseStorePassword
+        keyAlias = releaseKeyAlias
+        keyPassword = releaseKeyPassword
         enableV1Signing = true
         enableV2Signing = true
       } else {
+        logger.lifecycle("Release keystore not configured; falling back to debug signing.")
         val debugConfig = signingConfigs.getByName("debug")
         storeFile = debugConfig.storeFile
         storePassword = debugConfig.storePassword

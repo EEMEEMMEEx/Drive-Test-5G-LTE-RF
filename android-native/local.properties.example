@@ -1,0 +1,19 @@
+## Copy to local.properties (git-ignored) and fill in real values.
+## Never commit local.properties or any file containing these secrets.
+
+sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
+
+## Firebase / cloud sync (optional)
+MAPS_API_KEY=
+GEMINI_API_KEY=
+FIREBASE_DB_URL=
+FIREBASE_AUTH_TOKEN=
+GDRIVE_ACCESS_TOKEN=
+GDRIVE_FOLDER_ID=
+
+## Release signing (optional; without these the release build falls back to debug signing)
+## Path to the keystore file, e.g. D:\\my-release-keystore
+RELEASE_KEYSTORE_PATH=
+RELEASE_KEYSTORE_PASSWORD=
+RELEASE_KEY_ALIAS=
+RELEASE_KEY_PASSWORD=
