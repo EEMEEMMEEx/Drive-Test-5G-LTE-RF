@@ -115,6 +115,7 @@ class CloudTelemetrySyncManagerTest {
     @Before
     fun setUp() {
         CloudConfigRepository.resetForTesting()
+        CloudTelemetrySyncManager.resetForTesting()
         CloudTelemetrySyncManager.setStorageDirForTesting(tempFolder.root, testDispatcher)
     }
 
@@ -208,5 +209,106 @@ class CloudTelemetrySyncManagerTest {
 
         assertTrue(queueFile.exists())
         assertEquals(5, CloudTelemetrySyncManager.getOfflineQueueCount())
+    }
+
+    @Test
+    fun buildSessionMetadataJson_withSample_serializesAllFields() {
+        val config = CloudConfig(
+            vehicleId = "DT-V01",
+            firebaseDbUrl = "https://example-firebase.io",
+            firebaseAuthToken = "",
+            liveTelemetryEnabled = true,
+            googleDriveAccessToken = "",
+            googleDriveFolderId = "",
+            autoUploadOnWifi = false
+        )
+
+        val session = DriveTestSession(
+            id = 1762849200000L,
+            sessionNumber = 1,
+            name = "Session #1",
+            startTime = 1762849200000L
+        )
+
+        val sample = createSample(1, 13.7563, 100.5018, -82, 16.5, is5g = true)
+
+        val jsonStr = CloudTelemetrySyncManager.buildSessionMetadataJson(config, session, sample, isRecording = true)
+        val json = JSONObject(jsonStr)
+
+        assertEquals("1762849200000", json.getString("sessionId"))
+        assertEquals("DT-V01", json.getString("vehicleId"))
+        assertEquals(1762849200000L, json.getLong("startTime"))
+        assertEquals(sample.timestamp, json.getLong("updatedAt"))
+        assertEquals(1, json.getInt("sampleCount"))
+        assertEquals("AIS 5G", json.getString("operator"))
+        assertEquals("NR_SA", json.getString("rat"))
+        assertEquals(-82.0, json.getDouble("avgRsrp"), 0.01)
+        assertTrue(json.getBoolean("isRecording"))
+    }
+
+    @Test
+    fun buildSessionMetadataJson_stoppedSession_serializesAllFields() {
+        val config = CloudConfig(
+            vehicleId = "DT-V02",
+            firebaseDbUrl = "https://example-firebase.io",
+            firebaseAuthToken = "",
+            liveTelemetryEnabled = true,
+            googleDriveAccessToken = "",
+            googleDriveFolderId = "",
+            autoUploadOnWifi = false
+        )
+
+        val s1 = createSample(1, 13.75, 100.50, -80, 15.0, is5g = true)
+        val s2 = createSample(2, 13.76, 100.51, -90, 10.0, is5g = true)
+
+        val session = DriveTestSession(
+            id = 1762849300000L,
+            sessionNumber = 2,
+            name = "Session #2",
+            startTime = 1762849300000L,
+            sampleCount = 2,
+            samples = listOf(s1, s2),
+            avgRsrp = -85
+        )
+
+        val jsonStr = CloudTelemetrySyncManager.buildSessionMetadataJson(config, session, null, isRecording = false)
+        val json = JSONObject(jsonStr)
+
+        assertEquals("1762849300000", json.getString("sessionId"))
+        assertEquals("DT-V02", json.getString("vehicleId"))
+        assertEquals(1762849300000L, json.getLong("startTime"))
+        assertEquals(2, json.getInt("sampleCount"))
+        assertEquals("AIS 5G", json.getString("operator"))
+        assertEquals("NR_SA", json.getString("rat"))
+        assertEquals(-85.0, json.getDouble("avgRsrp"), 0.01)
+        assertFalse(json.getBoolean("isRecording"))
+    }
+
+    @Test
+    fun offlineQueue_persistsSessionMetadata_andFlushesCorrectly() {
+        val queueFile = File(tempFolder.root, "cloud_offline_queue.jsonl")
+        assertFalse(queueFile.exists())
+
+        // Save entry with session metadata
+        CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{\"hb\":1}",
+            sessionId = "sess_1",
+            trailPointJson = "{\"tp\":1}",
+            sessionMetaJson = "{\"sm\":1}"
+        )
+
+        // Save legacy entry without session metadata (backward compat)
+        CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{\"hb\":2}",
+            sessionId = "sess_2",
+            trailPointJson = "{\"tp\":2}"
+        )
+
+        assertEquals(2, CloudTelemetrySyncManager.getOfflineQueueCount())
+
+        val lines = queueFile.readLines()
+        assertEquals(2, lines.size)
+        assertTrue(lines[0].contains("\"sm\":\"{\\\"sm\\\":1}\""))
+        assertFalse(lines[1].contains("\"sm\":"))
     }
 }

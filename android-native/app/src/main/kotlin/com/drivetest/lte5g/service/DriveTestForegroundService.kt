@@ -253,6 +253,7 @@ class DriveTestForegroundService : Service() {
         activeSessionId = session.id
         _isRecording.value = true
         _samplesList.value = session.samples
+        CloudTelemetrySyncManager.markSessionStarted(session)
 
         try {
             val notification = buildNotification()
@@ -356,8 +357,10 @@ class DriveTestForegroundService : Service() {
         SessionRepository.finishCurrentSession()
         if (sessionToFinish != null) {
             val finalized = SessionRepository.sessions.value.firstOrNull { it.id == sessionToFinish.id } ?: sessionToFinish
-            CloudTelemetrySyncManager.markSessionStopped()
+            CloudTelemetrySyncManager.markSessionStopped(finalized)
             GoogleDriveAutoUploader.enqueueSessionForWifiUpload(finalized)
+        } else {
+            CloudTelemetrySyncManager.markSessionStopped()
         }
         _isRecording.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)

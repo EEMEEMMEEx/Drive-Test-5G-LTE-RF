@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.drivetest.lte5g.model.DriveTestSample
 import com.drivetest.lte5g.model.DriveTestSession
+import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,16 @@ object CloudTelemetrySyncManager {
 
     private var storageDir: File? = null
     private var isInitialized = false
+
+    @Volatile
+    private var lastActiveSession: DriveTestSession? = null
+    @Volatile
+    private var lastActiveSessionId: String? = null
+
+    fun resetForTesting() {
+        lastActiveSession = null
+        lastActiveSessionId = null
+    }
 
     fun init(context: Context, customDir: File? = null, dispatcher: CoroutineDispatcher = Dispatchers.IO) {
         CloudConfigRepository.init(context)
@@ -134,10 +145,92 @@ object CloudTelemetrySyncManager {
         return root.toString()
     }
 
+    fun calculateAverageRsrp(session: DriveTestSession, sample: DriveTestSample? = null): Double? {
+        val existingRsrps = session.samples.mapNotNull { it.metrics.nr?.ssRsrp ?: it.metrics.lte?.rsrp }
+        val allRsrps = if (sample != null && !session.samples.any { it.id == sample.id }) {
+            val sRsrp = sample.metrics.nr?.ssRsrp ?: sample.metrics.lte?.rsrp
+            if (sRsrp != null) existingRsrps + sRsrp else existingRsrps
+        } else {
+            existingRsrps
+        }
+        return when {
+            allRsrps.isNotEmpty() -> {
+                val avg = allRsrps.average()
+                kotlin.math.round(avg * 10.0) / 10.0
+            }
+            session.avgRsrp != null -> session.avgRsrp.toDouble()
+            sample != null -> {
+                val sRsrp = sample.metrics.nr?.ssRsrp ?: sample.metrics.lte?.rsrp
+                sRsrp?.toDouble()
+            }
+            else -> null
+        }
+    }
+
+    fun calculateSampleCount(session: DriveTestSession, sample: DriveTestSample? = null): Int {
+        return when {
+            sample != null && !session.samples.any { it.id == sample.id } -> session.samples.size + 1
+            session.samples.isNotEmpty() -> session.samples.size
+            session.sampleCount > 0 -> session.sampleCount
+            sample != null -> 1
+            else -> 0
+        }
+    }
+
+    /**
+     * Build the JSON payload for session metadata node (/fleet/sessions/{sessionId}).
+     */
+    fun buildSessionMetadataJson(
+        config: CloudConfig,
+        session: DriveTestSession,
+        sample: DriveTestSample? = null,
+        isRecording: Boolean = true
+    ): String {
+        val (rat, _, _) = if (sample != null) {
+            extractPrimaryMetrics(sample)
+        } else {
+            val lastSample = session.samples.lastOrNull()
+            if (lastSample != null) {
+                extractPrimaryMetrics(lastSample)
+            } else {
+                val fallbackRat = when (session.ratLockMode) {
+                    RatLockMode.NR_ONLY -> "NR_SA"
+                    RatLockMode.LTE_ONLY -> "LTE"
+                    else -> "AUTO"
+                }
+                Triple(fallbackRat, null, null)
+            }
+        }
+
+        val operator = sample?.metrics?.operatorAlpha
+            ?: session.samples.lastOrNull()?.metrics?.operatorAlpha
+            ?: session.simDisplayName
+
+        val avgRsrp = calculateAverageRsrp(session, sample)
+        val sampleCount = calculateSampleCount(session, sample)
+        val updatedAt = sample?.timestamp ?: System.currentTimeMillis()
+
+        val root = JSONObject().apply {
+            put("sessionId", session.id.toString())
+            put("vehicleId", config.vehicleId)
+            put("startTime", session.startTime)
+            put("updatedAt", updatedAt)
+            put("sampleCount", sampleCount)
+            operator?.let { put("operator", it) }
+            put("rat", rat)
+            avgRsrp?.let { put("avgRsrp", it) }
+            put("isRecording", isRecording)
+        }
+        return root.toString()
+    }
+
     /**
      * Enqueue a new sample from the foreground service loop.
      */
     fun enqueueSample(session: DriveTestSession, sample: DriveTestSample) {
+        lastActiveSession = session
+        lastActiveSessionId = session.id.toString()
+
         val config = CloudConfigRepository.config.value
         if (!config.liveTelemetryEnabled || config.firebaseDbUrl.isBlank()) {
             return
@@ -146,10 +239,11 @@ object CloudTelemetrySyncManager {
         scope.launch(ioDispatcher) {
             val heartbeatJson = buildVehicleHeartbeatJson(config, session, sample)
             val trailPointJson = buildTrailPointJson(sample)
+            val sessionMetaJson = buildSessionMetadataJson(config, session, sample, isRecording = true)
 
-            val success = trySendTelemetry(config, heartbeatJson, session.id.toString(), trailPointJson)
+            val success = trySendTelemetry(config, heartbeatJson, session.id.toString(), trailPointJson, sessionMetaJson)
             if (!success) {
-                saveToOfflineQueue(heartbeatJson, session.id.toString(), trailPointJson)
+                saveToOfflineQueue(heartbeatJson, session.id.toString(), trailPointJson, sessionMetaJson)
             } else {
                 // If live push succeeded and we have queued offline points, attempt background flush
                 flushOfflineQueueAsync(config)
@@ -161,7 +255,8 @@ object CloudTelemetrySyncManager {
         config: CloudConfig,
         heartbeatJson: String,
         sessionId: String,
-        trailPointJson: String
+        trailPointJson: String,
+        sessionMetaJson: String? = null
     ): Boolean = withContext(ioDispatcher) {
         try {
             val authParam = if (config.firebaseAuthToken.isNotBlank()) "?auth=${config.firebaseAuthToken}" else ""
@@ -175,14 +270,54 @@ object CloudTelemetrySyncManager {
             val trailUrl = "$baseUrl/fleet/trails/$sessionId.json$authParam"
             val trailSuccess = executeHttpRequest(trailUrl, "POST", trailPointJson)
 
-            heartbeatSuccess && trailSuccess
+            // 3. Update session metadata via PUT
+            val sessionSuccess = if (sessionMetaJson != null) {
+                val sessionUrl = "$baseUrl/fleet/sessions/$sessionId.json$authParam"
+                executeHttpRequest(sessionUrl, "PUT", sessionMetaJson)
+            } else true
+
+            heartbeatSuccess && trailSuccess && sessionSuccess
         } catch (e: Exception) {
             Log.w(TAG, "Telemetry transmission failed: ${e.message}")
             false
         }
     }
 
-    fun markSessionStopped() {
+    fun markSessionStarted(session: DriveTestSession) {
+        lastActiveSession = session
+        lastActiveSessionId = session.id.toString()
+
+        val config = CloudConfigRepository.config.value
+        if (!config.liveTelemetryEnabled || config.firebaseDbUrl.isBlank()) return
+
+        scope.launch(ioDispatcher) {
+            try {
+                val authParam = if (config.firebaseAuthToken.isNotBlank()) "?auth=${config.firebaseAuthToken}" else ""
+                val baseUrl = config.firebaseDbUrl.trimEnd('/')
+
+                // 1. Write initial session metadata to /fleet/sessions/{sessionId}.json
+                val sessionUrl = "$baseUrl/fleet/sessions/${session.id}.json$authParam"
+                val sessionMetaJson = buildSessionMetadataJson(config, session, null, isRecording = true)
+                executeHttpRequest(sessionUrl, "PUT", sessionMetaJson)
+
+                // 2. Update vehicle state to indicate recording started
+                val vehicleUrl = "$baseUrl/fleet/vehicles/${config.vehicleId}.json$authParam"
+                val vehiclePayload = JSONObject().apply {
+                    put("vehicleId", config.vehicleId)
+                    put("sessionId", session.id.toString())
+                    put("isRecording", true)
+                    put("updatedAt", System.currentTimeMillis())
+                }.toString()
+                executeHttpRequest(vehicleUrl, "PATCH", vehiclePayload)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to mark session started: ${e.message}")
+            }
+        }
+    }
+
+    fun markSessionStopped(session: DriveTestSession? = null) {
+        val targetSession = session ?: lastActiveSession
+        val targetSessionId = targetSession?.id?.toString() ?: lastActiveSessionId
         val config = CloudConfigRepository.config.value
         if (config.firebaseDbUrl.isBlank()) return
 
@@ -190,16 +325,31 @@ object CloudTelemetrySyncManager {
             try {
                 val authParam = if (config.firebaseAuthToken.isNotBlank()) "?auth=${config.firebaseAuthToken}" else ""
                 val baseUrl = config.firebaseDbUrl.trimEnd('/')
-                val vehicleUrl = "$baseUrl/fleet/vehicles/${config.vehicleId}.json$authParam"
 
-                val payload = JSONObject().apply {
+                // 1. Update vehicle state to stopped
+                val vehicleUrl = "$baseUrl/fleet/vehicles/${config.vehicleId}.json$authParam"
+                val vehiclePayload = JSONObject().apply {
                     put("isRecording", false)
                     put("updatedAt", System.currentTimeMillis())
                 }.toString()
+                executeHttpRequest(vehicleUrl, "PATCH", vehiclePayload)
 
-                executeHttpRequest(vehicleUrl, "PATCH", payload)
+                // 2. Update session metadata at /fleet/sessions/{sessionId}.json
+                if (targetSessionId != null) {
+                    val sessionUrl = "$baseUrl/fleet/sessions/$targetSessionId.json$authParam"
+                    val sessionPayload = if (targetSession != null) {
+                        buildSessionMetadataJson(config, targetSession, null, isRecording = false)
+                    } else {
+                        JSONObject().apply {
+                            put("isRecording", false)
+                            put("updatedAt", System.currentTimeMillis())
+                        }.toString()
+                    }
+                    val method = if (targetSession != null) "PUT" else "PATCH"
+                    executeHttpRequest(sessionUrl, method, sessionPayload)
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to mark vehicle stopped: ${e.message}")
+                Log.w(TAG, "Failed to mark vehicle and session stopped: ${e.message}")
             }
         }
     }
@@ -236,7 +386,12 @@ object CloudTelemetrySyncManager {
     }
 
     @Synchronized
-    fun saveToOfflineQueue(heartbeatJson: String, sessionId: String, trailPointJson: String) {
+    fun saveToOfflineQueue(
+        heartbeatJson: String,
+        sessionId: String,
+        trailPointJson: String,
+        sessionMetaJson: String? = null
+    ) {
         val dir = storageDir ?: return
         if (!dir.exists()) dir.mkdirs()
         val file = File(dir, "cloud_offline_queue.jsonl")
@@ -245,6 +400,7 @@ object CloudTelemetrySyncManager {
             put("hb", heartbeatJson)
             put("sid", sessionId)
             put("tp", trailPointJson)
+            sessionMetaJson?.let { put("sm", it) }
         }.toString()
 
         try {
@@ -307,8 +463,9 @@ object CloudTelemetrySyncManager {
                 val hb = obj.getString("hb")
                 val sid = obj.getString("sid")
                 val tp = obj.getString("tp")
+                val sm = if (obj.has("sm")) obj.getString("sm") else null
 
-                val success = trySendTelemetrySync(config, hb, sid, tp)
+                val success = trySendTelemetrySync(config, hb, sid, tp, sm)
                 if (success) {
                     flushedCount++
                 } else {
@@ -332,7 +489,8 @@ object CloudTelemetrySyncManager {
         config: CloudConfig,
         heartbeatJson: String,
         sessionId: String,
-        trailPointJson: String
+        trailPointJson: String,
+        sessionMetaJson: String? = null
     ): Boolean {
         val authParam = if (config.firebaseAuthToken.isNotBlank()) "?auth=${config.firebaseAuthToken}" else ""
         val baseUrl = config.firebaseDbUrl.trimEnd('/')
@@ -343,7 +501,12 @@ object CloudTelemetrySyncManager {
         val trailUrl = "$baseUrl/fleet/trails/$sessionId.json$authParam"
         val trailSuccess = executeHttpRequest(trailUrl, "POST", trailPointJson)
 
-        return heartbeatSuccess && trailSuccess
+        val sessionSuccess = if (sessionMetaJson != null) {
+            val sessionUrl = "$baseUrl/fleet/sessions/$sessionId.json$authParam"
+            executeHttpRequest(sessionUrl, "PUT", sessionMetaJson)
+        } else true
+
+        return heartbeatSuccess && trailSuccess && sessionSuccess
     }
 
     suspend fun testFirebaseConnection(dbUrl: String, authToken: String?): Result<String> = withContext(ioDispatcher) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOC Fleet Telemetry & Live Map — Drive Test LTE/5G</title>
+  <title>NOC Fleet Telemetry & Live Map — Drive Test LTE/5G v1.13.0</title>
   
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
@@ -24,7 +24,7 @@
         <div class="radar-pulse"></div>
         <div>
           <h1>DRIVE TEST LTE / 5G</h1>
-          <span class="sub-brand">NOC REAL-TIME FLEET TELEMETRY CONSOLE v1.12.3</span>
+          <span class="sub-brand">NOC REAL-TIME FLEET TELEMETRY CONSOLE v1.13.0</span>
         </div>
       </div>
 
@@ -48,11 +48,20 @@
         </div>
       </div>
 
-      <!-- Action Status -->
+      <!-- Action Status & Mode Switcher -->
       <div class="header-actions">
-        <div class="live-status-badge">
-          <span class="dot-indicator dot-active"></span>
-          <span>LIVE NOC TELEMETRY</span>
+        <div class="mode-switcher" id="mode-switcher">
+          <button class="mode-btn active" id="btn-mode-live" title="Real-time live fleet tracking">
+            <span class="dot-indicator dot-active"></span>
+            <span>LIVE FLEET</span>
+          </button>
+          <button class="mode-btn" id="btn-mode-playback" title="Historical session playback">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21"/>
+              <path d="M12 2a10 10 0 1 0 10 10"/>
+            </svg>
+            <span>HISTORICAL PLAYBACK</span>
+          </button>
         </div>
       </div>
     </header>
@@ -61,11 +70,11 @@
     <nav class="mobile-nav-tabs" id="mobile-nav">
       <button class="mobile-tab-btn active" data-tab="map">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-        <span>LIVE MAP</span>
+        <span>MAP</span>
       </button>
       <button class="mobile-tab-btn" data-tab="fleet">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
-        <span>FLEET (<span id="mobile-fleet-count">0</span>)</span>
+        <span id="mobile-fleet-tab-label">FLEET (<span id="mobile-fleet-count">0</span>)</span>
       </button>
       <button class="mobile-tab-btn" data-tab="inspector">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -75,33 +84,58 @@
 
     <!-- Main NOC Workspace -->
     <main class="noc-workspace">
-      <!-- Left Panel: Fleet Roster -->
+      <!-- Left Panel: Fleet Roster & Historical Sessions -->
       <aside class="panel panel-left">
         <div class="panel-header">
-          <h2>FLEET ROSTER</h2>
+          <h2 id="left-panel-title">FLEET ROSTER</h2>
           <span class="badge" id="roster-badge">0 VEHICLES</span>
         </div>
-        <div class="vehicle-list" id="vehicle-list">
-          <div class="empty-state">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px;">
-              <path d="M4.93 4.93a10 10 0 0 1 14.14 0"/>
-              <path d="M7.76 7.76a6 6 0 0 1 8.48 0"/>
-              <circle cx="12" cy="12" r="2"/>
-              <path d="M12 14v8"/>
-            </svg>
-            <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.5px;">WAITING FOR FIELD VEHICLES</div>
-            <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">กำลังรอรับข้อมูลจากรถทดสอบ...<br>กดปุ่ม <b>START</b> บนแอปมือถือเพื่อเริ่มสตรีมสด</div>
+
+        <!-- Live Fleet View -->
+        <div class="panel-tab-content active" id="panel-tab-live">
+          <div class="vehicle-list" id="vehicle-list">
+            <div class="empty-state">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px;">
+                <path d="M4.93 4.93a10 10 0 0 1 14.14 0"/>
+                <path d="M7.76 7.76a6 6 0 0 1 8.48 0"/>
+                <circle cx="12" cy="12" r="2"/>
+                <path d="M12 14v8"/>
+              </svg>
+              <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.5px;">WAITING FOR FIELD VEHICLES</div>
+              <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">กำลังรอรับข้อมูลจากรถทดสอบ...<br>กดปุ่ม <b>START</b> บนแอปมือถือเพื่อเริ่มสตรีมสด</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historical Playback Session Selector & Archive List -->
+        <div class="panel-tab-content" id="panel-tab-playback" style="display: none;">
+          <div class="session-search-bar">
+            <div class="search-input-wrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="session-search-input" placeholder="Filter session / vehicle..." class="session-search-input">
+            </div>
+            <button id="btn-refresh-sessions-list" class="btn-icon" title="Refresh session list from Firebase">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+          <div class="session-list" id="session-list">
+            <div class="empty-state">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <div>No recorded sessions found.</div>
+            </div>
           </div>
         </div>
 
         <div class="rsrp-legend">
-          <div class="legend-title">RSRP SIGNAL TIERS (3GPP / ITU-R)</div>
-          <div class="legend-scale">
+          <div class="legend-title" id="legend-title">RSRP SIGNAL TIERS (3GPP / ITU-R)</div>
+          <div class="legend-scale" id="legend-scale">
             <div class="scale-item"><span class="swatch bg-tier1"></span> ≥ -80 dBm (Excellent)</div>
             <div class="scale-item"><span class="swatch bg-tier2"></span> -80 to -90 dBm (Good)</div>
             <div class="scale-item"><span class="swatch bg-tier3"></span> -90 to -100 dBm (Fair)</div>
             <div class="scale-item"><span class="swatch bg-tier4"></span> -100 to -110 dBm (Poor)</div>
-            <div class="scale-item"><span class="swatch bg-tier5"></span> < -110 dBm (Coverage Hole)</div>
+            <div class="scale-item"><span class="swatch bg-tier5"></span> &lt; -110 dBm (Coverage Hole)</div>
           </div>
         </div>
       </aside>
@@ -110,6 +144,22 @@
       <section class="map-container">
         <div id="map"></div>
         <div class="map-controls">
+          <!-- Heatmap Layer Control Group -->
+          <div class="heatmap-control-group">
+            <button id="btn-toggle-heatmap" class="map-btn" title="Toggle Multi-Vehicle Coverage Heatmap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M3.5 12a8.5 8.5 0 0 1 17 0"/>
+                <path d="M7 12a5 5 0 0 1 10 0"/>
+              </svg>
+              <span id="heatmap-btn-label">HEATMAP: OFF</span>
+            </button>
+            <div class="heatmap-metric-selector" id="heatmap-metric-selector" style="display: none;">
+              <button class="metric-pill active" id="btn-metric-rsrp" data-metric="RSRP" title="Interpolate RSRP signal (-135 to -55 dBm)">RSRP</button>
+              <button class="metric-pill" id="btn-metric-sinr" data-metric="SINR" title="Interpolate SINR signal (-10 to 30 dB)">SINR</button>
+            </div>
+          </div>
+
           <button id="btn-center-fleet" class="map-btn" title="Fit all fleet vehicles">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
             <span>FIT ALL</span>
@@ -122,6 +172,50 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             <span>PURGE OFFLINE</span>
           </button>
+        </div>
+
+        <!-- Timeline Playback Scrubber Bar (Historical Playback Mode) -->
+        <div class="playback-scrubber-bar" id="playback-scrubber-bar" style="display: none;">
+          <div class="scrubber-transport">
+            <button id="btn-playback-step-back" class="scrubber-btn" title="Step Back (1 sample)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+            </button>
+            <button id="btn-playback-play" class="scrubber-btn scrubber-btn-primary" title="Play / Pause">
+              <svg id="playback-icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21"/></svg>
+              <svg id="playback-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <button id="btn-playback-step-fwd" class="scrubber-btn" title="Step Forward (1 sample)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+            </button>
+            <div class="speed-selector">
+              <button class="speed-btn active" data-speed="1">1x</button>
+              <button class="speed-btn" data-speed="2">2x</button>
+              <button class="speed-btn" data-speed="5">5x</button>
+            </div>
+          </div>
+
+          <div class="scrubber-timeline">
+            <div class="scrubber-meta">
+              <div class="scrubber-session-info">
+                <span class="scrubber-lbl">SESSION:</span>
+                <span id="scrubber-session-name" class="text-cyan">NO SESSION LOADED</span>
+              </div>
+              <div class="scrubber-counters">
+                <span id="scrubber-time-display" class="scrubber-time">--:--:--</span>
+                <span class="scrubber-dot">•</span>
+                <span id="scrubber-sample-counter" class="scrubber-counter">SAMPLE 0 / 0</span>
+              </div>
+            </div>
+            <div class="slider-wrapper">
+              <input type="range" id="playback-scrubber" min="0" max="100" value="0" step="1" disabled>
+            </div>
+          </div>
+
+          <div class="scrubber-actions">
+            <select id="playback-session-select" class="scrubber-select" title="Choose historical session">
+              <option value="">-- Choose Session --</option>
+            </select>
+          </div>
         </div>
 
         <!-- Mobile Floating Mini Drawer (Shown on mobile when a vehicle is selected) -->
@@ -248,6 +342,7 @@
   </div>
 
   <script src="env.js"></script>
+  <script src="rf-heatmap.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

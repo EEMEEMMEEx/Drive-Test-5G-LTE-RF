@@ -1,6 +1,6 @@
-# Live Fleet NOC Dashboard — Drive Test LTE/5G
+# Live Fleet NOC Dashboard — Drive Test LTE/5G v1.13.0
 
-Web Console สำหรับศูนย์ปฏิบัติการโครงข่าย (Network Operations Center — NOC) แสดงตำแหน่งรถทดสอบสัญญาณภาคสนาม (Drive Test Fleet) แบบ Real-Time พร้อมวิเคราะห์ค่า RF Telemetry 5G NR / LTE (Dual-SIM) และตรวจจับพื้นที่สัญญาณบกพร่อง (RF Anomalies) อัตโนมัติ
+Web Console สำหรับศูนย์ปฏิบัติการโครงข่าย (Network Operations Center — NOC) แสดงตำแหน่งรถทดสอบสัญญาณภาคสนาม (Drive Test Fleet) แบบ Real-Time พร้อมวิเคราะห์ค่า RF Telemetry 5G NR / LTE (Dual-SIM), เล่นข้อมูลย้อนหลัง (Historical Session Playback) และแสดงแผนที่คลื่นความร้อนความครอบคลุม (Multi-Vehicle Coverage Heatmap) อัตโนมัติ
 
 ---
 
@@ -14,17 +14,26 @@ Web Console สำหรับศูนย์ปฏิบัติการโ�
      - 🟡 **-90 ถึง -100 dBm** (Fair)
      - 🟠 **-100 ถึง -110 dBm** (Poor)
      - 🔴 **< -110 dBm** (Coverage Hole)
-2. **Dual-SIM Telemetry Inspector:**
+2. **Historical Session Playback (Timeline Scrubber):**
+   - สลับโหมด 'LIVE FLEET' และ 'HISTORICAL PLAYBACK' ได้อย่างราบรื่น
+   - ดึงรายการบันทึกย้อนหลังจาก Firebase RTDB (`/fleet/sessions` และ `/fleet/trails`)
+   - แถบควบคุม Play/Pause, Step Forward/Back, ปรับความเร็ว 1x/2x/5x พร้อมไทม์ไลน์เลื่อนดูพิกัดและค่า RF ทุกจุด
+   - แอนิเมชันหัวรถและเกจ Dual-SIM RF Inspector ขยับตามข้อมูลจริงในอดีตแบบเรียลไทม์
+3. **Multi-Vehicle Coverage Heatmap (IDW Interpolation):**
+   - เอนจินคำนวณการกระจายคลื่นความครอบคลุมเชิงพื้นที่ (Inverse Distance Weighting — IDW) บน HTML5 Canvas ร่วมกับ Leaflet Map
+   - รองรับการแสดงผลทั้งมิติ **RSRP** (-135 ถึง -55 dBm) และ **SINR** (-10 ถึง 30 dB)
+   - รวมข้อมูลพิกัดและคลื่นสัญญาณจากรถทุกคันใน Fleet หรือจาก Session ย้อนหลัง
+4. **Dual-SIM Telemetry Inspector:**
    - ตรวจสอบค่าสัญญาณสดของรถที่เลือกเปรียบเทียบ **SIM 1 (Primary)** vs **SIM 2 (Benchmark)**:
      - Operator, RAT (5G SA / NSA / LTE), Band, PCI, Cell ID
      - RSRP และ SINR พร้อมหลอดแสดงผลแบบไดนามิก
      - คำนวณค่าความต่าง **Δ RSRP (RSRP Advantage)** แบบ Real-Time
-3. **Real-Time RF Anomaly Alert Feed:**
+5. **Real-Time RF Anomaly Alert Feed:**
    - ตรวจจับจุดอับสัญญาณ (`COVERAGE_HOLE`: RSRP < -110 dBm)
    - ตรวจจับพื้นที่สัญญาณรบกวนสูง (`INTERFERENCE`: RSRP ≥ -95 dBm แต่ SINR < 0 dB)
    - คลิกที่การแจ้งเตือนเพื่อบิน (Fly-to) ไปยังพิกัดที่มีปัญหาบนแผนที่ได้ทันที
-4. **Pure 100% Real-Time Firebase Sync:**
-   - เชื่อมต่อ **Firebase Realtime Database** (`/fleet/vehicles` และ `/fleet/trails`) แบบสด
+6. **Pure 100% Real-Time Firebase Sync:**
+   - เชื่อมต่อ **Firebase Realtime Database** (`/fleet/vehicles`, `/fleet/sessions`, `/fleet/trails`) แบบสด
    - ตั้งค่าผ่าน `env.js` / `.env` อัตโนมัติ ไม่ต้องคลิกตั้งค่าหรือกรอก URL ซ้ำซ้อน
    - รองรับทั้งการเปิดผ่าน Browser ธรรมดา (`file://`) หรือผ่าน Web Server (Nginx / Vercel / GitHub Pages / Vite)
 
@@ -47,7 +56,7 @@ python -m http.server 3000 --directory noc-dashboard
 
 ---
 
-## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.12.2)
+## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.13.0)
 
 1. เปิดแอป **Drive Test LTE/5G** บนมือถือ
 2. ระบบตั้งค่า Firebase Realtime Database และเปิดการส่ง Telemetry อัตโนมัติมาให้อยู่แล้ว
