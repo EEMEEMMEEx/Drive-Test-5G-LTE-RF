@@ -10,7 +10,7 @@ A local-first web application replicating the full capabilities, UI screens, dat
 - **PWA & Android Native Runtime (v1.14.0):**
   - **PWA Offline-First:** Service worker precaching, Web App Manifest, offline map tile caching (`stale-while-revalidate` / `network-first`), and standalone install prompt.
   - **Capacitor Android Wrapper:** Bridge plugin (`DriveTestPlugin.java`) with foreground service (`DriveTestForegroundService.java`) for real cellular telephony radio metrics and GNSS location tracking on device.
-  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.9.9`) with dual-SIM benchmark logging (live SIM 2 dashboard gauges, dual-SIM route map layers with 5 color modes, isolated KMZ/CSV SIM layers), route START/END markers with live route stats chips (distance, time, avg RSRP), In-Place Telemetry Dynamic Island Fluid Cloud capsule (with Telemetry HUD tile, custom Stop/New Session actions, and suppressed audio scrubber), In-App OTA Updates, Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
+  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.13.3`) with dual-SIM benchmark logging (live SIM 2 dashboard gauges, dual-SIM route map layers with 5 color modes, isolated KMZ/CSV SIM layers), route START/END markers with live route stats chips (distance, time, avg RSRP), In-Place Telemetry Dynamic Island Fluid Cloud capsule (with Telemetry HUD tile, custom Stop/New Session actions, and suppressed audio scrubber), Play In-App Updates, Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
 - **Screen S01 — Live Drive Test Dashboard (`DriveTestDashboard`):**
   - Real-time semi-circular RSRP gauge (`-135` to `-55 dBm`) with live RSRQ, SINR, RSSI, CSI-RSRP, CQI (`1..15`), and Timing Advance (`TA`).
   - Serving Cell & **5G NR (`SA` / `NSA`) + LTE Carrier Aggregation (`CA`)** component monitor (`Band`, `EARFCN`, `DL Frequency`, `Bandwidth`, `PCI`, `Cell ID`, `TAC/LAC`, `PLMN`).
@@ -33,10 +33,40 @@ A local-first web application replicating the full capabilities, UI screens, dat
 ## Project Documentation & Replica Artifacts
 
 - [Reverse Engineering Analysis Report](docs/reverse-engineering-report.md)
+- [Play Protect บล็อกการติดตั้ง APK (วิเคราะห์ + วิธีแก้ฝั่งผู้ใช้)](docs/play-protect-install.md)
+- [Incident: Google OAuth token หลุดไปกับ APK (revoke / audit / rotate)](docs/security-token-incident.md)
+- [Runbook: แจกจ่ายผ่าน Play internal testing + ย้ายจาก sideload](docs/play-release-runbook.md)
 - [Replica Recon Map](replica/recon.md) & [Feature Matrix (`features.csv`)](replica/features.csv)
 - [Replica Architecture](replica/architecture.md) & [SQL Schema (`schema.sql`)](replica/schema.sql)
 - [Design Tokens (`tokens.json`)](replica/design/tokens.json) & [Component Specs](replica/design/components.md)
 - [Test Plan](replica/test-plan.md) & [Bug Log](replica/bugs.md)
+
+## Android Native Build (`android-native/`)
+
+แอป Kotlin + Jetpack Compose อยู่ใน `android-native/` ใช้ Gradle wrapper ของตัวเอง (ไม่ใช้ `npm`)
+
+```powershell
+cd android-native
+.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:bundleRelease   # ต้องตั้งค่า release signing ด้านล่างก่อน
+```
+
+ตั้งค่า `android-native/local.properties` (git-ignored, ห้าม commit) โดยคัดลอกจาก `local.properties.example`
+
+| Key | จำเป็น | ใช้ทำอะไร |
+| --- | --- | --- |
+| `sdk.dir` | ใช่ | ตำแหน่ง Android SDK |
+| `MAPS_API_KEY` | ใช่ | Google Maps SDK |
+| `RELEASE_KEYSTORE_PATH`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` | ใช่ (สำหรับ release) | เซ็น release build / AAB |
+| `CLOUD_UPLOAD_URL` | ไม่บังคับ | endpoint ของ Worker รับอัปโหลด Drive: `https://<worker-host>/api/drive-upload` (ยังไม่ deploy — ดูหมายเหตุด้านล่าง) |
+| `GEMINI_API_KEY`, `FIREBASE_DB_URL`, `FIREBASE_AUTH_TOKEN` | ไม่บังคับ | cloud sync / telemetry เสริม (`FIREBASE_AUTH_TOKEN` ถูกใช้เป็น header `x-app-auth` ด้วย — อย่าใช้ค่าที่ละเอียดอ่อนร่วมกัน) |
+
+การเปลี่ยนแปลงที่ต้องรู้:
+
+- **`GDRIVE_ACCESS_TOKEN` และ `GDRIVE_FOLDER_ID` ถูกถอดออกจาก `local.properties` และ `BuildConfig` แล้ว** — ค่าเดิมเคยถูกฝังลง APK ที่แจก ที่แทนคือการอัปโหลดผ่าน Cloudflare Worker ที่ถือ credential ของ Google ฝั่ง server (`worker/drive-upload.js`, route `POST /api/drive-upload`, ผูกผ่าน `wrangler.jsonc:7`): ตั้ง secret ด้วย `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` / `APP_AUTH_TOKEN` / `GDRIVE_FOLDER_ID` (ตรวจด้วย `wrangler secret list`) แล้ว `wrangler deploy` และตั้ง `CLOUD_UPLOAD_URL` ฝั่งแอป ห้ามใส่ token ของ Google ลง `local.properties`, `BuildConfig` หรือไฟล์ที่ commit อีก — ดู [Incident runbook](docs/security-token-incident.md) (รวมถึง follow-up เรื่อง `x-app-auth` ที่ยังอิง `FIREBASE_AUTH_TOKEN` ซึ่งฝังอยู่ใน APK)
+  - **ยังไม่ deploy ณ 2026-11-12:** ถ้าไม่ตั้ง `CLOUD_UPLOAD_URL` การอัปโหลดจะถูกข้าม (status `NONE`) และ session ยังอยู่ในเครื่องครบ ไม่มี data loss; ถ้าตั้งแล้ว endpoint ล่มจะได้ status `FAILED` + retry 3 ครั้ง ไม่ crash
+- **release build ต้องเซ็นด้วย release keystore** — ถ้าตั้งค่าไม่ครบ Gradle จะ fallback ไป debug signing (`android-native/app/build.gradle.kts` ในบล็อก `signingConfigs`) ซึ่งทำให้ AAB อัปโหลด Play ไม่ผ่าน และผู้ใช้ติดตั้งทับตัวเดิมไม่ได้เพราะ signature ไม่ตรง ต้องเห็นว่า build log ไม่มีบรรทัด `Release keystore not configured; falling back to debug signing.`
+- **การแจกจ่ายเปลี่ยนจาก APK บน GitHub Releases + OTA ที่ติดตั้งเอง → Play internal testing + Play In-App Updates** การย้ายจาก sideload ต้อง export session ก่อนถอนแอป ดู [Release runbook](docs/play-release-runbook.md)
 
 ## Quick Start & Verification
 

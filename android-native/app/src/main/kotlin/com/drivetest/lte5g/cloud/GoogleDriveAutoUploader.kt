@@ -32,8 +32,6 @@ import java.util.Locale
 
 object GoogleDriveAutoUploader {
     private const val TAG = "GoogleDriveUploader"
-    private const val DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
-    private const val DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about?fields=user"
 
     private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
@@ -79,7 +77,7 @@ object GoogleDriveAutoUploader {
      */
     fun enqueueSessionForWifiUpload(session: DriveTestSession) {
         val config = CloudConfigRepository.config.value
-        if (config.googleDriveAccessToken.isBlank()) {
+        if (config.cloudUploadUrl.isBlank()) {
             return
         }
 
@@ -96,7 +94,7 @@ object GoogleDriveAutoUploader {
         if (!isWifiConnected(context)) return
 
         val config = CloudConfigRepository.config.value
-        if (config.googleDriveAccessToken.isBlank()) return
+        if (config.cloudUploadUrl.isBlank()) return
 
         val allSessions = SessionRepository.sessions.value
         val pendingSessions = allSessions.filter { session ->
@@ -118,8 +116,8 @@ object GoogleDriveAutoUploader {
         val context = appContext ?: return
         val config = CloudConfigRepository.config.value
 
-        if (config.googleDriveAccessToken.isBlank()) {
-            onComplete?.invoke(false, "ยังไม่ได้ระบุ Google Drive Access Token ใน local.properties")
+        if (config.cloudUploadUrl.isBlank()) {
+            onComplete?.invoke(false, "ยังไม่ได้ตั้งค่า Cloud Upload Endpoint (CLOUD_UPLOAD_URL)")
             return
         }
 
@@ -206,8 +204,8 @@ object GoogleDriveAutoUploader {
                 val uploadResult = uploadFileMultipart(
                     file = file,
                     mimeType = mimeType,
-                    folderId = config.googleDriveFolderId,
-                    accessToken = config.googleDriveAccessToken
+                    uploadUrl = config.cloudUploadUrl,
+                    appAuthToken = config.firebaseAuthToken
                 )
                 if (uploadResult.isFailure) {
                     return@withContext Result.failure(uploadResult.exceptionOrNull() ?: Exception("Upload failed for ${file.name}"))
@@ -224,54 +222,42 @@ object GoogleDriveAutoUploader {
     }
 
     /**
-     * Upload single file via Google Drive REST API v3 multipart upload.
+     * Upload one file through the Drive proxy Worker (multipart/form-data, app auth header).
+     * The Worker holds the Google credential; this app never sees or sends a Google token.
+     * Returns the created Drive file id.
      */
     fun uploadFileMultipart(
         file: File,
         mimeType: String,
-        folderId: String,
-        accessToken: String
+        uploadUrl: String,
+        appAuthToken: String
     ): Result<String> {
         val boundary = "dt_boundary_" + System.currentTimeMillis()
         var conn: HttpURLConnection? = null
 
         try {
-            val url = URL(DRIVE_UPLOAD_URL)
+            val url = URL(uploadUrl)
             conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 30_000
                 readTimeout = 60_000
                 doInput = true
                 doOutput = true
-                setRequestProperty("Authorization", "Bearer ${accessToken.trim()}")
-                setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
+                setRequestProperty("x-app-auth", appAuthToken.trim())
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             }
-
-            val metadataJson = JSONObject().apply {
-                put("name", file.name)
-                if (folderId.isNotBlank()) {
-                    put("parents", org.json.JSONArray().put(folderId.trim()))
-                }
-            }.toString()
 
             val os = conn.outputStream
             val crlf = "\r\n"
 
-            // Part 1: Metadata
+            // Single part: the exported file (the Worker derives name and MIME from its headers).
             os.write(("--$boundary$crlf").toByteArray(Charsets.UTF_8))
-            os.write(("Content-Type: application/json; charset=UTF-8$crlf$crlf").toByteArray(Charsets.UTF_8))
-            os.write(metadataJson.toByteArray(Charsets.UTF_8))
-            os.write(crlf.toByteArray(Charsets.UTF_8))
-
-            // Part 2: Media
-            os.write(("--$boundary$crlf").toByteArray(Charsets.UTF_8))
+            os.write(("Content-Disposition: form-data; name=\"file\"; filename=\"${file.name}\"$crlf").toByteArray(Charsets.UTF_8))
             os.write(("Content-Type: $mimeType$crlf$crlf").toByteArray(Charsets.UTF_8))
             file.inputStream().use { input ->
                 input.copyTo(os)
             }
             os.write(crlf.toByteArray(Charsets.UTF_8))
-
-            // End boundary
             os.write(("--$boundary--$crlf").toByteArray(Charsets.UTF_8))
             os.flush()
 
@@ -279,52 +265,13 @@ object GoogleDriveAutoUploader {
             return if (responseCode in 200..299) {
                 val resp = conn.inputStream.bufferedReader(Charsets.UTF_8).use(BufferedReader::readText)
                 val json = JSONObject(resp)
-                val fileId = json.optString("id", "")
-                Result.success(fileId)
+                Result.success(json.optString("id", ""))
             } else {
                 val err = conn.errorStream?.bufferedReader(Charsets.UTF_8)?.use(BufferedReader::readText) ?: "HTTP $responseCode"
-                Result.failure(Exception("Google Drive error: $err (HTTP $responseCode)"))
+                Result.failure(Exception("Cloud upload error: $err (HTTP $responseCode)"))
             }
         } catch (e: Exception) {
             return Result.failure(e)
-        } finally {
-            conn?.disconnect()
-        }
-    }
-
-    suspend fun testDriveConnection(accessToken: String): Result<String> = withContext(ioDispatcher) {
-        val cleanToken = accessToken.trim()
-        if (cleanToken.isBlank()) {
-            return@withContext Result.failure(IllegalArgumentException("กรุณาระบุ Google Drive Access Token"))
-        }
-
-        var conn: HttpURLConnection? = null
-        try {
-            val url = URL(DRIVE_ABOUT_URL)
-            conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 8000
-                doInput = true
-                setRequestProperty("Authorization", "Bearer $cleanToken")
-                setRequestProperty("Accept", "application/json")
-            }
-
-            val code = conn.responseCode
-            if (code in 200..299) {
-                val resp = conn.inputStream.bufferedReader().use(BufferedReader::readText)
-                val json = JSONObject(resp)
-                val userObj = json.optJSONObject("user")
-                val displayName = userObj?.optString("displayName", "Google Drive User") ?: "Google Drive User"
-                val email = userObj?.optString("emailAddress", "") ?: ""
-                val info = if (email.isNotBlank()) "$displayName ($email)" else displayName
-                Result.success("เชื่อมต่อ Google Drive สำเร็จ: $info")
-            } else {
-                val err = conn.errorStream?.bufferedReader()?.use(BufferedReader::readText) ?: "HTTP $code"
-                Result.failure(Exception("การเชื่อมต่อล้มเหลว: $err (HTTP $code)"))
-            }
-        } catch (e: Exception) {
-            Result.failure(Exception("ไม่สามารถเชื่อมต่อได้: ${e.message}"))
         } finally {
             conn?.disconnect()
         }

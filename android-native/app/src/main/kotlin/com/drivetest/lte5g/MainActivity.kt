@@ -1,4 +1,4 @@
-package com.drivetest.lte5g
+﻿package com.drivetest.lte5g
 
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,12 +32,17 @@ import com.drivetest.lte5g.ui.analytics.AnalyticsScreen
 import com.drivetest.lte5g.ui.dashboard.DashboardScreen
 import com.drivetest.lte5g.ui.map.DriveTestMapScreen
 import com.drivetest.lte5g.ui.sessions.SessionsScreen
+import com.drivetest.lte5g.ui.settings.PlayUpdateFallbackDialog
 import com.drivetest.lte5g.ui.settings.SettingsScreen
 import com.drivetest.lte5g.ui.theme.DriveTestLTE5GTheme
 import com.drivetest.lte5g.ui.theme.TelemetryCyan
 import com.drivetest.lte5g.ui.theme.TelemetryDarkBg
 import com.drivetest.lte5g.updater.OtaState
 import com.drivetest.lte5g.updater.OtaUpdateManager
+import com.drivetest.lte5g.updater.PlayUpdateAction
+import com.drivetest.lte5g.updater.PlayUpdateManager
+import com.drivetest.lte5g.updater.PlayUpdateState
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,7 +61,9 @@ fun MainDriveTestApp() {
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
+    val playState by PlayUpdateManager.state.collectAsStateWithLifecycle()
     var showInstallDialog by remember { mutableStateOf(true) }
+    var showPlayFallback by remember { mutableStateOf(false) }
 
     // Read authoritative package version info dynamically (Rule 10)
     val packageInfo = remember {
@@ -72,13 +79,14 @@ fun MainDriveTestApp() {
         }
     }
     val currentVersionName = packageInfo?.versionName ?: "1.11.2"
+    val scope = rememberCoroutineScope()
 
-    // Revalidate on resume (e.g. returning from settings permission grant)
+    // Refreshes Play update state on resume (also completes a downloaded flexible update)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                OtaUpdateManager.revalidate(context)
+                scope.launch { PlayUpdateManager.onResume(context) }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -87,9 +95,10 @@ fun MainDriveTestApp() {
         }
     }
 
-    // Trigger Automatic OTA update flow on launch (auto-check + background download)
+    // Checks release notes (GitHub) and asks Play Core whether an update is available
     LaunchedEffect(Unit) {
-        OtaUpdateManager.startAutoUpdateFlow(context, currentVersionName)
+        PlayUpdateManager.check(context)
+        OtaUpdateManager.checkForUpdates(currentVersionName)
     }
 
     Scaffold(
@@ -188,90 +197,116 @@ fun MainDriveTestApp() {
         }
     }
 
-    // Automatic OTA Install Confirmation Dialog
-    if (showInstallDialog && otaState is OtaState.ReadyToInstall) {
-        val readyState = otaState as OtaState.ReadyToInstall
-        val release = readyState.releaseInfo
-        val validation = readyState.validation
+// Play In-App Updates: prompt when Play reports an update for this install
+    val playUpdate = playState
+    val release = (otaState as? OtaState.UpdateAvailable)?.releaseInfo
+    val hasPlayUpdate = playUpdate is PlayUpdateState.Available && !playUpdate.updateInProgress
+    val needsCompletion = playUpdate is PlayUpdateState.Downloaded ||
+        (playUpdate is PlayUpdateState.Available && playUpdate.updateInProgress)
 
-        if (validation.isValid) {
-            AlertDialog(
-                onDismissRequest = { showInstallDialog = false },
-                icon = {
-                    Icon(
-                        Icons.Default.SystemUpdate,
-                        contentDescription = null,
-                        tint = TelemetryCyan,
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                title = {
-                    Text(
-                        text = "พบอัปเดตใหม่ v${release.versionName}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = Color.White
-                    )
-                },
-                text = {
-                    Column {
-                        if (release.releaseTitle.isNotBlank()) {
-                            Text(
-                                text = release.releaseTitle,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = TelemetryCyan
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
+    if (showInstallDialog && (hasPlayUpdate || needsCompletion)) {
+        val androidVersion = when {
+            playUpdate is PlayUpdateState.Available -> playUpdate.versionCode.toString()
+            else -> release?.versionName.orEmpty()
+        }
+        AlertDialog(
+            onDismissRequest = { showInstallDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.SystemUpdate,
+                    contentDescription = null,
+                    tint = TelemetryCyan,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (release != null) {
+                        "พบอัปเดตใหม่ v${release.versionName}"
+                    } else {
+                        "พบอัปเดตใหม่ (Play build $androidVersion)"
+                    },
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column {
+                    if (release != null && release.releaseTitle.isNotBlank()) {
                         Text(
-                            text = "ดาวน์โหลดและตรวจสอบความปลอดภัยเสร็จสมบูรณ์ในพื้นหลังแล้ว พร้อมสำหรับการติดตั้ง",
-                            fontSize = 12.sp,
-                            color = Color(0xFFCBD5E1),
-                            lineHeight = 16.sp
+                            text = release.releaseTitle,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = TelemetryCyan
                         )
-                        if (release.releaseNotes.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Surface(
-                                color = Color(0xFF1E293B),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = release.releaseNotes.take(240) + if (release.releaseNotes.length > 240) "..." else "",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF94A3B8),
-                                    modifier = Modifier.padding(8.dp),
-                                    lineHeight = 14.sp
-                                )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                    Text(
+                        text = if (needsCompletion) {
+                            "ดาวน์โหลดอัปเดตเสร็จแล้ว ปิดแอปหนึ่งครั้งเพื่อติดตั้งให้เสร็จ"
+                        } else {
+                            "อัปเดตจะติดตั้งผ่าน Google Play ไม่ต้องดาวน์โหลดหรือติดตั้ง APK เอง"
+                        },
+                        fontSize = 12.sp,
+                        color = Color(0xFFCBD5E1),
+                        lineHeight = 16.sp
+                    )
+                    if (release != null && release.releaseNotes.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = release.releaseNotes.take(240) + if (release.releaseNotes.length > 240) "..." else "",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.padding(8.dp),
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showInstallDialog = false
+                        scope.launch {
+                            val result = PlayUpdateManager.startUpdate(context)
+                            val action = result.getOrNull()
+                            if (action == null || action == PlayUpdateAction.NOT_FROM_PLAY) {
+                                showPlayFallback = true
                             }
                         }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            OtaUpdateManager.installApk(context, readyState.apkFile)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = TelemetryCyan)
-                    ) {
-                        Text(
-                            text = if (!validation.canInstallPackages) "เปิดสิทธิ์และติดตั้ง" else "ติดตั้งทันที",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showInstallDialog = false }
-                    ) {
-                        Text("ไว้ภายหลัง", color = Color(0xFF94A3B8))
-                    }
-                },
-                containerColor = Color(0xFF0F172A),
-                tonalElevation = 6.dp
-            )
-        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TelemetryCyan)
+                ) {
+                    Text(
+                        text = if (needsCompletion) "ติดตั้งให้เสร็จ" else "อัปเดตเลย",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showInstallDialog = false }
+                ) {
+                    Text("ไว้ภายหลัง", color = Color(0xFF94A3B8))
+                }
+            },
+            containerColor = Color(0xFF0F172A),
+            tonalElevation = 6.dp
+        )
+    }
+
+    // Play cannot update a sideloaded install: point the user at the Play listing instead
+    if (showPlayFallback) {
+        val reason = (playState as? PlayUpdateState.Unavailable)?.reason
+            ?: "แอปที่ติดตั้งจาก APK เองจะไม่ได้รับอัปเดตผ่าน Google Play"
+        PlayUpdateFallbackDialog(reason = reason, onDismiss = { showPlayFallback = false })
     }
 }

@@ -39,8 +39,8 @@ class GoogleDriveUploadWorker(
         }
 
         val config = CloudConfigRepository.config.value
-        if (config.googleDriveAccessToken.isBlank()) {
-            Log.w(TAG, "No Google Drive OAuth token configured in local.properties. Skipping upload.")
+        if (config.cloudUploadUrl.isBlank()) {
+            Log.w(TAG, "No cloud upload endpoint configured (CLOUD_UPLOAD_URL). Skipping upload.")
             return Result.failure()
         }
 

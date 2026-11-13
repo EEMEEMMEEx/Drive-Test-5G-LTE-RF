@@ -6,7 +6,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class OtaUpdateManagerTest {
 
@@ -28,6 +27,7 @@ class OtaUpdateManagerTest {
         assertTrue(OtaUpdateManager.compareVersions("v1.9.3-android", "1.9.0") > 0)
         assertTrue(OtaUpdateManager.compareVersions("2.0.0", "1.9.9") > 0)
         assertTrue(OtaUpdateManager.compareVersions("1.4.10", "1.4.2") > 0)
+        assertTrue(OtaUpdateManager.compareVersions("1.13.3", "1.13.2") > 0)
 
         // Older versions
         assertTrue(OtaUpdateManager.compareVersions("1.4.2", "1.5.0") < 0)
@@ -97,11 +97,90 @@ class OtaUpdateManagerTest {
     }
 
     @Test
-    fun testExtractCertInfo_dummyData() {
-        val dummyBytes = byteArrayOf(1, 2, 3, 4, 5)
-        val (subject, fingerprint) = OtaUpdateManager.extractCertInfo(dummyBytes)
-        assertNotNull(subject)
-        assertTrue(fingerprint.isNotEmpty())
-        assertTrue(fingerprint.contains(":"))
+    fun testDecideUpdateAction_immediateWinsOverFlexible() {
+        assertEquals(
+            PlayUpdateAction.START_IMMEDIATE,
+            PlayUpdateManager.decide(RemoteUpdateStatus.AVAILABLE, immediateAllowed = true, flexibleAllowed = true)
+        )
+        assertEquals(
+            PlayUpdateAction.START_IMMEDIATE,
+            PlayUpdateManager.decide(RemoteUpdateStatus.AVAILABLE, immediateAllowed = true, flexibleAllowed = false)
+        )
+    }
+
+    @Test
+    fun testDecideUpdateAction_flexibleAndResume() {
+        assertEquals(
+            PlayUpdateAction.START_FLEXIBLE,
+            PlayUpdateManager.decide(RemoteUpdateStatus.AVAILABLE, immediateAllowed = false, flexibleAllowed = true)
+        )
+        // A flow already in progress must be resumed, not restarted
+        assertEquals(
+            PlayUpdateAction.COMPLETE_PENDING,
+            PlayUpdateManager.decide(RemoteUpdateStatus.IN_PROGRESS, immediateAllowed = true, flexibleAllowed = true)
+        )
+    }
+
+    @Test
+    fun testDecideUpdateAction_noUpdateOrNotFromPlay() {
+        assertEquals(
+            PlayUpdateAction.UP_TO_DATE,
+            PlayUpdateManager.decide(RemoteUpdateStatus.NOT_AVAILABLE, immediateAllowed = false, flexibleAllowed = false)
+        )
+        // Update available but Play allows neither flow: only possible for non-Play installs
+        assertEquals(
+            PlayUpdateAction.NOT_FROM_PLAY,
+            PlayUpdateManager.decide(RemoteUpdateStatus.AVAILABLE, immediateAllowed = false, flexibleAllowed = false)
+        )
+    }
+
+    @Test
+    fun testDecideUpdateAction_sideloadedInstallIsNotReportedAsUpToDate() {
+        // Play says nothing is pending, but the app was not installed by Play:
+        // the user must be told to install once from Play, not shown "up to date".
+        assertEquals(
+            PlayUpdateAction.NOT_FROM_PLAY,
+            PlayUpdateManager.decide(
+                RemoteUpdateStatus.NOT_AVAILABLE,
+                immediateAllowed = false,
+                flexibleAllowed = false,
+                installedFromPlay = false
+            )
+        )
+        // Same status for a Play install stays up to date
+        assertEquals(
+            PlayUpdateAction.UP_TO_DATE,
+            PlayUpdateManager.decide(
+                RemoteUpdateStatus.NOT_AVAILABLE,
+                immediateAllowed = false,
+                flexibleAllowed = false,
+                installedFromPlay = true
+            )
+        )
+        // A running flow is resumed even for a sideloaded install
+        assertEquals(
+            PlayUpdateAction.COMPLETE_PENDING,
+            PlayUpdateManager.decide(
+                RemoteUpdateStatus.IN_PROGRESS,
+                immediateAllowed = false,
+                flexibleAllowed = false,
+                installedFromPlay = false
+            )
+        )
+    }
+
+    @Test
+    fun testIsInstalledFromPlay_onlyAcceptsPlayStoreInstaller() {
+        assertTrue(PlayUpdateManager.isInstalledFromPlay("com.android.vending"))
+        assertFalse(PlayUpdateManager.isInstalledFromPlay("com.google.android.packageinstaller"))
+        assertFalse(PlayUpdateManager.isInstalledFromPlay(null))
+    }
+
+    @Test
+    fun testPlayStoreUrlBuiltFromPackageName() {
+        val url = PlayUpdateManager.playStoreUrl("com.drivetest.lte5g")
+        assertEquals("https://play.google.com/store/apps/details?id=com.drivetest.lte5g", url)
+        assertTrue(url.startsWith("https://"))
+        assertFalse(url.contains("null"))
     }
 }

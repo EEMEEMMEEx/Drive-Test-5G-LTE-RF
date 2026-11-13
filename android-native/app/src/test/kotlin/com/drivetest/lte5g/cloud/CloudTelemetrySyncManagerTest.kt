@@ -144,8 +144,7 @@ class CloudTelemetrySyncManagerTest {
             firebaseDbUrl = "https://example-firebase.io",
             firebaseAuthToken = "secret123",
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = "token123",
-            googleDriveFolderId = "folder123",
+            cloudUploadUrl = "",
             autoUploadOnWifi = true
         )
 
@@ -218,8 +217,7 @@ class CloudTelemetrySyncManagerTest {
             firebaseDbUrl = "https://example-firebase.io",
             firebaseAuthToken = "",
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = "",
-            googleDriveFolderId = "",
+            cloudUploadUrl = "",
             autoUploadOnWifi = false
         )
 
@@ -253,8 +251,7 @@ class CloudTelemetrySyncManagerTest {
             firebaseDbUrl = "https://example-firebase.io",
             firebaseAuthToken = "",
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = "",
-            googleDriveFolderId = "",
+            cloudUploadUrl = "",
             autoUploadOnWifi = false
         )
 

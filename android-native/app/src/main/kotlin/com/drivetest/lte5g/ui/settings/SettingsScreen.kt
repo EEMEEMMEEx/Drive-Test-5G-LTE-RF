@@ -52,6 +52,9 @@ import com.drivetest.lte5g.ui.theme.TelemetryCyan
 import com.drivetest.lte5g.ui.theme.TelemetryDarkBg
 import com.drivetest.lte5g.updater.OtaState
 import com.drivetest.lte5g.updater.OtaUpdateManager
+import com.drivetest.lte5g.updater.PlayUpdateAction
+import com.drivetest.lte5g.updater.PlayUpdateManager
+import com.drivetest.lte5g.updater.PlayUpdateState
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -65,6 +68,63 @@ private fun formatLastChecked(timestamp: Long?): String {
     return "Today at ${sdf.format(Date(timestamp))}"
 }
 
+/**
+ * Fallback shown when Google Play cannot update this install (app was installed by sideloading
+ * an APK). No APK is installed by the app itself anymore.
+ */
+@Composable
+fun PlayUpdateFallbackDialog(reason: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "อัปเดตผ่าน Google Play",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color.White
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "ติดตั้งจาก Play ก่อนหนึ่งครั้งเพื่อรับอัปเดตอัตโนมัติ",
+                    fontSize = 12.sp,
+                    color = Color(0xFFCBD5E1),
+                    lineHeight = 16.sp
+                )
+                if (reason.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = reason,
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    PlayUpdateManager.openPlayStore(context)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+            ) {
+                Text("เปิด Play Store", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("ปิด", color = Color(0xFF94A3B8))
+            }
+        },
+        containerColor = Color(0xFF0F172A),
+        tonalElevation = 6.dp
+    )
+}
+
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier
@@ -76,11 +136,13 @@ fun SettingsScreen(
 
     val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                OtaUpdateManager.revalidate(context)
+                // Finishes a flexible update Play downloaded while the app was in background
+                scope.launch { PlayUpdateManager.onResume(context) }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -89,9 +151,10 @@ fun SettingsScreen(
         }
     }
 
-    val scope = rememberCoroutineScope()
     val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
+    val playState by PlayUpdateManager.state.collectAsStateWithLifecycle()
     val lastCheckedTime by OtaUpdateManager.lastCheckedTimestamp.collectAsStateWithLifecycle()
+    var showPlayFallback by remember { mutableStateOf(false) }
 
     // Read authoritative package version info dynamically (Rule 10)
     val packageInfo = remember {
@@ -216,59 +279,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    is OtaState.Downloading -> {
-                        Surface(
-                            color = Color(0xFF1E293B),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(14.dp),
-                                            color = TelemetryCyan,
-                                            strokeWidth = 2.dp
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Downloading in Background...",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFFA5F3FC)
-                                        )
-                                    }
-                                    Text(
-                                        text = "${(state.progress * 100).toInt()}%",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TelemetryCyan
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    progress = { state.progress },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp),
-                                    color = TelemetryCyan,
-                                    trackColor = Color(0xFF0F172A)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "${String.format(Locale.US, "%.1f", state.downloadedBytes / (1024f * 1024f))} / ${String.format(Locale.US, "%.1f", state.totalBytes / (1024f * 1024f))} MB",
-                                    fontSize = 10.5.sp,
-                                    color = Color(0xFF94A3B8)
-                                )
-                            }
-                        }
-                    }
-
                     is OtaState.UpToDate -> {
                         Surface(
                             color = Color(0xFF064E3B),
@@ -351,59 +361,6 @@ fun SettingsScreen(
                                         text = release.releaseTitle,
                                         fontSize = 11.5.sp,
                                         color = Color(0xFFE2E8F0)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    is OtaState.ReadyToInstall -> {
-                        Surface(
-                            color = if (state.validation.isValid) Color(0xFF064E3B).copy(alpha = 0.7f) else Color(0xFF450A0A),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, if (state.validation.isValid) SignalTier1 else Color(0xFFDC2626)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            if (state.validation.isValid) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = if (state.validation.isValid) SignalTier1 else Color(0xFFEF4444),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = if (state.validation.isValid) "Update Ready to Install" else "Validation Failed",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                    Surface(
-                                        color = Color(0xFF0284C7),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            text = "v${state.releaseInfo.versionName}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                                if (!state.validation.isValid) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = state.validation.errorMessage ?: "Verification failed",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFFCA5A5)
                                     )
                                 }
                             }
@@ -529,69 +486,14 @@ fun SettingsScreen(
                         }
                     }
 
-                    is OtaState.Downloading -> {
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("DOWNLOADING IN BACKGROUND...", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                        }
-                    }
-
-                    is OtaState.ReadyToInstall -> {
-                        if (state.validation.isValid) {
-                            Button(
-                                onClick = {
-                                    OtaUpdateManager.installApk(context, state.apkFile)
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = if (!state.validation.canInstallPackages) "ALLOW PERMISSION & INSTALL" else "INSTALL UPDATE NOW",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Color.Black
-                                )
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { OtaUpdateManager.shareApkFile(context, state.apkFile) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("SHARE APK", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                OutlinedButton(
-                                    onClick = { OtaUpdateManager.resetState() },
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("DISMISS", fontSize = 11.sp, color = Color(0xFF94A3B8))
-                                }
-                            }
-                        }
-                    }
-
                     is OtaState.UpdateAvailable -> {
                         Button(
                             onClick = {
-                                if (!OtaUpdateManager.canRequestPackageInstalls(context)) {
-                                    OtaUpdateManager.openInstallPermissionSettings(context)
-                                } else {
-                                    scope.launch {
-                                        val res = OtaUpdateManager.downloadApk(context, state.releaseInfo)
-                                        res.onSuccess { apkFile ->
-                                            OtaUpdateManager.installApk(context, apkFile)
-                                        }
+                                scope.launch {
+                                    val result = PlayUpdateManager.startUpdate(context)
+                                    val action = result.getOrNull()
+                                    if (action == null || action == PlayUpdateAction.NOT_FROM_PLAY) {
+                                        showPlayFallback = true
                                     }
                                 }
                             },
@@ -600,7 +502,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "DOWNLOAD & INSTALL UPDATE",
+                                text = "อัปเดตผ่าน Play Store",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                                 color = Color.Black
@@ -658,7 +560,62 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 5. FALLBACK: Play updates only work for installs that came from Play
+                val playDownload = playState
+                if (playDownload is PlayUpdateState.Downloading) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "กำลังดาวน์โหลดอัปเดตผ่าน Play",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFFA5F3FC)
+                        )
+                        Text(
+                            text = "${playDownload.progressPercent}%",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TelemetryCyan
+                        )
+                    }
+                }
+                val playUnavailable = playState
+                if (playUnavailable is PlayUpdateState.Unavailable) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = playUnavailable.reason,
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+                TextButton(
+                    onClick = { showPlayFallback = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "ติดตั้งจาก Play ก่อนหนึ่งครั้งเพื่อรับอัปเดตอัตโนมัติ",
+                        fontSize = 11.5.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
             }
+        }
+
+        if (showPlayFallback) {
+            val playReason = (playState as? PlayUpdateState.Unavailable)?.reason
+                ?: "แอปที่ติดตั้งจาก APK เองจะไม่ได้รับอัปเดตผ่าน Google Play"
+            PlayUpdateFallbackDialog(
+                reason = playReason,
+                onDismiss = { showPlayFallback = false }
+            )
         }
 
         // Measurement Cadence Configuration Card

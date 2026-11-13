@@ -22,11 +22,9 @@ val firebaseDbUrl: String = localProperties.getProperty("FIREBASE_DB_URL")
 val firebaseAuthToken: String = localProperties.getProperty("FIREBASE_AUTH_TOKEN")
   ?: System.getenv("FIREBASE_AUTH_TOKEN")
   ?: ""
-val gdriveAccessToken: String = localProperties.getProperty("GDRIVE_ACCESS_TOKEN")
-  ?: System.getenv("GDRIVE_ACCESS_TOKEN")
-  ?: ""
-val gdriveFolderId: String = localProperties.getProperty("GDRIVE_FOLDER_ID")
-  ?: System.getenv("GDRIVE_FOLDER_ID")
+// Drive uploads run server-side (worker/drive-upload.js); the app only needs that endpoint, never a Google credential.
+val cloudUploadUrl: String = localProperties.getProperty("CLOUD_UPLOAD_URL")
+  ?: System.getenv("CLOUD_UPLOAD_URL")
   ?: ""
 // Release signing material lives outside VCS (local.properties or CI env vars).
 // Never commit the keystore path, store password, alias or key password.
@@ -50,14 +48,13 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 45
-    versionName = "1.13.1"
+    versionCode = 47
+    versionName = "1.13.3"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     buildConfigField("String", "FIREBASE_DB_URL", "\"$firebaseDbUrl\"")
     buildConfigField("String", "FIREBASE_AUTH_TOKEN", "\"$firebaseAuthToken\"")
-    buildConfigField("String", "GDRIVE_ACCESS_TOKEN", "\"$gdriveAccessToken\"")
-    buildConfigField("String", "GDRIVE_FOLDER_ID", "\"$gdriveFolderId\"")
+    buildConfigField("String", "CLOUD_UPLOAD_URL", "\"$cloudUploadUrl\"")
   }
 
   signingConfigs {
@@ -115,6 +112,32 @@ kotlin {
   jvmToolchain(17)
 }
 
+// Security guard: fails the build if a Google OAuth token (ya29.) or a non-empty GDRIVE_ACCESS_TOKEN field reappears in the generated BuildConfig.
+val guardNoDriveToken = tasks.register("guardNoDriveToken") {
+  group = "verification"
+  description = "Fails when a Google Drive OAuth token or the removed GDRIVE_ACCESS_TOKEN field returns to BuildConfig."
+  dependsOn(tasks.matching { it.name.startsWith("generate") && it.name.endsWith("BuildConfig") })
+  outputs.upToDateWhen { false }
+  val generatedRoot = layout.buildDirectory.dir("generated/source/buildConfig")
+  doLast {
+    val token = Regex("""ya29\.[A-Za-z0-9_\-.]{10,}""")
+    val injectedField = Regex("""GDRIVE_ACCESS_TOKEN\s*=\s*"(?!")""")
+    val violations = mutableListOf<String>()
+    generatedRoot.get().asFile.walkTopDown()
+      .filter { it.isFile && it.name == "BuildConfig.java" }
+      .forEach { f ->
+        val text = f.readText()
+        if (token.containsMatchIn(text)) violations += "${f.path}: ya29. token"
+        if (injectedField.containsMatchIn(text)) violations += "${f.path}: GDRIVE_ACCESS_TOKEN is non-empty"
+      }
+    if (violations.isNotEmpty()) {
+      throw GradleException("Drive token guard failed (secrets must stay server-side):\n" + violations.joinToString("\n"))
+    }
+  }
+}
+tasks.matching { it.name == "assembleDebug" || it.name == "assembleRelease" || it.name == "bundleRelease" }
+  .configureEach { dependsOn(guardNoDriveToken) }
+
 dependencies {
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
@@ -164,4 +187,8 @@ dependencies {
   // WorkManager (Background Cloud Uploads on Wi-Fi)
   implementation(libs.androidx.work.runtime.ktx)
   testImplementation("androidx.work:work-testing:2.10.0")
+
+  // Google Play In-App Updates (requested by @updater, board #31)
+  implementation("com.google.android.play:app-update:2.1.0")
+  implementation("com.google.android.play:app-update-ktx:2.1.0")
 }

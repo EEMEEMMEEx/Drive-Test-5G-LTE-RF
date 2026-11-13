@@ -3,6 +3,8 @@
   "name": "drivetest-noc",
   "compatibility_date": "2026-10-12",
   "account_id": "60355536714e27ee2e51aca4ba6ecc8a",
+  // Worker handles /api/drive-upload (server-side Drive upload, secrets via `wrangler secret put`) and serves the dashboard.
+  "main": "worker/drive-upload.js",
   "assets": {
     "directory": "./noc-dashboard"
   }

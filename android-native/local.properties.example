@@ -8,8 +8,9 @@ MAPS_API_KEY=
 GEMINI_API_KEY=
 FIREBASE_DB_URL=
 FIREBASE_AUTH_TOKEN=
-GDRIVE_ACCESS_TOKEN=
-GDRIVE_FOLDER_ID=
+## Cloud upload endpoint of the Drive proxy Worker (worker/drive-upload.js).
+## No Google credential belongs here: the Drive refresh token is a Worker secret (wrangler secret put GOOGLE_REFRESH_TOKEN).
+CLOUD_UPLOAD_URL=
 
 ## Release signing (optional; without these the release build falls back to debug signing)
 ## Path to the keystore file, e.g. D:\\my-release-keystore

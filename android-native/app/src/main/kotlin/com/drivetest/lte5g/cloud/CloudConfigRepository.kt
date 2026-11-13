@@ -28,8 +28,7 @@ data class CloudConfig(
     val firebaseDbUrl: String,
     val firebaseAuthToken: String,
     val liveTelemetryEnabled: Boolean = true,
-    val googleDriveAccessToken: String,
-    val googleDriveFolderId: String,
+    val cloudUploadUrl: String,
     val autoUploadOnWifi: Boolean = true
 )
 
@@ -49,8 +48,7 @@ object CloudConfigRepository {
             firebaseDbUrl = BuildConfig.FIREBASE_DB_URL,
             firebaseAuthToken = BuildConfig.FIREBASE_AUTH_TOKEN,
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = BuildConfig.GDRIVE_ACCESS_TOKEN,
-            googleDriveFolderId = BuildConfig.GDRIVE_FOLDER_ID,
+            cloudUploadUrl = BuildConfig.CLOUD_UPLOAD_URL,
             autoUploadOnWifi = true
         )
     )
@@ -87,16 +85,14 @@ object CloudConfigRepository {
             "https://drivetest-telemetry-default-rtdb.asia-southeast1.firebasedatabase.app"
         }
         val fbToken = BuildConfig.FIREBASE_AUTH_TOKEN
-        val driveToken = BuildConfig.GDRIVE_ACCESS_TOKEN
-        val driveFolder = BuildConfig.GDRIVE_FOLDER_ID
+        val uploadUrl = BuildConfig.CLOUD_UPLOAD_URL
 
         _config.value = CloudConfig(
             vehicleId = vId,
             firebaseDbUrl = defaultFbUrl,
             firebaseAuthToken = fbToken,
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = driveToken,
-            googleDriveFolderId = driveFolder,
+            cloudUploadUrl = uploadUrl,
             autoUploadOnWifi = true
         )
 
@@ -281,8 +277,7 @@ object CloudConfigRepository {
             firebaseDbUrl = "",
             firebaseAuthToken = "",
             liveTelemetryEnabled = true,
-            googleDriveAccessToken = "",
-            googleDriveFolderId = "",
+            cloudUploadUrl = "",
             autoUploadOnWifi = true
         )
         _sessionStatuses.value = emptyMap()
