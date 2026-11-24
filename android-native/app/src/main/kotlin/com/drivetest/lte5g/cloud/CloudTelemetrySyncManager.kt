@@ -93,6 +93,7 @@ object CloudTelemetrySyncManager {
 
         val root = JSONObject().apply {
             put("vehicleId", config.vehicleId)
+            put("deviceInstallId", CloudConfigRepository.getDeviceInstallId())
             put("sessionId", session.id.toString())
             put("isRecording", true)
             put("updatedAt", sample.timestamp)
@@ -304,6 +305,7 @@ object CloudTelemetrySyncManager {
                 val vehicleUrl = "$baseUrl/fleet/vehicles/${config.vehicleId}.json$authParam"
                 val vehiclePayload = JSONObject().apply {
                     put("vehicleId", config.vehicleId)
+                    put("deviceInstallId", CloudConfigRepository.getDeviceInstallId())
                     put("sessionId", session.id.toString())
                     put("isRecording", true)
                     put("updatedAt", System.currentTimeMillis())

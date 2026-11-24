@@ -180,8 +180,34 @@ fun SettingsScreen(
     val cloudConfig by CloudConfigRepository.config.collectAsStateWithLifecycle()
     var vehicleIdInput by remember(cloudConfig.vehicleId) { mutableStateOf(cloudConfig.vehicleId) }
     var vehicleIdError by remember { mutableStateOf<String?>(null) }
-    var isValidatingId by remember { mutableStateOf(false) }
+    var vehicleIdNotice by remember { mutableStateOf<String?>(null) }
+    var isDuplicateHint by remember { mutableStateOf(false) }
+    var isCheckingId by remember { mutableStateOf(false) }
+    var isSavingId by remember { mutableStateOf(false) }
     var isIdSavedSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(vehicleIdInput, isSavingId, isIdSavedSuccess) {
+        if (isSavingId || isIdSavedSuccess) return@LaunchedEffect
+        val norm = vehicleIdInput.trim().uppercase(Locale.US)
+        if (norm.isBlank()) {
+            isCheckingId = false
+            isDuplicateHint = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(300)
+        isCheckingId = true
+        val valRes = CloudConfigRepository.validateVehicleId(norm)
+        isCheckingId = false
+        if (vehicleIdInput.trim().uppercase(Locale.US) == norm && !isSavingId && !isIdSavedSuccess) {
+            if (valRes.isSuccess && !valRes.getOrDefault(true)) {
+                isDuplicateHint = true
+                vehicleIdNotice = "$norm is in use — SAVE will auto-assign next free ID"
+            } else {
+                isDuplicateHint = false
+                vehicleIdNotice = null
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -1014,17 +1040,23 @@ fun SettingsScreen(
 
                     // Auto-generate next ID button
                     TextButton(
+                        enabled = !isSavingId,
                         onClick = {
                             scope.launch {
-                                isValidatingId = true
+                                isSavingId = true
                                 vehicleIdError = null
+                                vehicleIdNotice = null
+                                isDuplicateHint = false
                                 isIdSavedSuccess = false
                                 val nextRes = CloudConfigRepository.queryNextAvailableVehicleId()
                                 val nextId = nextRes.getOrDefault("DT-01")
-                                vehicleIdInput = nextId
                                 val saveRes = CloudConfigRepository.saveVehicleId(nextId)
-                                isValidatingId = false
+                                isSavingId = false
                                 if (saveRes.isSuccess) {
+                                    val claim = saveRes.getOrThrow()
+                                    vehicleIdInput = claim.assignedId
+                                    vehicleIdNotice = claim.reassignmentNotice
+                                    isDuplicateHint = false
                                     isIdSavedSuccess = true
                                 } else {
                                     vehicleIdError = saveRes.exceptionOrNull()?.message
@@ -1063,21 +1095,9 @@ fun SettingsScreen(
                             val norm = raw.trim().uppercase(Locale.US)
                             vehicleIdInput = norm
                             isIdSavedSuccess = false
-                            if (norm.isBlank()) {
-                                vehicleIdError = "Vehicle ID cannot be blank"
-                            } else {
-                                vehicleIdError = null
-                                scope.launch {
-                                    isValidatingId = true
-                                    val valRes = CloudConfigRepository.validateVehicleId(norm)
-                                    isValidatingId = false
-                                    if (valRes.isSuccess && !valRes.getOrDefault(true)) {
-                                        vehicleIdError = "This Vehicle ID is already in use"
-                                    } else {
-                                        vehicleIdError = null
-                                    }
-                                }
-                            }
+                            isDuplicateHint = false
+                            vehicleIdNotice = null
+                            vehicleIdError = if (norm.isBlank()) "Vehicle ID cannot be blank" else null
                         },
                         label = { Text("Vehicle ID (เช่น DT-01)", fontSize = 11.sp) },
                         singleLine = true,
@@ -1099,19 +1119,25 @@ fun SettingsScreen(
                         onClick = {
                             val norm = vehicleIdInput.trim().uppercase(Locale.US)
                             scope.launch {
-                                isValidatingId = true
+                                isSavingId = true
                                 vehicleIdError = null
+                                vehicleIdNotice = null
+                                isDuplicateHint = false
                                 isIdSavedSuccess = false
                                 val saveRes = CloudConfigRepository.saveVehicleId(norm)
-                                isValidatingId = false
+                                isSavingId = false
                                 if (saveRes.isSuccess) {
+                                    val claim = saveRes.getOrThrow()
+                                    vehicleIdInput = claim.assignedId
+                                    vehicleIdNotice = claim.reassignmentNotice
+                                    isDuplicateHint = false
                                     isIdSavedSuccess = true
                                 } else {
                                     vehicleIdError = saveRes.exceptionOrNull()?.message ?: "Failed to save ID"
                                 }
                             }
                         },
-                        enabled = !isValidatingId && vehicleIdError == null && vehicleIdInput.isNotBlank() && vehicleIdInput != cloudConfig.vehicleId,
+                        enabled = !isSavingId && vehicleIdError == null && vehicleIdInput.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = TelemetryCyan,
                             contentColor = Color(0xFF0F172A),
@@ -1121,7 +1147,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(50.dp)
                     ) {
-                        if (isValidatingId) {
+                        if (isSavingId) {
                             CircularProgressIndicator(
                                 color = Color.White,
                                 modifier = Modifier.size(16.dp),
@@ -1134,10 +1160,10 @@ fun SettingsScreen(
                 }
 
                 // Inline validation status
-                if (isValidatingId) {
+                if (isSavingId || isCheckingId) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Checking ID availability in fleet...",
+                        text = if (isSavingId) "Claiming Vehicle ID in fleet..." else "Checking ID availability in fleet...",
                         fontSize = 11.sp,
                         color = TelemetryCyan
                     )
@@ -1158,7 +1184,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
-                } else if (isIdSavedSuccess || vehicleIdInput == cloudConfig.vehicleId) {
+                } else if (isIdSavedSuccess || (vehicleIdInput == cloudConfig.vehicleId && !isDuplicateHint)) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -1175,6 +1201,23 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
+                    if (!vehicleIdNotice.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = vehicleIdNotice ?: "",
+                            fontSize = 11.sp,
+                            color = TelemetryCyan,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                } else if (!vehicleIdNotice.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = vehicleIdNotice ?: "",
+                        fontSize = 11.sp,
+                        color = TelemetryCyan,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
