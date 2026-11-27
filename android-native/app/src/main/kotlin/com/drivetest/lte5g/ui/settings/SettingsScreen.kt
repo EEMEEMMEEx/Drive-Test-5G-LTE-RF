@@ -154,6 +154,9 @@ fun SettingsScreen(
     val otaState by OtaUpdateManager.state.collectAsStateWithLifecycle()
     val playState by PlayUpdateManager.state.collectAsStateWithLifecycle()
     val lastCheckedTime by OtaUpdateManager.lastCheckedTimestamp.collectAsStateWithLifecycle()
+    val isFromPlay = remember(context) {
+        PlayUpdateManager.isInstalledFromPlay(PlayUpdateManager.installerPackage(context))
+    }
     var showPlayFallback by remember { mutableStateOf(false) }
 
     // Read authoritative package version info dynamically (Rule 10)
@@ -513,26 +516,47 @@ fun SettingsScreen(
                     }
 
                     is OtaState.UpdateAvailable -> {
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    val result = PlayUpdateManager.startUpdate(context)
-                                    val action = result.getOrNull()
-                                    if (action == null || action == PlayUpdateAction.NOT_FROM_PLAY) {
-                                        showPlayFallback = true
+                        if (isFromPlay) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        val result = PlayUpdateManager.startUpdate(context)
+                                        val action = result.getOrNull()
+                                        if (action == null || action == PlayUpdateAction.NOT_FROM_PLAY) {
+                                            showPlayFallback = true
+                                        }
                                     }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "อัปเดตผ่าน Play Store",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = Color.Black
-                            )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SignalTier1),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "อัปเดตผ่าน Play Store",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color.Black
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        OtaUpdateManager.checkForUpdates(currentVersionName)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "CHECK AGAIN",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
 
@@ -587,50 +611,52 @@ fun SettingsScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 5. FALLBACK: Play updates only work for installs that came from Play
-                val playDownload = playState
-                if (playDownload is PlayUpdateState.Downloading) {
+                // 5. Play Store update status & fallback (shown only when installed from Google Play)
+                if (isFromPlay) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0xFF1E293B), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+
+                    val playDownload = playState
+                    if (playDownload is PlayUpdateState.Downloading) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "กำลังดาวน์โหลดอัปเดตผ่าน Play",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFFA5F3FC)
+                            )
+                            Text(
+                                text = "${playDownload.progressPercent}%",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TelemetryCyan
+                            )
+                        }
+                    }
+                    val playUnavailable = playState
+                    if (playUnavailable is PlayUpdateState.Unavailable) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "กำลังดาวน์โหลดอัปเดตผ่าน Play",
-                            fontSize = 11.5.sp,
-                            color = Color(0xFFA5F3FC)
-                        )
-                        Text(
-                            text = "${playDownload.progressPercent}%",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TelemetryCyan
+                            text = playUnavailable.reason,
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
                         )
                     }
-                }
-                val playUnavailable = playState
-                if (playUnavailable is PlayUpdateState.Unavailable) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = playUnavailable.reason,
-                        fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                }
-                TextButton(
-                    onClick = { showPlayFallback = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "ติดตั้งจาก Play ก่อนหนึ่งครั้งเพื่อรับอัปเดตอัตโนมัติ",
-                        fontSize = 11.5.sp,
-                        color = Color(0xFF94A3B8)
-                    )
+                    TextButton(
+                        onClick = { showPlayFallback = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "ติดตั้งจาก Play ก่อนหนึ่งครั้งเพื่อรับอัปเดตอัตโนมัติ",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
                 }
             }
         }
