@@ -424,6 +424,8 @@ class DriveTestForegroundService : Service() {
                     delay(currentCadence.intervalMs)
 
                     val loc = locationCollector.currentLocation.value
+                    val gpsStale = locationCollector.isLocationStale()
+                    _isGpsStale.value = gpsStale
                     val metrics = cellCollector.currentMetrics.value
                     val metricsSim2 = if (_isDualSimMode.value) cellCollector.currentMetricsSim2.value else null
 
@@ -439,6 +441,8 @@ class DriveTestForegroundService : Service() {
 
                     if (loc == null) {
                         SessionDiagnostics.incDroppedNoLocation()
+                    } else if (gpsStale) {
+                        SessionDiagnostics.incDroppedStaleGps()
                     } else if (!passesFilter) {
                         SessionDiagnostics.incDroppedRatFilter()
                     } else {
@@ -530,6 +534,7 @@ class DriveTestForegroundService : Service() {
             CloudTelemetrySyncManager.markSessionStopped()
         }
         releaseWakeLock()
+        _isGpsStale.value = false
         _isRecording.value = false
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
@@ -687,6 +692,9 @@ class DriveTestForegroundService : Service() {
 
         private val _liveMetricsSim2 = MutableStateFlow<CellMetrics?>(null)
         val liveMetricsSim2: StateFlow<CellMetrics?> = _liveMetricsSim2.asStateFlow()
+
+        private val _isGpsStale = MutableStateFlow(false)
+        val isGpsStale: StateFlow<Boolean> = _isGpsStale.asStateFlow()
 
         fun isIgnoringBatteryOptimizations(context: Context): Boolean {
             return try {

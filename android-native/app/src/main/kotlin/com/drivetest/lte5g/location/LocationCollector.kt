@@ -24,6 +24,7 @@ class LocationCollector(
     companion object {
         private const val TAG = "LocationCollector"
         private const val LAST_LOCATION_MAX_AGE_MS = 60_000L
+        const val STALE_GPS_THRESHOLD_MS = 30_000L
     }
 
     private val fusedClient: FusedLocationProviderClient =
@@ -31,6 +32,9 @@ class LocationCollector(
 
     private val _currentLocation = MutableStateFlow<Location?>(null)
     val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
+
+    private val _isGpsStale = MutableStateFlow(false)
+    val isGpsStale: StateFlow<Boolean> = _isGpsStale.asStateFlow()
 
     @Volatile
     private var isTracking = false
@@ -46,6 +50,7 @@ class LocationCollector(
                 return
             }
             lastFixElapsedRealtimeMs = SystemClock.elapsedRealtime()
+            _isGpsStale.value = false
             _currentLocation.value = location
         }
     }
@@ -53,6 +58,20 @@ class LocationCollector(
     fun lastFixAgeMs(): Long? {
         val last = lastFixElapsedRealtimeMs ?: return null
         return maxOf(0L, SystemClock.elapsedRealtime() - last)
+    }
+
+    /**
+     * Returns true if a previous GPS fix exists and no new fix arrived within [thresholdMs] (default 30s).
+     * Updates [isGpsStale] state flow so UI/diagnostics can surface the stale GPS flag.
+     */
+    fun isLocationStale(thresholdMs: Long = STALE_GPS_THRESHOLD_MS): Boolean {
+        val age = lastFixAgeMs() ?: run {
+            _isGpsStale.value = false
+            return false
+        }
+        val stale = age > thresholdMs
+        _isGpsStale.value = stale
+        return stale
     }
 
     @SuppressLint("MissingPermission")
@@ -67,6 +86,7 @@ class LocationCollector(
                     val accurate = !lastLoc.hasAccuracy() || lastLoc.accuracy <= maxAccuracyThresholdMeters
                     if (accurate && ageMs in 0..LAST_LOCATION_MAX_AGE_MS) {
                         lastFixElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                        _isGpsStale.value = false
                         _currentLocation.value = lastLoc
                     }
                 }
@@ -122,6 +142,7 @@ class LocationCollector(
     fun stopTracking() {
         if (!isTracking) {
             _currentLocation.value = null
+            _isGpsStale.value = false
             lastFixElapsedRealtimeMs = null
             return
         }
@@ -133,6 +154,7 @@ class LocationCollector(
         } finally {
             isTracking = false
             _currentLocation.value = null
+            _isGpsStale.value = false
             lastFixElapsedRealtimeMs = null
         }
     }

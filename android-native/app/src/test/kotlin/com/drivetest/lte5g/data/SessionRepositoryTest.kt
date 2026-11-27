@@ -191,10 +191,13 @@ class SessionRepositoryTest {
         SessionRepository.resetForTesting()
         SessionRepository.initStorage(testDir)
 
-        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
-        assertNotNull(loaded)
-        assertEquals(0, loaded!!.simSlot)
-        assertEquals("SIM 1: AIS", loaded.simDisplayName)
+        val loadedMeta = SessionRepository.sessions.value.find { it.id == s.id }
+        assertNotNull(loadedMeta)
+        assertEquals(0, loadedMeta!!.simSlot)
+        assertEquals("SIM 1: AIS", loadedMeta.simDisplayName)
+        assertTrue("Expected lazy-load to skip reading samples on startup", loadedMeta.samples.isEmpty())
+
+        val loaded = SessionRepository.ensureSessionSamplesLoaded(s.id)!!
         assertEquals(1, loaded.samples.size)
         assertEquals(0, loaded.samples[0].simSlot)
         assertEquals("SIM 1: AIS", loaded.samples[0].simDisplayName)
@@ -254,12 +257,15 @@ class SessionRepositoryTest {
         SessionRepository.resetForTesting()
         SessionRepository.initStorage(testDir)
 
-        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
-        assertNotNull(loaded)
-        assertTrue(loaded!!.isDualSimLogging)
-        assertEquals("SIM 2: TRUE 5G", loaded.sim2DisplayName)
-        assertEquals(-80, loaded.avgRsrp)
-        assertEquals(-92, loaded.avgRsrpSim2)
+        val loadedMeta = SessionRepository.sessions.value.find { it.id == s.id }
+        assertNotNull(loadedMeta)
+        assertTrue(loadedMeta!!.isDualSimLogging)
+        assertEquals("SIM 2: TRUE 5G", loadedMeta.sim2DisplayName)
+        assertEquals(-80, loadedMeta.avgRsrp)
+        assertEquals(-92, loadedMeta.avgRsrpSim2)
+        assertTrue(loadedMeta.samples.isEmpty())
+
+        val loaded = SessionRepository.ensureSessionSamplesLoaded(s.id)!!
         assertEquals(1, loaded.samples.size)
         assertNotNull(loaded.samples[0].metricsSim2)
         assertEquals("52004", loaded.samples[0].metricsSim2?.plmn)
@@ -390,7 +396,9 @@ class SessionRepositoryTest {
         assertFalse(finalSession!!.isRecording)
         assertNotNull(finalSession.endTime)
         assertEquals(20, finalSession.sampleCount)
-        assertEquals(20, finalSession.samples.size)
+        assertTrue(finalSession.samples.isEmpty())
+        val hydratedFinal = SessionRepository.ensureSessionSamplesLoaded(session.id)!!
+        assertEquals(20, hydratedFinal.samples.size)
     }
 
     @Test
@@ -443,10 +451,41 @@ class SessionRepositoryTest {
 
         SessionRepository.resetForTesting()
         SessionRepository.initStorage(testDir)
-        val reloaded = SessionRepository.sessions.value.find { it.id == session.id }
-        assertNotNull(reloaded)
-        assertEquals(10_000, reloaded!!.sampleCount)
+        val reloadedMeta = SessionRepository.sessions.value.find { it.id == session.id }
+        assertNotNull(reloadedMeta)
+        assertEquals(10_000, reloadedMeta!!.sampleCount)
+        assertTrue(reloadedMeta.samples.isEmpty())
+        assertEquals(-86, reloadedMeta.avgRsrp)
+
+        val reloaded = SessionRepository.ensureSessionSamplesLoaded(session.id)!!
         assertEquals(10_000, reloaded.samples.size)
         assertEquals(-86, reloaded.avgRsrp)
+    }
+
+    @Test
+    fun testLoadSavedSessions_lazyLoadsOnlyRequestedSession() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val s1 = SessionRepository.createNewSession(name = "Session One")
+        SessionRepository.addSample(makeLteSample(s1.id, 1L, s1.startTime + 1000L, rsrp = -82))
+        SessionRepository.finishCurrentSession()
+
+        val s2 = SessionRepository.createNewSession(name = "Session Two")
+        SessionRepository.addSample(makeLteSample(s2.id, 1L, s2.startTime + 1000L, rsrp = -94))
+        SessionRepository.finishCurrentSession()
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val meta1 = SessionRepository.sessions.value.find { it.id == s1.id }!!
+        val meta2 = SessionRepository.sessions.value.find { it.id == s2.id }!!
+        assertEquals(1, meta1.sampleCount)
+        assertEquals(1, meta2.sampleCount)
+        assertTrue(meta1.samples.isEmpty())
+        assertTrue(meta2.samples.isEmpty())
+
+        val hydrated1 = SessionRepository.ensureSessionSamplesLoaded(s1.id)!!
+        assertEquals(1, hydrated1.samples.size)
+        val stillUnloaded2 = SessionRepository.sessions.value.find { it.id == s2.id }!!
+        assertTrue(stillUnloaded2.samples.isEmpty())
     }
 }

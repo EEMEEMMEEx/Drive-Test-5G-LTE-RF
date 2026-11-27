@@ -12,6 +12,7 @@ import android.telephony.CellInfoNr
 import android.telephony.CellSignalStrengthLte
 import android.telephony.CellSignalStrengthNr
 import android.telephony.PhoneStateListener
+import android.telephony.SignalStrength
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyDisplayInfo
@@ -60,6 +61,11 @@ class CellCollector(private val context: Context) {
 
     private var isNsaOverrideSim1 = false
     private var isNsaOverrideSim2 = false
+
+    @Volatile
+    private var latestSignalStrengthNrSim1: NrMetrics? = null
+    @Volatile
+    private var latestSignalStrengthNrSim2: NrMetrics? = null
 
     private var callbackSim1: Any? = null
     private var legacyListenerSim1: PhoneStateListener? = null
@@ -168,7 +174,8 @@ class CellCollector(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val cb = object : TelephonyCallback(),
                 TelephonyCallback.DisplayInfoListener,
-                TelephonyCallback.CellInfoListener {
+                TelephonyCallback.CellInfoListener,
+                TelephonyCallback.SignalStrengthsListener {
 
                 override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
                     val override = telephonyDisplayInfo.overrideNetworkType
@@ -184,8 +191,15 @@ class CellCollector(private val context: Context) {
                         slotIndex = currentSlotIndex,
                         simName = currentSimName,
                         cells = cellInfo,
-                        isNsaOverride = isNsaOverrideSim1
+                        isNsaOverride = isNsaOverrideSim1,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim1
                     )
+                }
+
+                override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
+                    val nr = extractNrFromSignalStrength(signalStrength, isNsa = isNsaOverrideSim1)
+                    latestSignalStrengthNrSim1 = nr
+                    applySignalStrengthNrFallbackSim1(nr)
                 }
             }
             callbackSim1 = cb
@@ -205,7 +219,8 @@ class CellCollector(private val context: Context) {
                         slotIndex = currentSlotIndex,
                         simName = currentSimName,
                         cells = cellInfo ?: emptyList(),
-                        isNsaOverride = isNsaOverrideSim1
+                        isNsaOverride = isNsaOverrideSim1,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim1
                     )
                 }
 
@@ -218,11 +233,21 @@ class CellCollector(private val context: Context) {
                         pollCellInfoSim1()
                     }
                 }
+
+                @Deprecated("Deprecated in Java")
+                override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
+                    val nr = signalStrength?.let { extractNrFromSignalStrength(it, isNsa = isNsaOverrideSim1) }
+                    latestSignalStrengthNrSim1 = nr
+                    applySignalStrengthNrFallbackSim1(nr)
+                }
             }
             legacyListenerSim1 = listener
             @Suppress("DEPRECATION")
             try {
-                activeTelephonyManager.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
+                activeTelephonyManager.listen(
+                    listener,
+                    PhoneStateListener.LISTEN_CELL_INFO or PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
+                )
                 sim1ListenerRegistered = true
             } catch (e: Exception) {
                 sim1ListenerRegistered = false
@@ -253,7 +278,8 @@ class CellCollector(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val cb = object : TelephonyCallback(),
                 TelephonyCallback.DisplayInfoListener,
-                TelephonyCallback.CellInfoListener {
+                TelephonyCallback.CellInfoListener,
+                TelephonyCallback.SignalStrengthsListener {
 
                 override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
                     val override = telephonyDisplayInfo.overrideNetworkType
@@ -269,8 +295,15 @@ class CellCollector(private val context: Context) {
                         slotIndex = secondarySlotIndex,
                         simName = secondarySimName,
                         cells = cellInfo,
-                        isNsaOverride = isNsaOverrideSim2
+                        isNsaOverride = isNsaOverrideSim2,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim2
                     )
+                }
+
+                override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
+                    val nr = extractNrFromSignalStrength(signalStrength, isNsa = isNsaOverrideSim2)
+                    latestSignalStrengthNrSim2 = nr
+                    applySignalStrengthNrFallbackSim2(nr)
                 }
             }
             callbackSim2 = cb
@@ -288,7 +321,8 @@ class CellCollector(private val context: Context) {
                         slotIndex = secondarySlotIndex,
                         simName = secondarySimName,
                         cells = cellInfo ?: emptyList(),
-                        isNsaOverride = isNsaOverrideSim2
+                        isNsaOverride = isNsaOverrideSim2,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim2
                     )
                 }
 
@@ -301,11 +335,21 @@ class CellCollector(private val context: Context) {
                         pollCellInfoSim2()
                     }
                 }
+
+                @Deprecated("Deprecated in Java")
+                override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
+                    val nr = signalStrength?.let { extractNrFromSignalStrength(it, isNsa = isNsaOverrideSim2) }
+                    latestSignalStrengthNrSim2 = nr
+                    applySignalStrengthNrFallbackSim2(nr)
+                }
             }
             legacyListenerSim2 = listener
             @Suppress("DEPRECATION")
             try {
-                tm.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
+                tm.listen(
+                    listener,
+                    PhoneStateListener.LISTEN_CELL_INFO or PhoneStateListener.LISTEN_SIGNAL_STRENGTHS
+                )
             } catch (e: Exception) {
                 Log.e("CellCollector", "Error registering PhoneStateListener on SIM2 slot $secondarySlotIndex", e)
             }
@@ -348,7 +392,8 @@ class CellCollector(private val context: Context) {
                         slotIndex = currentSlotIndex,
                         simName = currentSimName,
                         cells = cellInfo,
-                        isNsaOverride = isNsaOverrideSim1
+                        isNsaOverride = isNsaOverrideSim1,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim1
                     )
                 }
 
@@ -362,7 +407,8 @@ class CellCollector(private val context: Context) {
                                 slotIndex = currentSlotIndex,
                                 simName = currentSimName,
                                 cells = cached,
-                                isNsaOverride = isNsaOverrideSim1
+                                isNsaOverride = isNsaOverrideSim1,
+                                fallbackSignalStrengthNr = latestSignalStrengthNrSim1
                             )
                         }
                     } catch (e: Exception) {
@@ -386,7 +432,8 @@ class CellCollector(private val context: Context) {
                         slotIndex = secondarySlotIndex,
                         simName = secondarySimName,
                         cells = cellInfo,
-                        isNsaOverride = isNsaOverrideSim2
+                        isNsaOverride = isNsaOverrideSim2,
+                        fallbackSignalStrengthNr = latestSignalStrengthNrSim2
                     )
                 }
 
@@ -400,7 +447,8 @@ class CellCollector(private val context: Context) {
                                 slotIndex = secondarySlotIndex,
                                 simName = secondarySimName,
                                 cells = cached,
-                                isNsaOverride = isNsaOverrideSim2
+                                isNsaOverride = isNsaOverrideSim2,
+                                fallbackSignalStrengthNr = latestSignalStrengthNrSim2
                             )
                         }
                     } catch (e: Exception) {
@@ -413,12 +461,63 @@ class CellCollector(private val context: Context) {
         }
     }
 
+    private fun extractNrFromSignalStrength(signalStrength: SignalStrength, isNsa: Boolean): NrMetrics? {
+        val nrStrength = signalStrength.getCellSignalStrengths(CellSignalStrengthNr::class.java).firstOrNull()
+            ?: return null
+        val ssRsrp = sanitizeInt(nrStrength.ssRsrp)
+        val ssRsrq = sanitizeInt(nrStrength.ssRsrq)
+        val ssSinr = sanitizeDouble(nrStrength.ssSinr)
+        val csiRsrp = sanitizeInt(nrStrength.csiRsrp)
+        val csiRsrq = sanitizeInt(nrStrength.csiRsrq)
+        val csiSinr = sanitizeDouble(nrStrength.csiSinr)
+        if (ssRsrp == null && ssRsrq == null && ssSinr == null && csiRsrp == null) {
+            return null
+        }
+        return NrMetrics(
+            pci = null,
+            nci = null,
+            tac = null,
+            nrArfcn = null,
+            band = null,
+            ssRsrp = ssRsrp,
+            ssRsrq = ssRsrq,
+            ssSinr = ssSinr,
+            csiRsrp = csiRsrp,
+            csiRsrq = csiRsrq,
+            csiSinr = csiSinr,
+            isNsa = isNsa
+        )
+    }
+
+    private fun applySignalStrengthNrFallbackSim1(nr: NrMetrics?) {
+        val current = _currentMetrics.value
+        if (nr != null && current.nr == null && (isNsaOverrideSim1 || current.lte != null)) {
+            val nsaFlag = isNsaOverrideSim1 || current.lte != null
+            _currentMetrics.value = current.copy(
+                ratType = if (nsaFlag) RatType.NR_NSA else RatType.NR_SA,
+                nr = nr.copy(isNsa = nsaFlag)
+            )
+        }
+    }
+
+    private fun applySignalStrengthNrFallbackSim2(nr: NrMetrics?) {
+        val current = _currentMetricsSim2.value ?: return
+        if (nr != null && current.nr == null && (isNsaOverrideSim2 || current.lte != null)) {
+            val nsaFlag = isNsaOverrideSim2 || current.lte != null
+            _currentMetricsSim2.value = current.copy(
+                ratType = if (nsaFlag) RatType.NR_NSA else RatType.NR_SA,
+                nr = nr.copy(isNsa = nsaFlag)
+            )
+        }
+    }
+
     private fun parseCellMetrics(
         tm: TelephonyManager,
         slotIndex: Int,
         simName: String?,
         cells: List<CellInfo>,
-        isNsaOverride: Boolean
+        isNsaOverride: Boolean,
+        fallbackSignalStrengthNr: NrMetrics? = null
     ): CellMetrics {
         if (cells.isEmpty()) {
             return CellMetrics(selectedSimSlot = slotIndex, simDisplayName = simName)
@@ -529,6 +628,10 @@ class CellCollector(private val context: Context) {
                     }
                 }
             }
+        }
+
+        if (servingNr == null && fallbackSignalStrengthNr != null && (isNsaOverride || servingLte != null)) {
+            servingNr = fallbackSignalStrengthNr.copy(isNsa = isNsaOverride || servingLte != null)
         }
 
         val determinedRat = when {

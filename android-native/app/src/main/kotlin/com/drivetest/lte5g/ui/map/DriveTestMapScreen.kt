@@ -108,6 +108,12 @@ fun DriveTestMapScreen(
     var showSim2 by remember { mutableStateOf(true) }
 
     val displaySession = if (isRecording) activeSession else (selectedSession ?: activeSession)
+    LaunchedEffect(displaySession?.id) {
+        val sess = displaySession ?: return@LaunchedEffect
+        if (sess.samples.isEmpty() && sess.sampleCount > 0) {
+            SessionRepository.loadSessionSamplesAsync(sess.id)
+        }
+    }
     val displaySamples = displaySession?.samples ?: emptyList()
     val stats = remember(displaySamples) { routeStats(displaySamples) }
     val hasSim2Data = displaySamples.any { it.metricsSim2 != null } || isDualSimMode

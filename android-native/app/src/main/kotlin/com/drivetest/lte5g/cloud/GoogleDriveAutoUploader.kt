@@ -121,7 +121,7 @@ object GoogleDriveAutoUploader {
             return
         }
 
-        if (session.samples.isEmpty()) {
+        if (session.samples.isEmpty() && session.sampleCount == 0) {
             onComplete?.invoke(false, "Session ไม่มีข้อมูลตัวอย่างสำหรับอัปโหลด")
             return
         }
@@ -129,7 +129,13 @@ object GoogleDriveAutoUploader {
         scope.launch(ioDispatcher) {
             CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.UPLOADING)
             try {
-                val result = exportAndUploadSessionBundle(context, session, config)
+                val hydratedSession = SessionRepository.ensureSessionSamplesLoaded(session.id) ?: session
+                if (hydratedSession.samples.isEmpty()) {
+                    CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.FAILED)
+                    onComplete?.invoke(false, "Session ไม่มีข้อมูลตัวอย่างสำหรับอัปโหลด")
+                    return@launch
+                }
+                val result = exportAndUploadSessionBundle(context, hydratedSession, config)
                 if (result.isSuccess) {
                     CloudConfigRepository.setSessionUploadStatus(session.id, CloudUploadStatus.UPLOADED)
                     onComplete?.invoke(true, "อัปโหลดขึ้น Google Drive ครบ 5 รูปแบบสำเร็จ!")

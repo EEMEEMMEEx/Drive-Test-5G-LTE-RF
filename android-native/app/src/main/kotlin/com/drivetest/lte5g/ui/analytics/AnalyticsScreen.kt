@@ -77,6 +77,13 @@ fun AnalyticsScreen(
         }
     }
 
+    androidx.compose.runtime.LaunchedEffect(currentSession?.id) {
+        val sess = currentSession ?: return@LaunchedEffect
+        if (sess.samples.isEmpty() && sess.sampleCount > 0) {
+            SessionRepository.loadSessionSamplesAsync(sess.id)
+        }
+    }
+
     // Run local heuristic analytics
     val analytics = remember(currentSession, currentSession?.samples?.size) {
         currentSession?.let { RfAnalyticsEngine.analyze(it) }

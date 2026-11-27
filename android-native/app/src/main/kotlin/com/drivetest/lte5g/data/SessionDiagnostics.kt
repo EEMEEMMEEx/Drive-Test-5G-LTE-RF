@@ -18,6 +18,7 @@ data class SessionDiagnosticSnapshot(
     val samplesFlushed: Int = 0,
     val droppedNoLocation: Int = 0,
     val droppedInaccurateGps: Int = 0,
+    val droppedStaleGps: Int = 0,
     val droppedRatFilter: Int = 0,
     val pollErrors: Int = 0,
     val loopExceptions: Int = 0,
@@ -45,6 +46,7 @@ object SessionDiagnostics {
     private val samplesFlushed = AtomicInteger(0)
     private val droppedNoLocation = AtomicInteger(0)
     private val droppedInaccurateGps = AtomicInteger(0)
+    private val droppedStaleGps = AtomicInteger(0)
     private val droppedRatFilter = AtomicInteger(0)
     private val pollErrors = AtomicInteger(0)
     private val loopExceptions = AtomicInteger(0)
@@ -71,6 +73,7 @@ object SessionDiagnostics {
         samplesFlushed.set(0)
         droppedNoLocation.set(0)
         droppedInaccurateGps.set(0)
+        droppedStaleGps.set(0)
         droppedRatFilter.set(0)
         pollErrors.set(0)
         loopExceptions.set(0)
@@ -82,6 +85,7 @@ object SessionDiagnostics {
     fun addSamplesFlushed(count: Int) { if (count > 0) samplesFlushed.addAndGet(count) }
     fun incDroppedNoLocation() { droppedNoLocation.incrementAndGet() }
     fun incDroppedInaccurateGps() { droppedInaccurateGps.incrementAndGet() }
+    fun incDroppedStaleGps() { droppedStaleGps.incrementAndGet() }
     fun incDroppedRatFilter() { droppedRatFilter.incrementAndGet() }
     fun incPollErrors() { pollErrors.incrementAndGet() }
     fun incLoopExceptions() { loopExceptions.incrementAndGet() }
@@ -93,6 +97,7 @@ object SessionDiagnostics {
         samplesFlushed = samplesFlushed.get(),
         droppedNoLocation = droppedNoLocation.get(),
         droppedInaccurateGps = droppedInaccurateGps.get(),
+        droppedStaleGps = droppedStaleGps.get(),
         droppedRatFilter = droppedRatFilter.get(),
         pollErrors = pollErrors.get(),
         loopExceptions = loopExceptions.get(),
@@ -144,6 +149,7 @@ object SessionDiagnostics {
                 "samplesFlushed" to snap.samplesFlushed,
                 "droppedNoLocation" to snap.droppedNoLocation,
                 "droppedInaccurateGps" to snap.droppedInaccurateGps,
+                "droppedStaleGps" to snap.droppedStaleGps,
                 "droppedRatFilter" to snap.droppedRatFilter,
                 "pollErrors" to snap.pollErrors,
                 "loopExceptions" to snap.loopExceptions,

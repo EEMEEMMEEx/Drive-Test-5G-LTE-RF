@@ -48,7 +48,8 @@ class GoogleDriveUploadWorker(
             return Result.failure()
         }
 
-        val session = SessionRepository.sessions.value.firstOrNull { it.id == sessionId }
+        val session = SessionRepository.ensureSessionSamplesLoaded(sessionId)
+            ?: SessionRepository.sessions.value.firstOrNull { it.id == sessionId }
         if (session == null || session.samples.isEmpty()) {
             Log.w(TAG, "Session #$sessionId not found in repository or has no samples.")
             return Result.failure()

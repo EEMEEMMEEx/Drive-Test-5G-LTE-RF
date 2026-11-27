@@ -89,11 +89,24 @@ fun SessionsScreen(
 
     var sessionToDelete by remember { mutableStateOf<DriveTestSession?>(null) }
 
+    androidx.compose.runtime.LaunchedEffect(sessionForExportMenu?.id) {
+        val target = sessionForExportMenu ?: return@LaunchedEffect
+        if (target.samples.isEmpty() && target.sampleCount > 0) {
+            SessionRepository.loadSessionSamplesAsync(target.id)
+        }
+    }
+
+    fun resolveSamplesForExport(session: DriveTestSession?): DriveTestSession? {
+        if (session == null) return null
+        if (session.samples.isNotEmpty() || session.sampleCount == 0) return session
+        return SessionRepository.ensureSessionSamplesLoaded(session.id) ?: session
+    }
+
     val kmzLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/vnd.google-earth.kmz")
     ) { uri ->
         if (uri != null) {
-            val session = sessionToExportKmz ?: activeSession
+            val session = resolveSamplesForExport(sessionToExportKmz ?: activeSession)
             val samples = session?.samples ?: emptyList()
             if (samples.isEmpty()) {
                 Toast.makeText(context, "No samples in this session to export!", Toast.LENGTH_SHORT).show()
@@ -114,7 +127,7 @@ fun SessionsScreen(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
         if (uri != null) {
-            val session = sessionToExportCsv ?: activeSession
+            val session = resolveSamplesForExport(sessionToExportCsv ?: activeSession)
             val samples = session?.samples ?: emptyList()
             if (samples.isEmpty()) {
                 Toast.makeText(context, "No samples in this session to export!", Toast.LENGTH_SHORT).show()
@@ -135,7 +148,7 @@ fun SessionsScreen(
         ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         if (uri != null) {
-            val session = sessionToExportPdf ?: activeSession
+            val session = resolveSamplesForExport(sessionToExportPdf ?: activeSession)
             if (session == null || session.samples.isEmpty()) {
                 Toast.makeText(context, "No samples to generate PDF report!", Toast.LENGTH_SHORT).show()
                 return@rememberLauncherForActivityResult
@@ -158,7 +171,7 @@ fun SessionsScreen(
         ActivityResultContracts.CreateDocument("application/geo+json")
     ) { uri ->
         if (uri != null) {
-            val session = sessionToExportGeoJson ?: activeSession
+            val session = resolveSamplesForExport(sessionToExportGeoJson ?: activeSession)
             if (session == null || session.samples.isEmpty()) {
                 Toast.makeText(context, "No samples to export GeoJSON!", Toast.LENGTH_SHORT).show()
                 return@rememberLauncherForActivityResult
@@ -178,7 +191,7 @@ fun SessionsScreen(
         ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
-            val session = sessionToExportMapInfo ?: activeSession
+            val session = resolveSamplesForExport(sessionToExportMapInfo ?: activeSession)
             if (session == null || session.samples.isEmpty()) {
                 Toast.makeText(context, "No samples to export MapInfo!", Toast.LENGTH_SHORT).show()
                 return@rememberLauncherForActivityResult

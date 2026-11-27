@@ -205,6 +205,7 @@ object SessionRepository {
     private var hasLoadedOnce: Boolean = false
     private var lastSessionId: Long = 0L
     private var activeAccumulator: ActiveSessionAccumulator? = null
+    private val loadedSampleSessionIds = HashSet<Long>()
 
     @Synchronized
     private fun generateUniqueSessionId(): Long {
@@ -222,6 +223,7 @@ object SessionRepository {
         _activeSession.value = null
         _selectedSessionForMap.value = null
         activeAccumulator = null
+        loadedSampleSessionIds.clear()
         lastSessionId = 0L
         hasLoadedOnce = false
         flushBatchSize = 10
@@ -352,7 +354,9 @@ object SessionRepository {
         if (storageDir != null && !hasLoadedOnce) {
             loadSavedSessionsSync()
         }
-        val existing = _sessions.value.firstOrNull { it.id == sessionId } ?: return null
+        val existing = ensureSessionSamplesLoaded(sessionId)
+            ?: _sessions.value.firstOrNull { it.id == sessionId }
+            ?: return null
         val resumed = existing.copy(
             endTime = null,
             isRecording = true
@@ -537,6 +541,7 @@ object SessionRepository {
             if (_selectedSessionForMap.value?.id == sessionId) {
                 _selectedSessionForMap.value = _sessions.value.firstOrNull()
             }
+            loadedSampleSessionIds.remove(sessionId)
             wasActive
         }
 
@@ -561,6 +566,76 @@ object SessionRepository {
 
     fun selectSessionForMap(session: DriveTestSession?) {
         _selectedSessionForMap.value = session
+        if (session != null && session.samples.isEmpty() && session.sampleCount > 0) {
+            loadSessionSamplesAsync(session.id)
+        }
+    }
+
+    /**
+     * Lazy-loads samples for [sessionId] from disk if not already in memory.
+     * Safe to call from background threads; updates [sessions] and [selectedSessionForMap].
+     */
+    fun ensureSessionSamplesLoaded(sessionId: Long): DriveTestSession? {
+        val current = synchronized(this) {
+            val found = _sessions.value.firstOrNull { it.id == sessionId } ?: return null
+            if (found.samples.isNotEmpty() || found.sampleCount == 0 || sessionId in loadedSampleSessionIds) {
+                return found
+            }
+            found
+        }
+
+        val dir = storageDir ?: return current
+        awaitPendingWrites()
+        val loadedSamples = diskLock.withLock {
+            val samplesFile = File(dir, "session_${sessionId}$SAMPLES_SUFFIX")
+            if (samplesFile.exists()) {
+                readSamplesNdjson(samplesFile, sessionId)
+            } else {
+                val legacyFile = File(dir, "session_${sessionId}$LEGACY_SUFFIX")
+                if (legacyFile.exists()) {
+                    try {
+                        jsonToLegacySession(JSONObject(legacyFile.readText(Charsets.UTF_8))).samples
+                    } catch (e: Exception) {
+                        safeLogError("Error lazy-loading legacy samples for $sessionId", e)
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+            }
+        }
+
+        return synchronized(this) {
+            val latest = _sessions.value.firstOrNull { it.id == sessionId } ?: return@synchronized null
+            if (latest.samples.isNotEmpty()) {
+                loadedSampleSessionIds.add(sessionId)
+                return@synchronized latest
+            }
+            val hydrated = latest.copy(
+                samples = loadedSamples,
+                sampleCount = maxOf(latest.sampleCount, loadedSamples.size)
+            )
+            loadedSampleSessionIds.add(sessionId)
+            replaceSessionInList(hydrated)
+            if (_selectedSessionForMap.value?.id == sessionId) {
+                _selectedSessionForMap.value = hydrated
+            }
+            hydrated
+        }
+    }
+
+    fun loadSessionSamplesAsync(sessionId: Long, onLoaded: ((DriveTestSession?) -> Unit)? = null) {
+        val existing = synchronized(this) {
+            _sessions.value.firstOrNull { it.id == sessionId }
+        }
+        if (existing != null && (existing.samples.isNotEmpty() || existing.sampleCount == 0 || sessionId in loadedSampleSessionIds)) {
+            onLoaded?.invoke(existing)
+            return
+        }
+        writerExecutor.execute {
+            val hydrated = ensureSessionSamplesLoaded(sessionId)
+            onLoaded?.invoke(hydrated)
+        }
     }
 
     fun readActiveSessionPointer(): ActiveSessionPointer? {
@@ -747,26 +822,35 @@ object SessionRepository {
         val loadedById = LinkedHashMap<Long, DriveTestSession>()
         diskLock.withLock {
             try {
-                // 1. Load new crash-safe format: session_<id>.meta.json + session_<id>.samples.ndjson
+                // 1. Load metadata only for crash-safe format; samples are lazy-loaded on demand
                 val metaFiles = dir.listFiles { _, name ->
                     name.startsWith("session_") && name.endsWith(META_SUFFIX)
                 } ?: emptyArray()
+                val currentActiveId = _activeSession.value?.takeIf { it.isRecording }?.id
 
                 for (metaFile in metaFiles) {
                     try {
                         val metaObj = JSONObject(metaFile.readText(Charsets.UTF_8))
                         val sessionId = metaObj.getLong("id")
-                        val samplesFile = File(dir, "session_${sessionId}$SAMPLES_SUFFIX")
-                        val samples = readSamplesNdjson(samplesFile, sessionId)
-                        val session = reconcileLoadedSession(
-                            session = jsonToSessionMetadata(metaObj, samples),
-                            sourceLastModified = maxOf(
-                                metaFile.lastModified(),
-                                if (samplesFile.exists()) samplesFile.lastModified() else 0L
-                            ),
-                            dir = dir,
-                            legacyFileToClean = null
-                        )
+                        val metaOnly = jsonToSessionMetadata(metaObj, emptyList())
+                        val needsCrashRecovery = (metaOnly.isRecording || metaOnly.endTime == null) &&
+                            metaOnly.id != currentActiveId
+
+                        val session = if (needsCrashRecovery) {
+                            val samplesFile = File(dir, "session_${sessionId}$SAMPLES_SUFFIX")
+                            val samples = readSamplesNdjson(samplesFile, sessionId)
+                            reconcileLoadedSession(
+                                session = jsonToSessionMetadata(metaObj, samples),
+                                sourceLastModified = maxOf(
+                                    metaFile.lastModified(),
+                                    if (samplesFile.exists()) samplesFile.lastModified() else 0L
+                                ),
+                                dir = dir,
+                                legacyFileToClean = null
+                            )
+                        } else {
+                            metaOnly
+                        }
                         loadedById[session.id] = session
                     } catch (e: Exception) {
                         safeLogError("Error loading meta session file ${metaFile.name}", e)
