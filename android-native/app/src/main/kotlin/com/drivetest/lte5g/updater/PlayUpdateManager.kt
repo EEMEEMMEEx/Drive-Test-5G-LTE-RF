@@ -15,6 +15,9 @@ import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
+import com.drivetest.lte5g.data.SessionDiagnostics
+import com.drivetest.lte5g.data.SessionRepository
+import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -205,11 +208,22 @@ object PlayUpdateManager {
         }
     }
 
+    @Volatile
+    internal var isRecordingProvider: () -> Boolean = { DriveTestForegroundService.isRecording.value }
+
+    fun shouldDeferUpdateRestart(isRecording: Boolean = isRecordingProvider()): Boolean = isRecording
+
     /**
      * Starts the Play update flow (immediate or flexible) or resumes a pending one.
      * Returns the action that was taken so the UI can react; never throws.
      */
     suspend fun startUpdate(context: Context): Result<PlayUpdateAction> {
+        if (shouldDeferUpdateRestart()) {
+            SessionRepository.activeSession.value?.id?.let { sid ->
+                SessionDiagnostics.recordEvent(sid, "UPDATE_DEFERRED", mapOf("source" to "startUpdate"))
+            }
+            return Result.failure(IllegalStateException("กำลังบันทึก Drive Test อยู่ กรุณากดหยุดบันทึกก่อนอัปเดตแอป"))
+        }
         val activity = findActivity(context)
             ?: return Result.failure(IllegalStateException("ไม่พบ Activity สำหรับเปิดหน้าอัปเดตของ Play"))
         val appUpdateManager = manager(context)
@@ -283,6 +297,14 @@ object PlayUpdateManager {
         try {
             val info = appUpdateManager.appUpdateInfo.awaitResult()
             if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                if (shouldDeferUpdateRestart()) {
+                    Log.i(TAG, "Deferring Play completeUpdate() while drive test recording is active")
+                    _state.value = PlayUpdateState.Downloaded
+                    SessionRepository.activeSession.value?.id?.let { sid ->
+                        SessionDiagnostics.recordEvent(sid, "UPDATE_DEFERRED", mapOf("source" to "onResume"))
+                    }
+                    return
+                }
                 completeUpdate(context)
                 return
             }

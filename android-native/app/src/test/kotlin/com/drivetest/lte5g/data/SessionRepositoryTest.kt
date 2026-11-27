@@ -4,7 +4,6 @@ import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
 import com.drivetest.lte5g.model.LteMetrics
 import com.drivetest.lte5g.model.MeasurementCadence
-import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import org.junit.Assert.assertEquals
@@ -140,6 +139,7 @@ class SessionRepositoryTest {
         assertNull(SessionRepository.activeSession.value)
         assertNull(SessionRepository.sessions.value.find { it.id == s1.id })
     }
+
     @Test
     fun testCreateNewSession_withSimSlot_preservesSimInfo() {
         val session = SessionRepository.createNewSession(
@@ -186,8 +186,9 @@ class SessionRepositoryTest {
         SessionRepository.addSample(sample)
         SessionRepository.finishCurrentSession()
 
-        // Re-load from storage
+        // True cold reload from disk (clears in-memory state first)
         val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        SessionRepository.resetForTesting()
         SessionRepository.initStorage(testDir)
 
         val loaded = SessionRepository.sessions.value.find { it.id == s.id }
@@ -200,67 +201,252 @@ class SessionRepositoryTest {
         assertEquals(0, loaded.samples[0].metrics.selectedSimSlot)
         assertEquals("SIM 1: AIS", loaded.samples[0].metrics.simDisplayName)
     }
-
-    @Test
-    fun testDualSimLogging_savesAndLoadsMetricsSim2AndAverages() {
-        val s = SessionRepository.createNewSession(
-            name = "Dual SIM Benchmark Test",
-            simSlot = 0,
-            simDisplayName = "SIM 1: AIS 5G",
-            isDualSimLogging = true,
-            sim2DisplayName = "SIM 2: TRUE 5G"
-        )
-        assertTrue(s.isDualSimLogging)
-        assertEquals("SIM 2: TRUE 5G", s.sim2DisplayName)
-
-        val sample = DriveTestSample(
-            id = 100L,
-            sessionId = s.id,
-            timestamp = System.currentTimeMillis(),
-            latitude = 13.75,
-            longitude = 100.50,
-            altitude = 12.0,
-            speedKmh = 30f,
-            bearing = 0f,
-            accuracyMeters = 2f,
-            metrics = CellMetrics(
-                ratType = RatType.NR_NSA,
-                plmn = "52001",
-                operatorAlpha = "AIS",
-                lte = LteMetrics(pci = 100, eci = 1234L, tac = 20, earfcn = 1800, band = 3, rsrp = -80, rsrq = -10, rssnr = 15.0, cqi = 10)
-            ),
-            metricsSim2 = CellMetrics(
-                ratType = RatType.LTE,
-                plmn = "52004",
-                operatorAlpha = "TRUE",
-                lte = LteMetrics(pci = 200, eci = 5678L, tac = 30, earfcn = 2100, band = 1, rsrp = -92, rsrq = -12, rssnr = 10.0, cqi = 8)
-            ),
-            simSlot = 0,
-            simDisplayName = "SIM 1: AIS 5G"
-        )
-        SessionRepository.addSample(sample)
-
-        val active = SessionRepository.activeSession.value
-        assertNotNull(active)
-        assertEquals(-80, active?.avgRsrp)
-        assertEquals(-92, active?.avgRsrpSim2)
-        assertEquals(10.0, active?.avgSinrSim2)
-
-        SessionRepository.finishCurrentSession()
-
-        // Reload and verify persistence
-        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
-        SessionRepository.initStorage(testDir)
-
-        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
-        assertNotNull(loaded)
-        assertTrue(loaded!!.isDualSimLogging)
-        assertEquals("SIM 2: TRUE 5G", loaded.sim2DisplayName)
-        assertEquals(-80, loaded.avgRsrp)
-        assertEquals(-92, loaded.avgRsrpSim2)
-        assertEquals(1, loaded.samples.size)
-        assertNotNull(loaded.samples[0].metricsSim2)
-        assertEquals("52004", loaded.samples[0].metricsSim2?.plmn)
-        assertEquals(-92, loaded.samples[0].metricsSim2?.lte?.rsrp)
-    }
-}
+
+    @Test
+    fun testDualSimLogging_savesAndLoadsMetricsSim2AndAverages() {
+        val s = SessionRepository.createNewSession(
+            name = "Dual SIM Benchmark Test",
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS 5G",
+            isDualSimLogging = true,
+            sim2DisplayName = "SIM 2: TRUE 5G"
+        )
+        assertTrue(s.isDualSimLogging)
+        assertEquals("SIM 2: TRUE 5G", s.sim2DisplayName)
+
+        val sample = DriveTestSample(
+            id = 100L,
+            sessionId = s.id,
+            timestamp = System.currentTimeMillis(),
+            latitude = 13.75,
+            longitude = 100.50,
+            altitude = 12.0,
+            speedKmh = 30f,
+            bearing = 0f,
+            accuracyMeters = 2f,
+            metrics = CellMetrics(
+                ratType = RatType.NR_NSA,
+                plmn = "52001",
+                operatorAlpha = "AIS",
+                lte = LteMetrics(pci = 100, eci = 1234L, tac = 20, earfcn = 1800, band = 3, rsrp = -80, rsrq = -10, rssnr = 15.0, cqi = 10)
+            ),
+            metricsSim2 = CellMetrics(
+                ratType = RatType.LTE,
+                plmn = "52004",
+                operatorAlpha = "TRUE",
+                lte = LteMetrics(pci = 200, eci = 5678L, tac = 30, earfcn = 2100, band = 1, rsrp = -92, rsrq = -12, rssnr = 10.0, cqi = 8)
+            ),
+            simSlot = 0,
+            simDisplayName = "SIM 1: AIS 5G"
+        )
+        SessionRepository.addSample(sample)
+
+        val active = SessionRepository.activeSession.value
+        assertNotNull(active)
+        assertEquals(-80, active?.avgRsrp)
+        assertEquals(-92, active?.avgRsrpSim2)
+        assertEquals(10.0, active?.avgSinrSim2)
+
+        SessionRepository.finishCurrentSession()
+
+        // True cold reload from disk
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val loaded = SessionRepository.sessions.value.find { it.id == s.id }
+        assertNotNull(loaded)
+        assertTrue(loaded!!.isDualSimLogging)
+        assertEquals("SIM 2: TRUE 5G", loaded.sim2DisplayName)
+        assertEquals(-80, loaded.avgRsrp)
+        assertEquals(-92, loaded.avgRsrpSim2)
+        assertEquals(1, loaded.samples.size)
+        assertNotNull(loaded.samples[0].metricsSim2)
+        assertEquals("52004", loaded.samples[0].metricsSim2?.plmn)
+        assertEquals(-92, loaded.samples[0].metricsSim2?.lte?.rsrp)
+    }
+
+    private fun makeLteSample(sessionId: Long, id: Long, timestamp: Long, rsrp: Int = -88): DriveTestSample {
+        return DriveTestSample(
+            id = id,
+            sessionId = sessionId,
+            timestamp = timestamp,
+            latitude = 13.75 + id * 0.00001,
+            longitude = 100.50 + id * 0.00001,
+            altitude = 10.0,
+            speedKmh = 40f,
+            bearing = 90f,
+            accuracyMeters = 4f,
+            metrics = CellMetrics(
+                ratType = RatType.LTE,
+                plmn = "520-03",
+                operatorAlpha = "AIS",
+                lte = LteMetrics(
+                    pci = 101,
+                    eci = 123456L,
+                    tac = 200,
+                    earfcn = 1850,
+                    band = 3,
+                    rsrp = rsrp,
+                    rsrq = -10,
+                    rssnr = 12.0,
+                    cqi = 11
+                )
+            ),
+            ratLockMode = RatLockMode.AUTO,
+            cadence = MeasurementCadence.PRECISE
+        )
+    }
+
+    @Test
+    fun testCrashRecovery_preservesIncrementalSamplesAndFreezesEndTime() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val session = SessionRepository.createNewSession(name = "Crash Kill Test", cadence = MeasurementCadence.PRECISE)
+        val baseTs = session.startTime
+
+        for (i in 1L..25L) {
+            SessionRepository.addSample(makeLteSample(session.id, i, baseTs + i * 1000L, rsrp = -80 - (i % 10).toInt()))
+        }
+        SessionRepository.flushActiveSessionSync()
+
+        // Simulate abrupt OS/OEM SIGKILL: skip finishCurrentSession() and wipe RAM
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val recovered = SessionRepository.sessions.value.find { it.id == session.id }
+        assertNotNull(recovered)
+        assertEquals(25, recovered!!.sampleCount)
+        assertEquals(25, recovered.samples.size)
+        assertFalse(recovered.isRecording)
+        assertTrue(recovered.recoveredFromCrash)
+        assertEquals(baseTs + 25_000L, recovered.endTime)
+        assertNotNull(recovered.avgRsrp)
+
+        val diagText = SessionDiagnostics.readDiagnosticsText(session.id)
+        assertNotNull(diagText)
+        assertTrue(diagText!!.contains("CRASH_RECOVERED"))
+    }
+
+    @Test
+    fun testTruncatedNdjsonTail_preservesAllPriorSamples() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val session = SessionRepository.createNewSession(name = "Corrupt Tail Test")
+        val baseTs = session.startTime
+        for (i in 1L..5L) {
+            SessionRepository.addSample(makeLteSample(session.id, i, baseTs + i * 1000L, rsrp = -90))
+        }
+        SessionRepository.flushActiveSessionSync()
+
+        // Append a half-written JSON line simulating mid-write crash
+        val ndjsonFile = File(testDir, "session_${session.id}.samples.ndjson")
+        assertTrue(ndjsonFile.exists())
+        ndjsonFile.appendText("{\"id\":6,\"sessionId\":${session.id},\"latitude\":13.7")
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val recovered = SessionRepository.sessions.value.find { it.id == session.id }
+        assertNotNull(recovered)
+        assertEquals(5, recovered!!.sampleCount)
+        assertEquals(5, recovered.samples.size)
+        assertEquals(-90, recovered.avgRsrp)
+    }
+
+    @Test
+    fun testStartStickyResume_reopensInterruptedSessionWithoutDataLoss() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val session = SessionRepository.createNewSession(name = "Sticky Resume Test", cadence = MeasurementCadence.ECO)
+        val baseTs = session.startTime
+        for (i in 1L..15L) {
+            SessionRepository.addSample(makeLteSample(session.id, i, baseTs + i * 5000L, rsrp = -85))
+        }
+        SessionRepository.flushActiveSessionSync()
+
+        // Simulate OS kill + START_STICKY restart
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val pointer = SessionRepository.readActiveSessionPointer()
+        assertNotNull(pointer)
+        assertEquals(session.id, pointer!!.sessionId)
+        assertEquals(MeasurementCadence.ECO, pointer.cadence)
+
+        val resumed = SessionRepository.resumeSessionForRecovery(pointer.sessionId)
+        assertNotNull(resumed)
+        assertTrue(resumed!!.isRecording)
+        assertEquals(15, resumed.samples.size)
+
+        for (i in 16L..20L) {
+            SessionRepository.addSample(makeLteSample(session.id, i, baseTs + i * 5000L, rsrp = -85))
+        }
+        SessionRepository.finishCurrentSession()
+
+        // Cold reload confirms all 20 samples persisted and pointer cleaned up
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+        assertNull(SessionRepository.readActiveSessionPointer())
+        val finalSession = SessionRepository.sessions.value.find { it.id == session.id }
+        assertNotNull(finalSession)
+        assertFalse(finalSession!!.isRecording)
+        assertNotNull(finalSession.endTime)
+        assertEquals(20, finalSession.sampleCount)
+        assertEquals(20, finalSession.samples.size)
+    }
+
+    @Test
+    fun testLegacyMonolithicJson_reconcilesOrphanedZeroSampleSession() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val startTs = 1795655977938L
+        val legacyFile = File(testDir, "session_$startTs.json")
+        legacyFile.writeText(
+            """
+            {
+              "id": $startTs,
+              "sessionNumber": 1,
+              "name": "26/11/69",
+              "startTime": $startTs,
+              "endTime": null,
+              "ratLockMode": "AUTO",
+              "cadence": "PRECISE",
+              "sampleCount": 0,
+              "isRecording": true,
+              "samples": []
+            }
+            """.trimIndent()
+        )
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val recovered = SessionRepository.sessions.value.find { it.id == startTs }
+        assertNotNull(recovered)
+        assertFalse(recovered!!.isRecording)
+        assertNotNull(recovered.endTime)
+        assertTrue(recovered.recoveredFromCrash)
+    }
+
+    @Test
+    fun testHighVolumeScale_10000SamplesO1IngestionAndFlush() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        SessionRepository.flushBatchSize = 250
+        val session = SessionRepository.createNewSession(name = "10k Scale Test")
+        val baseTs = session.startTime
+
+        val startNanos = System.nanoTime()
+        for (i in 1L..10_000L) {
+            SessionRepository.addSample(makeLteSample(session.id, i, baseTs + i * 1000L, rsrp = -86))
+        }
+        SessionRepository.finishCurrentSession()
+        val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
+
+        assertTrue("Expected fast linear ingestion (<15000ms), took ${elapsedMs}ms", elapsedMs < 15_000L)
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+        val reloaded = SessionRepository.sessions.value.find { it.id == session.id }
+        assertNotNull(reloaded)
+        assertEquals(10_000, reloaded!!.sampleCount)
+        assertEquals(10_000, reloaded.samples.size)
+        assertEquals(-86, reloaded.avgRsrp)
+    }
+}

@@ -10,6 +10,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -29,10 +31,66 @@ object CloudTelemetrySyncManager {
     private var storageDir: File? = null
     private var isInitialized = false
 
+    private data class TelemetryWorkItem(
+        val config: CloudConfig,
+        val sessionHeader: DriveTestSession,
+        val sample: DriveTestSample
+    )
+
+    private const val LIVE_CHANNEL_CAPACITY = 64
+    private val telemetryChannel = Channel<TelemetryWorkItem>(
+        capacity = LIVE_CHANNEL_CAPACITY,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    @Volatile
+    private var consumerStarted = false
+
     @Volatile
     private var lastActiveSession: DriveTestSession? = null
     @Volatile
     private var lastActiveSessionId: String? = null
+
+    private fun ensureConsumerStarted() {
+        if (consumerStarted) return
+        synchronized(this) {
+            if (consumerStarted) return
+            consumerStarted = true
+            scope.launch(ioDispatcher) {
+                for (item in telemetryChannel) {
+                    try {
+                        val heartbeatJson = buildVehicleHeartbeatJson(item.config, item.sessionHeader, item.sample)
+                        val trailPointJson = buildTrailPointJson(item.sample)
+                        val sessionMetaJson = buildSessionMetadataJson(
+                            item.config,
+                            item.sessionHeader,
+                            item.sample,
+                            isRecording = true
+                        )
+
+                        val success = trySendTelemetry(
+                            item.config,
+                            heartbeatJson,
+                            item.sessionHeader.id.toString(),
+                            trailPointJson,
+                            sessionMetaJson
+                        )
+                        if (!success) {
+                            saveToOfflineQueue(
+                                heartbeatJson,
+                                item.sessionHeader.id.toString(),
+                                trailPointJson,
+                                sessionMetaJson
+                            )
+                        } else {
+                            flushOfflineQueueAsync(item.config)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Telemetry worker iteration failed: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
 
     fun resetForTesting() {
         lastActiveSession = null
@@ -147,6 +205,10 @@ object CloudTelemetrySyncManager {
     }
 
     fun calculateAverageRsrp(session: DriveTestSession, sample: DriveTestSample? = null): Double? {
+        if (session.samples.isEmpty()) {
+            return session.avgRsrp?.toDouble()
+                ?: sample?.let { (it.metrics.nr?.ssRsrp ?: it.metrics.lte?.rsrp)?.toDouble() }
+        }
         val existingRsrps = session.samples.mapNotNull { it.metrics.nr?.ssRsrp ?: it.metrics.lte?.rsrp }
         val allRsrps = if (sample != null && !session.samples.any { it.id == sample.id }) {
             val sRsrp = sample.metrics.nr?.ssRsrp ?: sample.metrics.lte?.rsrp
@@ -170,7 +232,7 @@ object CloudTelemetrySyncManager {
 
     fun calculateSampleCount(session: DriveTestSession, sample: DriveTestSample? = null): Int {
         return when {
-            sample != null && !session.samples.any { it.id == sample.id } -> session.samples.size + 1
+            session.samples.isNotEmpty() && sample != null && !session.samples.any { it.id == sample.id } -> session.samples.size + 1
             session.samples.isNotEmpty() -> session.samples.size
             session.sampleCount > 0 -> session.sampleCount
             sample != null -> 1
@@ -213,6 +275,8 @@ object CloudTelemetrySyncManager {
 
         val root = JSONObject().apply {
             put("sessionId", session.id.toString())
+            put("sessionName", session.name)
+            put("cadence", session.cadence.name)
             put("vehicleId", config.vehicleId)
             put("startTime", session.startTime)
             put("updatedAt", updatedAt)
@@ -226,10 +290,12 @@ object CloudTelemetrySyncManager {
     }
 
     /**
-     * Enqueue a new sample from the foreground service loop.
+     * Enqueue a new sample from the foreground service loop using a bounded channel and lightweight
+     * session header (never retaining the full in-memory samples list across network coroutines).
      */
     fun enqueueSample(session: DriveTestSession, sample: DriveTestSample) {
-        lastActiveSession = session
+        val lightweightHeader = session.copy(samples = emptyList())
+        lastActiveSession = lightweightHeader
         lastActiveSessionId = session.id.toString()
 
         val config = CloudConfigRepository.config.value
@@ -237,19 +303,8 @@ object CloudTelemetrySyncManager {
             return
         }
 
-        scope.launch(ioDispatcher) {
-            val heartbeatJson = buildVehicleHeartbeatJson(config, session, sample)
-            val trailPointJson = buildTrailPointJson(sample)
-            val sessionMetaJson = buildSessionMetadataJson(config, session, sample, isRecording = true)
-
-            val success = trySendTelemetry(config, heartbeatJson, session.id.toString(), trailPointJson, sessionMetaJson)
-            if (!success) {
-                saveToOfflineQueue(heartbeatJson, session.id.toString(), trailPointJson, sessionMetaJson)
-            } else {
-                // If live push succeeded and we have queued offline points, attempt background flush
-                flushOfflineQueueAsync(config)
-            }
-        }
+        ensureConsumerStarted()
+        telemetryChannel.trySend(TelemetryWorkItem(config, lightweightHeader, sample))
     }
 
     private suspend fun trySendTelemetry(
@@ -285,7 +340,8 @@ object CloudTelemetrySyncManager {
     }
 
     fun markSessionStarted(session: DriveTestSession) {
-        lastActiveSession = session
+        val lightweightHeader = session.copy(samples = emptyList())
+        lastActiveSession = lightweightHeader
         lastActiveSessionId = session.id.toString()
 
         val config = CloudConfigRepository.config.value

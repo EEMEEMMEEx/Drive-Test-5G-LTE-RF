@@ -1,5 +1,5 @@
 /**
- * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.13.0
+ * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.14.0
  * Features:
  * 1. 100% Real-Time Live Fleet Telemetry & Multi-SIM RF Inspector
  * 2. Historical Session Playback with Timeline Scrubber & Marker Animation
@@ -814,9 +814,14 @@ function renderSessionsArchive(sessionList) {
     return;
   }
 
+  const escapeHtml = (str) => String(str || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+
   const query = (document.getElementById('session-search-input')?.value || '').toLowerCase().trim();
   const filtered = query
     ? sessionList.filter(s =>
+        (s.sessionName || '').toLowerCase().includes(query) ||
         (s.sessionId || '').toLowerCase().includes(query) ||
         (s.vehicleId || '').toLowerCase().includes(query) ||
         (s.operator || '').toLowerCase().includes(query)
@@ -828,21 +833,22 @@ function renderSessionsArchive(sessionList) {
     const isSelected = state.playback.currentSessionId === s.sessionId;
     const dateStr = s.startTime ? new Date(s.startTime).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
     const rsrpColor = getRsrpColor(s.avgRsrp);
+    const displayLabel = escapeHtml(s.sessionName || s.sessionId);
 
     html += `
       <div class="session-card ${isSelected ? 'selected' : ''}" onclick="loadSession('${s.sessionId}')">
         <div class="session-card-top">
-          <span class="session-id">${s.vehicleId || 'DT-UNIT'}</span>
+          <span class="session-id">${escapeHtml(s.vehicleId || 'DT-UNIT')}</span>
           <span class="session-badge">${s.sampleCount || 0} PTS</span>
         </div>
         <div class="session-meta-row">
-          <span>${s.sessionId}</span>
+          <span>${displayLabel}</span>
           <span>${dateStr}</span>
         </div>
         <div class="session-metrics-chips">
-          <span class="session-chip text-cyan">${s.rat || '5G/LTE'}</span>
+          <span class="session-chip text-cyan">${escapeHtml(s.rat || '5G/LTE')}</span>
           <span class="session-chip" style="color: ${rsrpColor};">RSRP ${s.avgRsrp !== undefined ? s.avgRsrp + ' dBm' : '—'}</span>
-          <span class="session-chip">${s.operator || 'Field Unit'}</span>
+          <span class="session-chip">${escapeHtml(s.operator || 'Field Unit')}</span>
         </div>
       </div>
     `;
@@ -862,7 +868,8 @@ function populateSessionDropdown(sessionList) {
     const dateStr = s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const opt = document.createElement('option');
     opt.value = s.sessionId;
-    opt.textContent = `${s.vehicleId || 'Unit'} • ${s.sessionId} (${s.sampleCount || 0} pts, ${dateStr})`;
+    const label = s.sessionName || s.sessionId;
+    opt.textContent = `${s.vehicleId || 'Unit'} • ${label} (${s.sampleCount || 0} pts, ${dateStr})`;
     select.appendChild(opt);
   });
 

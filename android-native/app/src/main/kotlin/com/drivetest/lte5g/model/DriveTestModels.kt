@@ -117,5 +117,7 @@ data class DriveTestSession(
     val isDualSimLogging: Boolean = false,
     val sim2DisplayName: String? = null,
     val avgRsrpSim2: Int? = null,
-    val avgSinrSim2: Double? = null
+    val avgSinrSim2: Double? = null,
+    val recoveredFromCrash: Boolean = false,
+    val recoveryNote: String? = null
 )

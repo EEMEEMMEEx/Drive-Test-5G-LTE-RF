@@ -1,5 +1,6 @@
 package com.drivetest.lte5g.ui.sessions
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -31,12 +33,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.ai.GeminiAdvisorState
 import com.drivetest.lte5g.ai.GeminiRfAdvisor
 import com.drivetest.lte5g.cloud.CloudConfigRepository
 import com.drivetest.lte5g.cloud.CloudUploadStatus
 import com.drivetest.lte5g.cloud.GoogleDriveAutoUploader
+import com.drivetest.lte5g.data.SessionDiagnostics
 import com.drivetest.lte5g.data.SessionRepository
 import com.drivetest.lte5g.data.analytics.RfAnalyticsEngine
 import com.drivetest.lte5g.export.GisExporter
@@ -590,7 +594,9 @@ fun SessionsScreen(
                 },
                 text = {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         ExportOptionItem(
@@ -664,6 +670,46 @@ fun SessionsScreen(
                                 }
                             }
                         )
+                        ExportOptionItem(
+                            icon = Icons.Default.BugReport,
+                            iconTint = Color(0xFFFBBF24),
+                            title = "Share Diagnostic Log (.diag.jsonl)",
+                            description = "Lifecycle, WakeLock, GPS drop counters & Android exit reasons",
+                            onClick = {
+                                sessionForExportMenu = null
+                                val diagFile = SessionDiagnostics.getDiagnosticFile(session.id)
+                                if (diagFile == null || !diagFile.exists() || diagFile.length() == 0L) {
+                                    Toast.makeText(
+                                        context,
+                                        "ยังไม่มี Diagnostic Log สำหรับเซสชันนี้ (รองรับตั้งแต่ v1.13.5)",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    try {
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.provider",
+                                            diagFile
+                                        )
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            putExtra(Intent.EXTRA_SUBJECT, "Drive Test Diagnostics: ${session.name}")
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(
+                                            Intent.createChooser(shareIntent, "Share Diagnostic Log")
+                                        )
+                                    } catch (e: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            "ไม่สามารถแชร์ Diagnostic Log ได้: ${e.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        )
                     }
                 },
                 confirmButton = {},
@@ -726,6 +772,13 @@ fun SessionItemCard(
                         fontSize = 11.sp,
                         color = Color(0xFF94A3B8)
                     )
+                    if (session.recoveredFromCrash) {
+                        Text(
+                            text = session.recoveryNote ?: "Recovered after unexpected termination",
+                            fontSize = 10.sp,
+                            color = Color(0xFFFBBF24)
+                        )
+                    }
                 }
 
                 Row {
@@ -776,6 +829,21 @@ fun SessionItemCard(
                     fontSize = 11.sp,
                     color = Color(0xFFCBD5E1)
                 )
+
+                if (session.recoveredFromCrash) {
+                    Surface(
+                        color = Color(0xFF78350F),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "RECOVERED",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFDE68A),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
 
                 if (cloudStatus != CloudUploadStatus.NONE) {
                     Surface(

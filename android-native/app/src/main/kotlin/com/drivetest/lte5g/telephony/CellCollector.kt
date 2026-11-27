@@ -82,17 +82,25 @@ class CellCollector(private val context: Context) {
         registerTelephonyListenersSim1()
     }
 
-    private fun sanitizeInt(value: Int): Int? {
-        return if (value == CellInfo.UNAVAILABLE || value == Int.MAX_VALUE || value < -150) null else value
-    }
+    private fun sanitizeInt(value: Int): Int? = sanitizeIntValue(value)
 
-    private fun sanitizeLong(value: Long): Long? {
-        return if (value == CellInfo.UNAVAILABLE_LONG || value == Long.MAX_VALUE || value < 0) null else value
-    }
+    private fun sanitizeLong(value: Long): Long? = sanitizeLongValue(value)
 
     private fun sanitizeDouble(value: Int): Double? {
-        val sanitized = sanitizeInt(value) ?: return null
+        val sanitized = sanitizeIntValue(value) ?: return null
         return sanitized.toDouble()
+    }
+
+    @Volatile
+    private var sim1ListenerRegistered = false
+
+    fun ensureListenersRegistered() {
+        if (!sim1ListenerRegistered) {
+            registerTelephonyListenersSim1()
+        }
+        if (isDualSimLogging && secondaryTelephonyManager == null) {
+            setupSecondarySim()
+        }
     }
 
     fun setDualSimLogging(enabled: Boolean) {
@@ -183,7 +191,9 @@ class CellCollector(private val context: Context) {
             callbackSim1 = cb
             try {
                 activeTelephonyManager.registerTelephonyCallback(executor, cb)
+                sim1ListenerRegistered = true
             } catch (e: Exception) {
+                sim1ListenerRegistered = false
                 Log.e("CellCollector", "Error registering TelephonyCallback on SIM1 slot $currentSlotIndex", e)
             }
         } else {
@@ -213,13 +223,16 @@ class CellCollector(private val context: Context) {
             @Suppress("DEPRECATION")
             try {
                 activeTelephonyManager.listen(listener, PhoneStateListener.LISTEN_CELL_INFO)
+                sim1ListenerRegistered = true
             } catch (e: Exception) {
+                sim1ListenerRegistered = false
                 Log.e("CellCollector", "Error registering PhoneStateListener on SIM1 slot $currentSlotIndex", e)
             }
         }
     }
 
     private fun unregisterTelephonyListenersSim1() {
+        sim1ListenerRegistered = false
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callbackSim1 != null) {
                 activeTelephonyManager.unregisterTelephonyCallback(callbackSim1 as TelephonyCallback)
@@ -421,15 +434,15 @@ class CellCollector(private val context: Context) {
             if (info is CellInfoLte) {
                 val id = info.cellIdentity
                 val ss = info.cellSignalStrength
-                val pci = sanitizeInt(id.pci)
-                val eci = sanitizeLong(id.ci.toLong())
-                val tac = sanitizeInt(id.tac)
-                val earfcn = sanitizeInt(id.earfcn)
+                val pci = sanitizeNonNegativeInt(id.pci)
+                val eci = sanitizeCiToLong(id.ci)
+                val tac = sanitizeNonNegativeInt(id.tac)
+                val earfcn = sanitizeNonNegativeInt(id.earfcn)
                 val band = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && id.bands.isNotEmpty()) id.bands[0] else null
                 val rsrp = sanitizeInt(ss.rsrp)
                 val rsrq = sanitizeInt(ss.rsrq)
                 val rssnr = sanitizeDouble(ss.rssnr)
-                val cqi = sanitizeInt(ss.cqi)
+                val cqi = sanitizeNonNegativeInt(ss.cqi)
 
                 if (plmn.isNullOrBlank()) {
                     val mcc = id.mccString ?: ""
@@ -545,6 +558,22 @@ class CellCollector(private val context: Context) {
     }
 
     companion object {
+        fun sanitizeIntValue(value: Int): Int? {
+            return if (value == CellInfo.UNAVAILABLE || value == Int.MAX_VALUE || value < -150) null else value
+        }
+
+        fun sanitizeNonNegativeInt(value: Int): Int? {
+            return if (value == CellInfo.UNAVAILABLE || value == Int.MAX_VALUE || value < 0) null else value
+        }
+
+        fun sanitizeCiToLong(ci: Int): Long? {
+            return if (ci == CellInfo.UNAVAILABLE || ci == Int.MAX_VALUE || ci < 0) null else ci.toLong()
+        }
+
+        fun sanitizeLongValue(value: Long): Long? {
+            return if (value == CellInfo.UNAVAILABLE_LONG || value == Long.MAX_VALUE || value < 0L) null else value
+        }
+
         @SuppressLint("MissingPermission")
         fun getActiveSubscriptions(context: Context): List<SimSlotInfo> {
             val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager

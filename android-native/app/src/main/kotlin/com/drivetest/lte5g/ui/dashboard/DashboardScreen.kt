@@ -2,7 +2,11 @@ package com.drivetest.lte5g.ui.dashboard
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -19,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivetest.lte5g.R
 import com.drivetest.lte5g.data.SessionRepository
@@ -86,14 +94,16 @@ fun DashboardScreen(
     var pendingRatLockMode by remember { mutableStateOf<RatLockMode?>(null) }
     var sessionNameInput by remember { mutableStateOf("") }
 
-    // Permission Request Launcher
+    // Permission Request Launcher (guard POST_NOTIFICATIONS for Android 13+ / API 33+)
     val requiredPermissions = remember {
-        arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.POST_NOTIFICATIONS
-        )
+        buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            add(Manifest.permission.READ_PHONE_STATE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }.toTypedArray()
     }
 
     var hasPermissions by remember {
@@ -102,6 +112,24 @@ fun DashboardScreen(
                 ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
             }
         )
+    }
+
+    var isIgnoringBatteryOpt by remember {
+        mutableStateOf(DriveTestForegroundService.isIgnoringBatteryOptimizations(context))
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isIgnoringBatteryOpt = DriveTestForegroundService.isIgnoringBatteryOptimizations(context)
+                hasPermissions = requiredPermissions.all {
+                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -225,8 +253,12 @@ fun DashboardScreen(
                 }
                 OutlinedButton(
                     onClick = {
-                        sessionNameInput = SessionRepository.getDefaultSessionName()
-                        showNewSessionDialog = true
+                        if (!hasPermissions) {
+                            permissionLauncher.launch(requiredPermissions)
+                        } else {
+                            sessionNameInput = SessionRepository.getDefaultSessionName()
+                            showNewSessionDialog = true
+                        }
                     },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TelemetryCyan),
                     border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.7f)),
@@ -234,6 +266,66 @@ fun DashboardScreen(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text("+ NEW", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // BATTERY OPTIMIZATION WARNING (PREVENTS OEM BACKGROUND KILL IN 6-9h SESSIONS)
+        if (!isIgnoringBatteryOpt) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF451A03)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Battery Optimization Warning",
+                        tint = Color(0xFFFBBF24),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "แนะนำปิดการจำกัดแบตเตอรี่พื้นหลัง",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFDE68A)
+                        )
+                        Text(
+                            text = "ป้องกันระบบปิดแอประหว่างบันทึกยาว 6-9 ชม.",
+                            fontSize = 11.sp,
+                            color = Color(0xFFFCD34D).copy(alpha = 0.85f)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                try {
+                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                } catch (_: Exception) {
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFDE68A)),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("ตั้งค่า", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

@@ -234,6 +234,8 @@ class CloudTelemetrySyncManagerTest {
         val json = JSONObject(jsonStr)
 
         assertEquals("1762849200000", json.getString("sessionId"))
+        assertEquals("Session #1", json.getString("sessionName"))
+        assertEquals("PRECISE", json.getString("cadence"))
         assertEquals("DT-V01", json.getString("vehicleId"))
         assertEquals(1762849200000L, json.getLong("startTime"))
         assertEquals(sample.timestamp, json.getLong("updatedAt"))
@@ -272,6 +274,8 @@ class CloudTelemetrySyncManagerTest {
         val json = JSONObject(jsonStr)
 
         assertEquals("1762849300000", json.getString("sessionId"))
+        assertEquals("Session #2", json.getString("sessionName"))
+        assertEquals("PRECISE", json.getString("cadence"))
         assertEquals("DT-V02", json.getString("vehicleId"))
         assertEquals(1762849300000L, json.getLong("startTime"))
         assertEquals(2, json.getInt("sampleCount"))

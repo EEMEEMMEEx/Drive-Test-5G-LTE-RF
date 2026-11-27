@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="update_cache" path="updates/" />
     <external-cache-path name="ext_update_cache" path="updates/" />
+    <files-path name="session_files" path="sessions/" />
 </paths>

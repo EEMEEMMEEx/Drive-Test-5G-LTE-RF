@@ -31,6 +31,10 @@ class GoogleDriveUploadWorker(
             return Result.failure()
         }
 
+        // Ensure storage & config are loaded on cold-process WorkManager execution
+        CloudConfigRepository.init(applicationContext)
+        SessionRepository.ensureLoadedSync(applicationContext)
+
         // Avoid duplicate upload if already marked UPLOADED
         val currentStatus = CloudConfigRepository.getSessionUploadStatus(sessionId)
         if (currentStatus == CloudUploadStatus.UPLOADED) {
