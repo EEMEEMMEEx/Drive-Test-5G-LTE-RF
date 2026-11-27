@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Drive Test LTE 5G</string>
+    <string name="notif_live_channel_name">Drive Test Live Updates (Navigation)</string>
+    <string name="notif_live_channel_desc">Live navigation status chip and real-time RF telemetry</string>
+    <string name="notif_signal_accessibility">Signal %1$s, recording %2$s</string>
+    <string name="notif_recording_fallback_title">Drive Test Recording</string>
+    <string name="notif_recording_fallback_text">Recording in progress…</string>
 </resources>

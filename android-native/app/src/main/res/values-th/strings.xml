@@ -1,0 +1,7 @@
+<resources>
+    <string name="notif_live_channel_name">การอัปเดตสด Drive Test (นำทาง)</string>
+    <string name="notif_live_channel_desc">ชิปสถานะแถบด้านบนและค่าสัญญาณ RF แบบเรียลไทม์</string>
+    <string name="notif_signal_accessibility">สัญญาณ %1$s กำลังบันทึก %2$s</string>
+    <string name="notif_recording_fallback_title">กำลังบันทึก Drive Test</string>
+    <string name="notif_recording_fallback_text">กำลังบันทึกข้อมูลสัญญาณ…</string>
+</resources>

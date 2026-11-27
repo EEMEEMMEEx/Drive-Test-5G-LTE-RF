@@ -12,8 +12,11 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
+import android.telephony.CellInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.drivetest.lte5g.MainActivity
+import com.drivetest.lte5g.R
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.model.RatLockMode
@@ -46,6 +49,16 @@ object LiveAlertNotificationHelper {
     val COLOR_BAD = 0xFFEF4444.toInt()       // < -115 dBm (Red)
     val COLOR_DEFAULT = 0xFF06B6D4.toInt()   // Scanning / No Signal (Cyan)
 
+    // 3GPP valid RSRP bounds (LTE -140..-44 dBm, 5G NR SS-RSRP -156..-31 dBm; allow margin to -20 dBm)
+    private const val MIN_VALID_RSRP_DBM = -156
+    private const val MAX_VALID_RSRP_DBM = -20
+    const val UNAVAILABLE_CHIP_TEXT = "-- dBm"
+
+    @Volatile
+    private var cachedSmallIconKey: String? = null
+    @Volatile
+    private var cachedSmallIcon: IconCompat? = null
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = context.getSystemService(NotificationManager::class.java)
@@ -56,12 +69,23 @@ object LiveAlertNotificationHelper {
                 manager?.deleteNotificationChannel("drive_test_channel")
             } catch (_: Exception) {}
 
+            val channelName = try {
+                context.getString(R.string.notif_live_channel_name)
+            } catch (_: Exception) {
+                "Drive Test Live Updates (Navigation)"
+            }
+            val channelDesc = try {
+                context.getString(R.string.notif_live_channel_desc)
+            } catch (_: Exception) {
+                "Live navigation status chip and real-time RF telemetry"
+            }
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Drive Test Live Updates (Navigation)",
+                channelName,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Live navigation status chip and real-time RF telemetry"
+                description = channelDesc
                 setShowBadge(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setSound(null, null)
@@ -71,8 +95,76 @@ object LiveAlertNotificationHelper {
         }
     }
 
+    /**
+     * Validates a raw RSRP integer against 3GPP bounds and Android unavailability sentinels
+     * ([Int.MAX_VALUE], [Int.MIN_VALUE], [CellInfo.UNAVAILABLE]).
+     */
+    fun sanitizeRsrp(rsrp: Int?): Int? {
+        if (rsrp == null || rsrp == Int.MAX_VALUE || rsrp == Int.MIN_VALUE) return null
+        if (rsrp < MIN_VALID_RSRP_DBM || rsrp > MAX_VALID_RSRP_DBM) return null
+        return rsrp
+    }
+
     fun getRsrp(metrics: CellMetrics?): Int? {
-        return metrics?.nr?.ssRsrp ?: metrics?.lte?.rsrp
+        return sanitizeRsrp(metrics?.nr?.ssRsrp) ?: sanitizeRsrp(metrics?.lte?.rsrp)
+    }
+
+    /**
+     * Language-neutral status bar chip label: signed integer + unit (e.g. "-67 dBm") or "-- dBm".
+     */
+    fun formatRsrpChipText(rsrp: Int?): String {
+        val valid = sanitizeRsrp(rsrp) ?: return UNAVAILABLE_CHIP_TEXT
+        return String.format(Locale.US, "%d dBm", valid)
+    }
+
+    /**
+     * Renders a crisp white-on-transparent monochrome square bitmap for the notification smallIcon
+     * slot so the status bar pill displays live RSRP (e.g. "-67" over "dBm") on the left while
+     * keeping the native Android chronometer ("00:58") running on the right.
+     */
+    internal fun generateRsrpSmallIconBitmap(rsrp: Int?): Bitmap? {
+        return try {
+            val size = 96
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val valid = sanitizeRsrp(rsrp)
+            val valueStr = valid?.let { String.format(Locale.US, "%d", it) } ?: "--"
+
+            val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+                textSize = when {
+                    valueStr.length >= 4 -> 38f
+                    valueStr.length == 3 -> 46f
+                    else -> 48f
+                }
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFFFFF.toInt()
+                textSize = 26f
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+
+            canvas.drawText(valueStr, size / 2f, 52f, valuePaint)
+            canvas.drawText("dBm", size / 2f, 84f, unitPaint)
+            bitmap
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun getOrCreateRsrpSmallIcon(rsrp: Int?): IconCompat? {
+        val key = formatRsrpChipText(rsrp)
+        if (key == cachedSmallIconKey && cachedSmallIcon != null) {
+            return cachedSmallIcon
+        }
+        val bmp = generateRsrpSmallIconBitmap(rsrp) ?: return null
+        val icon = IconCompat.createWithBitmap(bmp)
+        cachedSmallIconKey = key
+        cachedSmallIcon = icon
+        return icon
     }
 
     fun getRsrpTierColor(rsrp: Int?): Int {
@@ -320,13 +412,18 @@ object LiveAlertNotificationHelper {
         sim2DisplayName: String? = null
     ): Notification {
         val rsrp = getRsrp(metrics)
-        val rsrpStr = if (rsrp != null) "$rsrp dBm" else "N/A"
+        val rsrpStr = formatRsrpChipText(rsrp)
         val tierColor = getRsrpTierColor(rsrp)
         val qualityLabel = getRsrpQualityLabel(rsrp)
         val ratLabel = formatRatLabel(metrics)
         val speedStr = formatSpeed(speedKmh)
         val elapsedStr = formatElapsedTime(startTimeMillis)
         val artworkBitmap = generateSignalArtwork(metrics, tierColor, speedKmh, sampleCount)
+        val accessibilityText = try {
+            context.getString(R.string.notif_signal_accessibility, rsrpStr, elapsedStr)
+        } catch (_: Exception) {
+            "Signal $rsrpStr, recording $elapsedStr"
+        }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -338,7 +435,7 @@ object LiveAlertNotificationHelper {
         )
 
         val rsrp2 = getRsrp(metricsSim2)
-        val rsrp2Str = if (rsrp2 != null) "$rsrp2 dBm" else "N/A"
+        val rsrp2Str = formatRsrpChipText(rsrp2)
         val rat2Label = formatRatLabel(metricsSim2)
 
         val isDualSim = metricsSim2 != null
@@ -387,7 +484,7 @@ object LiveAlertNotificationHelper {
             .setContentTitle(titleText)
             .setContentText(contentText)
             .setSubText(subText)
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setTicker(accessibilityText)
             .setColor(tierColor)
             .setColorized(false) // Must be false for Android 16 Live Updates!
             .setOngoing(true)
@@ -401,11 +498,20 @@ object LiveAlertNotificationHelper {
             .setContentIntent(pendingIntent)
             // NOTE: Pure information display — ZERO action buttons per user specification
 
+        // Option A: Live monochrome RSRP small icon on the left + live chronometer ("00:58") on the right
+        val rsrpIcon = getOrCreateRsrpSmallIcon(rsrp)
+        if (rsrpIcon != null) {
+            builder.setSmallIcon(rsrpIcon)
+        } else {
+            builder.setSmallIcon(android.R.drawable.stat_sys_upload)
+        }
+
         if (artworkBitmap != null) {
             builder.setLargeIcon(artworkBitmap)
         }
 
         // Android 16 (API 36) / Android 17 (API 37) Promoted Ongoing Live Updates
+        // Intentionally omit setShortCriticalText so the chronometer stays visible on the right.
         builder.setRequestPromotedOngoing(true)
         builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
 
@@ -418,10 +524,9 @@ object LiveAlertNotificationHelper {
         builder.extras.putString("oplus.notification.capsule.status", "navigating")
         builder.extras.putString("coloros.notification.capsule.status", "navigating")
 
-        val capsuleTitle = if (isDualSim) "S1:$rsrpStr | S2:$rsrp2Str" else "$ratLabel · $rsrpStr"
-        builder.extras.putString("oplus.notification.capsule.title", capsuleTitle)
+        builder.extras.putString("oplus.notification.capsule.title", rsrpStr)
         builder.extras.putString("oplus.notification.capsule.content", "$sampleCount pts · $speedStr")
-        builder.extras.putString("coloros.notification.capsule.title", capsuleTitle)
+        builder.extras.putString("coloros.notification.capsule.title", rsrpStr)
         builder.extras.putString("coloros.notification.capsule.content", "$sampleCount pts · $speedStr")
         builder.extras.putString("android.substName", "Drive Test 5G")
 

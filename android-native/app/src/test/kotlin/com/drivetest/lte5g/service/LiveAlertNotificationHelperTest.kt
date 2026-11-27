@@ -168,5 +168,55 @@ class LiveAlertNotificationHelperTest {
         )
     }
 
+    @Test
+    fun testFormatRsrpChipText_validNegativeAndBoundaries() {
+        assertEquals("-67 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-67))
+        assertEquals("-115 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-115))
+        assertEquals("-44 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-44))
+        assertEquals("-140 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-140))
+        assertEquals("-156 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-156))
+        assertEquals("-20 dBm", LiveAlertNotificationHelper.formatRsrpChipText(-20))
+    }
 
+    @Test
+    fun testFormatRsrpChipText_unavailableAndOutOfBoundsValues() {
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(null))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(Int.MAX_VALUE))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(Int.MIN_VALUE))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(0))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(15))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(-157))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(-200))
+    }
+
+    @Test
+    fun testGetRsrp_fallsBackToLteWhenNrIsUnavailableSentinel() {
+        val nrUnavailable = NrMetrics(
+            pci = 1, nci = 1L, tac = 1, nrArfcn = 1, band = 78,
+            ssRsrp = Int.MAX_VALUE, ssRsrq = null, ssSinr = null,
+            csiRsrp = null, csiRsrq = null, csiSinr = null, isNsa = true
+        )
+        val lteValid = LteMetrics(
+            pci = 86, eci = 1L, tac = 1, earfcn = 1850, band = 3,
+            rsrp = -67, rsrq = -10, rssnr = 12.0, cqi = 12
+        )
+        val combined = CellMetrics(ratType = RatType.NR_NSA, nr = nrUnavailable, lte = lteValid)
+        assertEquals(-67, LiveAlertNotificationHelper.getRsrp(combined))
+        assertEquals("-67 dBm", LiveAlertNotificationHelper.formatRsrpChipText(LiveAlertNotificationHelper.getRsrp(combined)))
+
+        val bothUnavailable = CellMetrics(
+            ratType = RatType.LTE,
+            lte = lteValid.copy(rsrp = Int.MAX_VALUE)
+        )
+        assertNull(LiveAlertNotificationHelper.getRsrp(bothUnavailable))
+        assertEquals("-- dBm", LiveAlertNotificationHelper.formatRsrpChipText(LiveAlertNotificationHelper.getRsrp(bothUnavailable)))
+    }
+
+    @Test
+    fun testGenerateRsrpSmallIconBitmapSafe() {
+        // Must never crash on JVM (where Bitmap.createBitmap may return null or throw)
+        LiveAlertNotificationHelper.generateRsrpSmallIconBitmap(-67)
+        LiveAlertNotificationHelper.generateRsrpSmallIconBitmap(null)
+        LiveAlertNotificationHelper.generateRsrpSmallIconBitmap(Int.MAX_VALUE)
+    }
 }

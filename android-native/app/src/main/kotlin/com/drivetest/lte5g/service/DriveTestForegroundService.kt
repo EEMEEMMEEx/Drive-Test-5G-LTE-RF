@@ -627,9 +627,13 @@ class DriveTestForegroundService : Service() {
         val elapsedSinceLast = nowElapsed - lastNotificationUpdateElapsedMs
         val signalChanged = currentRsrp != lastNotifiedRsrp || currentRat != lastNotifiedRat
 
-        // Throttle notification Bitmap + Binder IPC updates in 1s Precise mode to prevent OEM kill pressure
-        if (!force && elapsedSinceLast < MIN_NOTIFICATION_UPDATE_INTERVAL_MS && !(signalChanged && elapsedSinceLast >= 1500L)) {
-            return
+        // Update on rounded RSRP/RAT change (rate-limited to >=1s) or periodic 15s expanded-card refresh
+        if (!force) {
+            if (signalChanged) {
+                if (elapsedSinceLast < MIN_SIGNAL_NOTIFY_INTERVAL_MS) return
+            } else if (elapsedSinceLast < IDLE_NOTIFICATION_REFRESH_INTERVAL_MS) {
+                return
+            }
         }
 
         lastNotificationUpdateElapsedMs = nowElapsed
@@ -652,7 +656,8 @@ class DriveTestForegroundService : Service() {
         private const val WAKELOCK_TIMEOUT_MS = 60L * 60L * 1000L // 60 minutes rolling
         private const val WAKELOCK_RENEW_INTERVAL_MS = 30L * 60L * 1000L // Renew every 30 minutes
         private const val DIAGNOSTIC_HEARTBEAT_INTERVAL_MS = 60_000L // 60s health snapshot
-        private const val MIN_NOTIFICATION_UPDATE_INTERVAL_MS = 3000L // Max 1 Bitmap IPC / 3s unless RF changes
+        private const val MIN_SIGNAL_NOTIFY_INTERVAL_MS = 1000L // Rate-limit chip updates on RSRP/RAT change
+        private const val IDLE_NOTIFICATION_REFRESH_INTERVAL_MS = 15_000L // Refresh expanded card stats when signal unchanged
 
         const val ACTION_START = "com.drivetest.lte5g.action.START"
         const val ACTION_STOP = "com.drivetest.lte5g.action.STOP"
