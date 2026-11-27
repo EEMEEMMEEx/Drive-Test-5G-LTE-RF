@@ -173,10 +173,19 @@ fun SettingsScreen(
     val availableSims by DriveTestForegroundService.availableSims.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    // Read authoritative package version info dynamically (Rule 10) and refresh on resume
+    var installedVersion by remember {
+        mutableStateOf(OtaUpdateManager.getInstalledAppVersion(context))
+    }
+    val currentVersionName = installedVersion.versionName
+    val currentVersionCode = installedVersion.versionCode.toInt()
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                installedVersion = OtaUpdateManager.getInstalledAppVersion(context)
+                OtaUpdateManager.onResume(context)
                 // Finishes a flexible update Play downloaded while the app was in background
                 scope.launch { PlayUpdateManager.onResume(context) }
             }
@@ -198,27 +207,6 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         OtaUpdateManager.init(context)
-    }
-
-    // Read authoritative package version info dynamically (Rule 10)
-    val packageInfo = remember {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0)
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-    val currentVersionName = packageInfo?.versionName ?: "1.11.2"
-    val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        packageInfo?.longVersionCode?.toInt() ?: 39
-    } else {
-        @Suppress("DEPRECATION")
-        packageInfo?.versionCode ?: 39
     }
 
     val cloudConfig by CloudConfigRepository.config.collectAsStateWithLifecycle()
@@ -328,6 +316,11 @@ fun SettingsScreen(
                         Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 } catch (_: Exception) {
+                }
+            },
+            onRetryError = {
+                OtaUpdateManager.retryAfterError(context, currentVersionName) {
+                    scope.launch { OtaUpdateManager.checkForUpdates(currentVersionName) }
                 }
             },
             onDismissError = { OtaUpdateManager.resetState() }
@@ -1419,6 +1412,7 @@ fun AppUpdateCard(
     onOpenPlayFallback: () -> Unit = {},
     onOpenInstallSettings: () -> Unit = {},
     onOpenNetworkSettings: () -> Unit = {},
+    onRetryError: () -> Unit = {},
     onDismissError: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -1785,7 +1779,9 @@ fun AppUpdateCard(
                                         text = when (state.kind) {
                                             OtaErrorKind.INSTALL_PERMISSION -> "Install Permission Required"
                                             OtaErrorKind.NETWORK -> "Network Unavailable"
-                                            OtaErrorKind.GENERAL -> "Update Check Failed"
+                                            OtaErrorKind.VERIFICATION -> "Package Verification Failed"
+                                            OtaErrorKind.INSTALL_FAILED -> "Installation Failed"
+                                            OtaErrorKind.GENERAL -> "Update Failed"
                                         },
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
@@ -2055,7 +2051,7 @@ fun AppUpdateCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
-                                onClick = onCheckForUpdates,
+                                onClick = onRetryError,
                                 colors = primaryColors,
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier

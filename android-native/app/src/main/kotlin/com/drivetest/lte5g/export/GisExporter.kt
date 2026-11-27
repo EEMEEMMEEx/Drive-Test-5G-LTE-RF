@@ -59,6 +59,8 @@ object GisExporter {
             trackProps.put("distance_meters", RfAnalyticsEngine.calculateTotalDistance(samples))
             session.avgRsrp?.let { trackProps.put("avg_rsrp_dbm", it) }
             session.avgSinr?.let { trackProps.put("avg_sinr_db", it) }
+            session.avgRsrpSim2?.let { trackProps.put("avg_rsrp_sim2_dbm", it) }
+            session.avgSinrSim2?.let { trackProps.put("avg_sinr_sim2_db", it) }
             trackFeature.put("properties", trackProps)
 
             features.put(trackFeature)
@@ -97,9 +99,13 @@ object GisExporter {
             props.put("speed_kmh", s.speedKmh)
             props.put("bearing", s.bearing)
             props.put("accuracy_m", s.accuracyMeters)
+            props.put("cadence_s", s.cadence.intervalMs / 1000L)
             props.put("rat", m.ratType.name)
             props.put("operator", m.operatorAlpha ?: "")
             props.put("plmn", m.plmn ?: "")
+            (m.simDisplayName?.takeIf { it.isNotBlank() } ?: s.simDisplayName?.takeIf { it.isNotBlank() })?.let {
+                props.put("sim_name", it)
+            }
             pci?.let { props.put("pci", it) }
             tac?.let { props.put("tac", it) }
             cellId?.let { props.put("cell_id", it) }
@@ -111,17 +117,31 @@ object GisExporter {
             m.lte?.cqi?.let { props.put("cqi", it) }
             props.put("sim_slot", s.simSlot)
 
-            // SIM 2 fields if present
+            // SIM 2 fields if present (full parity with CSV export; omitted cleanly on single-SIM)
             s.metricsSim2?.let { m2 ->
+                val pci2 = m2.nr?.pci ?: m2.lte?.pci
+                val tac2 = m2.nr?.tac ?: m2.lte?.tac
+                val cellId2 = m2.nr?.nci ?: m2.lte?.eci
+                val earfcn2 = m2.nr?.nrArfcn ?: m2.lte?.earfcn
+                val band2 = m2.nr?.band?.let { "n$it" } ?: m2.lte?.band?.let { "B$it" }
+                val rsrp2 = m2.nr?.ssRsrp ?: m2.lte?.rsrp
+                val rsrq2 = m2.nr?.ssRsrq ?: m2.lte?.rsrq
+                val sinr2 = m2.nr?.ssSinr ?: m2.lte?.rssnr
+
                 props.put("sim2_active", true)
                 props.put("sim2_rat", m2.ratType.name)
                 props.put("sim2_operator", m2.operatorAlpha ?: "")
-                val pci2 = m2.nr?.pci ?: m2.lte?.pci
-                val rsrp2 = m2.nr?.ssRsrp ?: m2.lte?.rsrp
-                val sinr2 = m2.nr?.ssSinr ?: m2.lte?.rssnr
+                props.put("sim2_plmn", m2.plmn ?: "")
+                m2.simDisplayName?.takeIf { it.isNotBlank() }?.let { props.put("sim2_name", it) }
                 pci2?.let { props.put("sim2_pci", it) }
+                tac2?.let { props.put("sim2_tac", it) }
+                cellId2?.let { props.put("sim2_cell_id", it) }
+                earfcn2?.let { props.put("sim2_earfcn", it) }
+                band2?.let { props.put("sim2_band", it) }
                 rsrp2?.let { props.put("sim2_rsrp_dbm", it) }
+                rsrq2?.let { props.put("sim2_rsrq_db", it) }
                 sinr2?.let { props.put("sim2_sinr_db", it) }
+                m2.lte?.cqi?.let { props.put("sim2_cqi", it) }
             }
 
             pointFeature.put("properties", props)

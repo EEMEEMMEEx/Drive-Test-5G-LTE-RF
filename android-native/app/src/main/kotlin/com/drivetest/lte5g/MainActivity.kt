@@ -65,27 +65,20 @@ fun MainDriveTestApp() {
     var showInstallDialog by remember { mutableStateOf(true) }
     var showPlayFallback by remember { mutableStateOf(false) }
 
-    // Read authoritative package version info dynamically (Rule 10)
-    val packageInfo = remember {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0)
-            }
-        } catch (_: Exception) {
-            null
-        }
+    // Read authoritative package version info dynamically (Rule 10) and refresh on resume
+    var installedVersion by remember {
+        mutableStateOf(OtaUpdateManager.getInstalledAppVersion(context))
     }
-    val currentVersionName = packageInfo?.versionName ?: "1.11.2"
+    val currentVersionName = installedVersion.versionName
     val scope = rememberCoroutineScope()
 
-    // Refreshes Play update state on resume (also completes a downloaded flexible update)
+    // Refreshes Play & OTA update state on resume (completes Play flexible updates or resumes OTA install)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                installedVersion = OtaUpdateManager.getInstalledAppVersion(context)
+                OtaUpdateManager.onResume(context)
                 scope.launch { PlayUpdateManager.onResume(context) }
             }
         }
@@ -97,8 +90,11 @@ fun MainDriveTestApp() {
 
     // Checks release notes (GitHub) and asks Play Core whether an update is available
     LaunchedEffect(Unit) {
+        OtaUpdateManager.init(context)
         PlayUpdateManager.check(context)
-        OtaUpdateManager.checkForUpdates(currentVersionName)
+        if (OtaUpdateManager.autoUpdateEnabled.value) {
+            OtaUpdateManager.checkForUpdatesIfIdle(context)
+        }
     }
 
     Scaffold(

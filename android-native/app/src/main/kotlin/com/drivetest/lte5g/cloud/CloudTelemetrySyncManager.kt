@@ -131,6 +131,40 @@ object CloudTelemetrySyncManager {
         return Triple(rat, rsrp, sinr)
     }
 
+    private fun extractBandLabel(metrics: CellMetrics): String? =
+        metrics.nr?.band?.let { "n$it" } ?: metrics.lte?.band?.let { "B$it" }
+
+    private fun extractCellIdString(metrics: CellMetrics): String? =
+        metrics.nr?.nci?.toString() ?: metrics.lte?.eci?.toString()
+
+    private fun putSim2Fields(root: JSONObject, sim2: CellMetrics, includeExtendedFields: Boolean) {
+        val sim2Rsrp = sim2.nr?.ssRsrp ?: sim2.lte?.rsrp
+        val sim2Rsrq = sim2.nr?.ssRsrq ?: sim2.lte?.rsrq
+        val sim2Sinr = sim2.nr?.ssSinr ?: sim2.lte?.rssnr
+        val sim2Pci = sim2.nr?.pci ?: sim2.lte?.pci
+        val sim2Band = extractBandLabel(sim2)
+
+        sim2.operatorAlpha?.takeIf { it.isNotBlank() }?.let { root.put("sim2Operator", it) }
+        root.put("sim2Rat", sim2.ratType.name)
+        sim2Band?.let { root.put("sim2Band", it) }
+        sim2Pci?.let { root.put("sim2Pci", it) }
+        sim2Rsrp?.let { root.put("sim2Rsrp", it) }
+        sim2Rsrq?.let { root.put("sim2Rsrq", it) }
+        sim2Sinr?.let { root.put("sim2Sinr", it) }
+
+        if (includeExtendedFields) {
+            sim2.simDisplayName?.takeIf { it.isNotBlank() }?.let { root.put("sim2Name", it) }
+            sim2.plmn?.takeIf { it.isNotBlank() }?.let { root.put("sim2Plmn", it) }
+            val sim2Arfcn = sim2.nr?.nrArfcn ?: sim2.lte?.earfcn
+            val sim2Tac = sim2.nr?.tac ?: sim2.lte?.tac
+            val sim2CellId = extractCellIdString(sim2)
+            sim2Arfcn?.let { root.put("sim2Arfcn", it) }
+            sim2.lte?.cqi?.let { root.put("sim2Cqi", it) }
+            sim2Tac?.let { root.put("sim2Tac", it) }
+            sim2CellId?.let { root.put("sim2CellId", it) }
+        }
+    }
+
     /**
      * Build the JSON payload for the live vehicle status node (/fleet/vehicles/{vehicleId}).
      */
@@ -142,15 +176,9 @@ object CloudTelemetrySyncManager {
         val (rat, rsrp, sinr) = extractPrimaryMetrics(sample)
         val rsrq = sample.metrics.nr?.ssRsrq ?: sample.metrics.lte?.rsrq
         val pci = sample.metrics.nr?.pci ?: sample.metrics.lte?.pci
-        val band = sample.metrics.nr?.band?.let { "n$it" } ?: sample.metrics.lte?.band?.let { "B$it" }
-        val cellId = sample.metrics.nr?.nci?.toString() ?: sample.metrics.lte?.eci?.toString()
+        val band = extractBandLabel(sample.metrics)
+        val cellId = extractCellIdString(sample.metrics)
         val alertState = computeAlertState(rsrp, sinr)
-
-        val sim2 = sample.metricsSim2
-        val sim2Rsrp = sim2?.let { it.nr?.ssRsrp ?: it.lte?.rsrp }
-        val sim2Sinr = sim2?.let { it.nr?.ssSinr ?: it.lte?.rssnr }
-        val sim2Pci = sim2?.let { it.nr?.pci ?: it.lte?.pci }
-        val sim2Band = sim2?.let { it.nr?.band?.let { "n$it" } ?: it.lte?.band?.let { "B$it" } }
 
         val root = JSONObject().apply {
             put("vehicleId", config.vehicleId)
@@ -173,14 +201,7 @@ object CloudTelemetrySyncManager {
             sample.metrics.operatorAlpha?.let { put("operator", it) }
 
             // Dual-SIM secondary info
-            if (sim2 != null) {
-                sim2.operatorAlpha?.let { put("sim2Operator", it) }
-                put("sim2Rat", sim2.ratType.name)
-                sim2Band?.let { put("sim2Band", it) }
-                sim2Pci?.let { put("sim2Pci", it) }
-                sim2Rsrp?.let { put("sim2Rsrp", it) }
-                sim2Sinr?.let { put("sim2Sinr", it) }
-            }
+            sample.metricsSim2?.let { putSim2Fields(this, it, includeExtendedFields = false) }
 
             put("sampleCount", session.samples.size + 1)
             put("alertState", alertState)
@@ -190,19 +211,45 @@ object CloudTelemetrySyncManager {
 
     /**
      * Build the JSON payload for a breadcrumb trail sample (/fleet/trails/{sessionId}/{sampleId}).
+     * Preserves all legacy top-level SIM 1 keys and appends full SIM 1 + SIM 2 RF fields when present.
      */
     fun buildTrailPointJson(sample: DriveTestSample): String {
+        val m1 = sample.metrics
         val (rat, rsrp, sinr) = extractPrimaryMetrics(sample)
-        val pci = sample.metrics.nr?.pci ?: sample.metrics.lte?.pci
+        val rsrq = m1.nr?.ssRsrq ?: m1.lte?.rsrq
+        val pci = m1.nr?.pci ?: m1.lte?.pci
+        val arfcn = m1.nr?.nrArfcn ?: m1.lte?.earfcn
+        val band = extractBandLabel(m1)
+        val tac = m1.nr?.tac ?: m1.lte?.tac
+        val cellId = extractCellIdString(m1)
+        val simName = m1.simDisplayName?.takeIf { it.isNotBlank() }
+            ?: sample.simDisplayName?.takeIf { it.isNotBlank() }
+
         val root = JSONObject().apply {
             put("ts", sample.timestamp)
             put("lat", sample.latitude)
             put("lon", sample.longitude)
-            rsrp?.let { put("rsrp", it) }
-            sinr?.let { put("sinr", it) }
-            pci?.let { put("pci", it) }
-            put("rat", rat)
+            put("alt", sample.altitude)
             put("speed", sample.speedKmh.toDouble())
+            put("bearing", sample.bearing.toDouble())
+            put("accuracyM", sample.accuracyMeters.toDouble())
+            put("cadenceSec", sample.cadence.intervalMs / 1000L)
+            put("rat", rat)
+            simName?.let { put("simName", it) }
+            m1.operatorAlpha?.takeIf { it.isNotBlank() }?.let { put("operator", it) }
+            m1.plmn?.takeIf { it.isNotBlank() }?.let { put("plmn", it) }
+            pci?.let { put("pci", it) }
+            arfcn?.let { put("arfcn", it) }
+            band?.let { put("band", it) }
+            rsrp?.let { put("rsrp", it) }
+            rsrq?.let { put("rsrq", it) }
+            sinr?.let { put("sinr", it) }
+            m1.lte?.cqi?.let { put("cqi", it) }
+            tac?.let { put("tac", it) }
+            cellId?.let { put("cellId", it) }
+
+            // Dual-SIM secondary RF fields (omitted cleanly on single-SIM devices)
+            sample.metricsSim2?.let { putSim2Fields(this, it, includeExtendedFields = true) }
         }
         return root.toString()
     }
@@ -693,18 +740,57 @@ object CloudTelemetrySyncManager {
         val lat = tp.optDouble("lat", Double.NaN)
         val lon = tp.optDouble("lon", Double.NaN)
         if (lat.isNaN() || lon.isNaN()) return null
-        val ratStr = tp.optString("rat", RatType.UNKNOWN.name)
-        val rat = try { RatType.valueOf(ratStr) } catch (_: Exception) { RatType.UNKNOWN }
-        val rsrp = if (tp.has("rsrp") && !tp.isNull("rsrp")) tp.optInt("rsrp") else null
-        val sinr = if (tp.has("sinr") && !tp.isNull("sinr")) tp.optDouble("sinr") else null
-        val pci = if (tp.has("pci") && !tp.isNull("pci")) tp.optInt("pci") else null
-        val speed = tp.optDouble("speed", 0.0).toFloat()
 
-        val lte = if (rat == RatType.LTE || rat == RatType.NR_NSA) {
-            LteMetrics(pci = pci, eci = null, tac = null, earfcn = null, band = null, rsrp = rsrp, rsrq = null, rssnr = sinr, cqi = null)
-        } else null
-        val nr = if (rat == RatType.NR_SA) {
-            NrMetrics(pci = pci, nci = null, tac = null, nrArfcn = null, band = null, ssRsrp = rsrp, ssRsrq = null, ssSinr = sinr, csiRsrp = null, csiRsrq = null, csiSinr = null, isNsa = false)
+        val speed = tp.optDouble("speed", 0.0).toFloat()
+        val alt = tp.optDouble("alt", 0.0)
+        val bearing = tp.optDouble("bearing", 0.0).toFloat()
+        val accuracyM = tp.optDouble("accuracyM", 0.0).toFloat()
+        val cadence = when (tp.optLong("cadenceSec", 1L)) {
+            5L -> com.drivetest.lte5g.model.MeasurementCadence.ECO
+            2L -> com.drivetest.lte5g.model.MeasurementCadence.STANDARD
+            else -> com.drivetest.lte5g.model.MeasurementCadence.PRECISE
+        }
+
+        val sim1Metrics = parseCellMetricsFromTrailPoint(
+            tp = tp,
+            ratKey = "rat",
+            rsrpKey = "rsrp",
+            rsrqKey = "rsrq",
+            sinrKey = "sinr",
+            pciKey = "pci",
+            arfcnKey = "arfcn",
+            bandKey = "band",
+            cqiKey = "cqi",
+            tacKey = "tac",
+            cellIdKey = "cellId",
+            operatorKey = "operator",
+            plmnKey = "plmn",
+            simNameKey = "simName",
+            slotIndex = 0
+        )
+
+        val hasSim2 = tp.has("sim2Rat") || tp.has("sim2Rsrp") || tp.has("sim2Sinr") ||
+            tp.has("sim2Pci") || tp.has("sim2Operator") || tp.has("sim2Band") ||
+            tp.has("sim2Rsrq") || tp.has("sim2Arfcn") || tp.has("sim2CellId")
+
+        val sim2Metrics = if (hasSim2) {
+            parseCellMetricsFromTrailPoint(
+                tp = tp,
+                ratKey = "sim2Rat",
+                rsrpKey = "sim2Rsrp",
+                rsrqKey = "sim2Rsrq",
+                sinrKey = "sim2Sinr",
+                pciKey = "sim2Pci",
+                arfcnKey = "sim2Arfcn",
+                bandKey = "sim2Band",
+                cqiKey = "sim2Cqi",
+                tacKey = "sim2Tac",
+                cellIdKey = "sim2CellId",
+                operatorKey = "sim2Operator",
+                plmnKey = "sim2Plmn",
+                simNameKey = "sim2Name",
+                slotIndex = 1
+            )
         } else null
 
         return DriveTestSample(
@@ -713,11 +799,101 @@ object CloudTelemetrySyncManager {
             timestamp = ts,
             latitude = lat,
             longitude = lon,
-            altitude = 0.0,
+            altitude = alt,
             speedKmh = speed,
-            bearing = 0f,
-            accuracyMeters = 0f,
-            metrics = CellMetrics(ratType = rat, lte = lte, nr = nr)
+            bearing = bearing,
+            accuracyMeters = accuracyM,
+            metrics = sim1Metrics,
+            metricsSim2 = sim2Metrics,
+            cadence = cadence,
+            simDisplayName = sim1Metrics.simDisplayName
+        )
+    }
+
+    private fun parseCellMetricsFromTrailPoint(
+        tp: JSONObject,
+        ratKey: String,
+        rsrpKey: String,
+        rsrqKey: String,
+        sinrKey: String,
+        pciKey: String,
+        arfcnKey: String,
+        bandKey: String,
+        cqiKey: String,
+        tacKey: String,
+        cellIdKey: String,
+        operatorKey: String,
+        plmnKey: String,
+        simNameKey: String,
+        slotIndex: Int
+    ): CellMetrics {
+        val ratStr = tp.optString(ratKey, RatType.UNKNOWN.name)
+        val rat = try { RatType.valueOf(ratStr) } catch (_: Exception) { RatType.UNKNOWN }
+        val rsrp = if (tp.has(rsrpKey) && !tp.isNull(rsrpKey)) tp.optInt(rsrpKey) else null
+        val rsrq = if (tp.has(rsrqKey) && !tp.isNull(rsrqKey)) tp.optInt(rsrqKey) else null
+        val sinr = if (tp.has(sinrKey) && !tp.isNull(sinrKey)) tp.optDouble(sinrKey) else null
+        val pci = if (tp.has(pciKey) && !tp.isNull(pciKey)) tp.optInt(pciKey) else null
+        val arfcn = if (tp.has(arfcnKey) && !tp.isNull(arfcnKey)) tp.optInt(arfcnKey) else null
+        val bandStr = if (tp.has(bandKey) && !tp.isNull(bandKey)) tp.optString(bandKey).takeIf { it.isNotBlank() } else null
+        val bandNum = bandStr?.removePrefix("n")?.removePrefix("N")?.removePrefix("B")?.removePrefix("b")?.toIntOrNull()
+        val cqi = if (tp.has(cqiKey) && !tp.isNull(cqiKey)) tp.optInt(cqiKey) else null
+        val tac = if (tp.has(tacKey) && !tp.isNull(tacKey)) tp.optInt(tacKey) else null
+        val cellId = if (tp.has(cellIdKey) && !tp.isNull(cellIdKey)) tp.optString(cellIdKey).toLongOrNull() else null
+        val operator = if (tp.has(operatorKey) && !tp.isNull(operatorKey)) tp.optString(operatorKey).takeIf { it.isNotBlank() } else null
+        val plmn = if (tp.has(plmnKey) && !tp.isNull(plmnKey)) tp.optString(plmnKey).takeIf { it.isNotBlank() } else null
+        val simName = if (tp.has(simNameKey) && !tp.isNull(simNameKey)) tp.optString(simNameKey).takeIf { it.isNotBlank() } else null
+
+        val isNrNsaBand = rat == RatType.NR_NSA && bandStr?.startsWith("n", ignoreCase = true) == true
+        val lte = when {
+            rat == RatType.LTE || (rat == RatType.NR_NSA && !isNrNsaBand) -> LteMetrics(
+                pci = pci,
+                eci = cellId,
+                tac = tac,
+                earfcn = arfcn,
+                band = bandNum,
+                rsrp = rsrp,
+                rsrq = rsrq,
+                rssnr = sinr,
+                cqi = cqi
+            )
+            isNrNsaBand && cqi != null -> LteMetrics(
+                pci = null,
+                eci = null,
+                tac = null,
+                earfcn = null,
+                band = null,
+                rsrp = null,
+                rsrq = null,
+                rssnr = null,
+                cqi = cqi
+            )
+            else -> null
+        }
+        val nr = if (rat == RatType.NR_SA || isNrNsaBand) {
+            NrMetrics(
+                pci = pci,
+                nci = cellId,
+                tac = tac,
+                nrArfcn = arfcn,
+                band = bandNum,
+                ssRsrp = rsrp,
+                ssRsrq = rsrq,
+                ssSinr = sinr,
+                csiRsrp = null,
+                csiRsrq = null,
+                csiSinr = null,
+                isNsa = (rat == RatType.NR_NSA)
+            )
+        } else null
+
+        return CellMetrics(
+            ratType = rat,
+            plmn = plmn,
+            operatorAlpha = operator,
+            lte = lte,
+            nr = nr,
+            selectedSimSlot = slotIndex,
+            simDisplayName = simName
         )
     }
 }

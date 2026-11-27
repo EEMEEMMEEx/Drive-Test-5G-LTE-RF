@@ -1,5 +1,6 @@
 package com.drivetest.lte5g.updater
 
+import android.content.pm.PackageInstaller
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -182,5 +183,95 @@ class OtaUpdateManagerTest {
         assertEquals("https://play.google.com/store/apps/details?id=com.drivetest.lte5g", url)
         assertTrue(url.startsWith("https://"))
         assertFalse(url.contains("null"))
+    }
+
+    @Test
+    fun testParseReleaseJson_extractsSha256DigestAndChecksumUrl() {
+        val sampleJson = """
+        {
+          "tag_name": "v1.13.14-android",
+          "name": "Drive Test LTE 5G v1.13.14 (versionCode 58)",
+          "body": "Release notes",
+          "assets": [
+            {
+              "name": "app-release.apk",
+              "size": 48556818,
+              "digest": "sha256:72C074AAD0438592F0B3536CCF866F20EF652E20168C2BF1D3E5C6EAEE5DBC22",
+              "browser_download_url": "https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/download/v1.13.14-android/app-release.apk"
+            },
+            {
+              "name": "checksums.txt",
+              "size": 128,
+              "browser_download_url": "https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/download/v1.13.14-android/checksums.txt"
+            }
+          ]
+        }
+        """.trimIndent()
+
+        val release = OtaUpdateManager.parseReleaseJson(sampleJson)
+        assertNotNull(release)
+        assertEquals(
+            "72c074aad0438592f0b3536ccf866f20ef652e20168c2bf1d3e5c6eaee5dbc22",
+            release!!.expectedSha256
+        )
+        assertEquals(
+            "https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF/releases/download/v1.13.14-android/checksums.txt",
+            release.checksumUrl
+        )
+    }
+
+    @Test
+    fun testParseSha256DigestAndChecksumText() {
+        assertEquals(
+            "72c074aad0438592f0b3536ccf866f20ef652e20168c2bf1d3e5c6eaee5dbc22",
+            OtaUpdateManager.parseSha256Digest("sha256:72C074AAD0438592F0B3536CCF866F20EF652E20168C2BF1D3E5C6EAEE5DBC22")
+        )
+        assertNull(OtaUpdateManager.parseSha256Digest("sha256:invalid"))
+        assertNull(OtaUpdateManager.parseSha256Digest(null))
+
+        val checksums = """
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  other.zip
+            72c074aad0438592f0b3536ccf866f20ef652e20168c2bf1d3e5c6eaee5dbc22  app-release.apk
+        """.trimIndent()
+        assertEquals(
+            "72c074aad0438592f0b3536ccf866f20ef652e20168c2bf1d3e5c6eaee5dbc22",
+            OtaUpdateManager.parseChecksumText(checksums, "app-release.apk")
+        )
+    }
+
+    @Test
+    fun testMapInstallFailure() {
+        val (abortedMsg, abortedKind) = OtaUpdateManager.mapInstallFailure(
+            PackageInstaller.STATUS_FAILURE_ABORTED,
+            "User cancelled"
+        )
+        assertEquals(OtaErrorKind.INSTALL_FAILED, abortedKind)
+        assertTrue(abortedMsg.contains("RETRY"))
+
+        val (_, permKind) = OtaUpdateManager.mapInstallFailure(
+            PackageInstaller.STATUS_FAILURE_BLOCKED,
+            "Caller lacks REQUEST_INSTALL_PACKAGES permission"
+        )
+        assertEquals(OtaErrorKind.INSTALL_PERMISSION, permKind)
+
+        val (_, invalidKind) = OtaUpdateManager.mapInstallFailure(
+            PackageInstaller.STATUS_FAILURE_INVALID,
+            "Corrupt APK"
+        )
+        assertEquals(OtaErrorKind.VERIFICATION, invalidKind)
+
+        val (conflictMsg, conflictKind) = OtaUpdateManager.mapInstallFailure(
+            PackageInstaller.STATUS_FAILURE_CONFLICT,
+            "INSTALL_FAILED_UPDATE_INCOMPATIBLE"
+        )
+        assertEquals(OtaErrorKind.INSTALL_FAILED, conflictKind)
+        assertTrue(conflictMsg.contains("signature"))
+
+        val (timeoutMsg, timeoutKind) = OtaUpdateManager.mapInstallFailure(
+            PackageInstaller.STATUS_FAILURE_TIMEOUT,
+            null
+        )
+        assertEquals(OtaErrorKind.INSTALL_FAILED, timeoutKind)
+        assertTrue(timeoutMsg.contains("RETRY"))
     }
 }

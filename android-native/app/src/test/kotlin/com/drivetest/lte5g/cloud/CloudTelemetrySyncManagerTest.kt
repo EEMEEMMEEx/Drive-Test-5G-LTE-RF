@@ -13,6 +13,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -42,6 +44,7 @@ class CloudTelemetrySyncManagerTest {
                 ratType = RatType.NR_SA,
                 plmn = "520-01",
                 operatorAlpha = "AIS 5G",
+                simDisplayName = "AIS-SIM1",
                 nr = NrMetrics(
                     pci = 420,
                     nci = 1234567890L,
@@ -62,6 +65,7 @@ class CloudTelemetrySyncManagerTest {
                 ratType = RatType.LTE,
                 plmn = "520-03",
                 operatorAlpha = "TRUE-H",
+                simDisplayName = "TRUE-SIM1",
                 lte = LteMetrics(
                     pci = 101,
                     eci = 987654L,
@@ -81,6 +85,8 @@ class CloudTelemetrySyncManagerTest {
                 ratType = RatType.LTE,
                 plmn = "520-03",
                 operatorAlpha = "TRUE-H",
+                selectedSimSlot = 1,
+                simDisplayName = "TRUE-SIM2",
                 lte = LteMetrics(
                     pci = 202,
                     eci = 456789L,
@@ -183,16 +189,75 @@ class CloudTelemetrySyncManagerTest {
 
     @Test
     fun buildTrailPointJson_serializesCompactPoint() {
-        val sample = createSample(1, 13.7563, 100.5018, -112, -2.5, is5g = false)
+        val sample = createSample(1, 13.7563, 100.5018, -112, -2.5, is5g = false, hasSim2 = false)
         val jsonStr = CloudTelemetrySyncManager.buildTrailPointJson(sample)
         val json = JSONObject(jsonStr)
 
+        // Legacy backward-compatible SIM 1 fields
         assertEquals(13.7563, json.getDouble("lat"), 0.0001)
         assertEquals(100.5018, json.getDouble("lon"), 0.0001)
+        assertEquals(15.0, json.getDouble("alt"), 0.01)
+        assertEquals(45.0, json.getDouble("speed"), 0.01)
+        assertEquals(180.0, json.getDouble("bearing"), 0.01)
+        assertEquals(3.5, json.getDouble("accuracyM"), 0.01)
+        assertEquals(1L, json.getLong("cadenceSec"))
         assertEquals(-112, json.getInt("rsrp"))
+        assertEquals(-10, json.getInt("rsrq"))
         assertEquals(-2.5, json.getDouble("sinr"), 0.01)
         assertEquals(101, json.getInt("pci"))
+        assertEquals(1850, json.getInt("arfcn"))
+        assertEquals("B3", json.getString("band"))
+        assertEquals(12, json.getInt("cqi"))
+        assertEquals(2002, json.getInt("tac"))
+        assertEquals("987654", json.getString("cellId"))
         assertEquals("LTE", json.getString("rat"))
+        assertEquals("TRUE-H", json.getString("operator"))
+        assertEquals("520-03", json.getString("plmn"))
+        assertEquals("TRUE-SIM1", json.getString("simName"))
+
+        // Single-SIM must omit all sim2* keys cleanly
+        assertFalse(json.has("sim2Rat"))
+        assertFalse(json.has("sim2Rsrp"))
+        assertFalse(json.has("sim2Rsrq"))
+        assertFalse(json.has("sim2Sinr"))
+        assertFalse(json.has("sim2Pci"))
+        assertFalse(json.has("sim2Operator"))
+    }
+
+    @Test
+    fun buildTrailPointJson_dualSim_serializesBothSimsWithoutOverwriting() {
+        val sample = createSample(1, 13.7563, 100.5018, -82, 16.5, is5g = true, hasSim2 = true)
+        val jsonStr = CloudTelemetrySyncManager.buildTrailPointJson(sample)
+        val json = JSONObject(jsonStr)
+
+        // SIM 1 preserved at top-level (backward compatible)
+        assertEquals("NR_SA", json.getString("rat"))
+        assertEquals("AIS 5G", json.getString("operator"))
+        assertEquals("520-01", json.getString("plmn"))
+        assertEquals("AIS-SIM1", json.getString("simName"))
+        assertEquals(420, json.getInt("pci"))
+        assertEquals(640000, json.getInt("arfcn"))
+        assertEquals("n78", json.getString("band"))
+        assertEquals(-82, json.getInt("rsrp"))
+        assertEquals(-11, json.getInt("rsrq"))
+        assertEquals(16.5, json.getDouble("sinr"), 0.01)
+        assertEquals(1001, json.getInt("tac"))
+        assertEquals("1234567890", json.getString("cellId"))
+
+        // SIM 2 complete RF fields matching CSV parity
+        assertEquals("LTE", json.getString("sim2Rat"))
+        assertEquals("TRUE-H", json.getString("sim2Operator"))
+        assertEquals("520-03", json.getString("sim2Plmn"))
+        assertEquals("TRUE-SIM2", json.getString("sim2Name"))
+        assertEquals(202, json.getInt("sim2Pci"))
+        assertEquals(1850, json.getInt("sim2Arfcn"))
+        assertEquals("B3", json.getString("sim2Band"))
+        assertEquals(-88, json.getInt("sim2Rsrp"))
+        assertEquals(-12, json.getInt("sim2Rsrq"))
+        assertEquals(8.5, json.getDouble("sim2Sinr"), 0.01)
+        assertEquals(10, json.getInt("sim2Cqi"))
+        assertEquals(2002, json.getInt("sim2Tac"))
+        assertEquals("456789", json.getString("sim2CellId"))
     }
 
     @Test
@@ -351,5 +416,74 @@ class CloudTelemetrySyncManagerTest {
         assertEquals(sid + 5000L, samples[1].timestamp)
         assertEquals(-93, samples[0].metrics.lte?.rsrp)
         assertEquals(86, samples[1].metrics.lte?.pci)
+        assertNull(samples[0].metricsSim2)
+        assertNull(samples[1].metricsSim2)
+    }
+
+    @Test
+    fun parseTrailJsonMapToSamples_dualSimRoundTrip_preservesBothSims() {
+        val sid = 1762849200000L
+        val dualSample = createSample(1, 13.7563, 100.5018, -82, 16.5, is5g = true, hasSim2 = true)
+        val singleSample = createSample(2, 13.7570, 100.5025, -95, 4.0, is5g = false, hasSim2 = false)
+
+        val trailMap = JSONObject().apply {
+            put("-P2", JSONObject(CloudTelemetrySyncManager.buildTrailPointJson(singleSample)))
+            put("-P1", JSONObject(CloudTelemetrySyncManager.buildTrailPointJson(dualSample)))
+        }.toString()
+
+        val parsed = CloudTelemetrySyncManager.parseTrailJsonMapToSamples(sid, trailMap)
+        assertEquals(2, parsed.size)
+
+        // First sample: dual-SIM
+        val s1 = parsed[0]
+        assertEquals(RatType.NR_SA, s1.metrics.ratType)
+        assertEquals("AIS 5G", s1.metrics.operatorAlpha)
+        assertEquals(-82, s1.metrics.nr?.ssRsrp)
+        assertEquals(-11, s1.metrics.nr?.ssRsrq)
+        assertEquals(78, s1.metrics.nr?.band)
+        assertEquals(640000, s1.metrics.nr?.nrArfcn)
+        assertEquals(1234567890L, s1.metrics.nr?.nci)
+
+        val sim2 = s1.metricsSim2
+        assertNotNull("Dual-SIM trail sample must preserve metricsSim2", sim2)
+        assertEquals(RatType.LTE, sim2!!.ratType)
+        assertEquals("TRUE-H", sim2.operatorAlpha)
+        assertEquals("520-03", sim2.plmn)
+        assertEquals("TRUE-SIM2", sim2.simDisplayName)
+        assertEquals(202, sim2.lte?.pci)
+        assertEquals(1850, sim2.lte?.earfcn)
+        assertEquals(3, sim2.lte?.band)
+        assertEquals(-88, sim2.lte?.rsrp)
+        assertEquals(-12, sim2.lte?.rsrq)
+        assertEquals(8.5, sim2.lte?.rssnr ?: 0.0, 0.01)
+        assertEquals(10, sim2.lte?.cqi)
+        assertEquals(2002, sim2.lte?.tac)
+        assertEquals(456789L, sim2.lte?.eci)
+
+        // Second sample: single-SIM
+        val s2 = parsed[1]
+        assertEquals(RatType.LTE, s2.metrics.ratType)
+        assertEquals(-95, s2.metrics.lte?.rsrp)
+        assertNull("Single-SIM trail sample must keep metricsSim2 null", s2.metricsSim2)
+    }
+
+    @Test
+    fun parseTrailJsonMapToSamples_legacyPayloadWithoutSinrOrSim2_parsesGracefully() {
+        val sid = 1795655977938L
+        val legacyJson = """
+            {
+              "-P7KQxwy-D61dp5POoTb":{"lat":17.8809848,"lon":102.7520226,"pci":110,"rat":"LTE","rsrp":-93,"speed":0,"ts":1795655981988},
+              "-P7KR_unknown":{"lat":17.8810000,"lon":102.7521000,"rat":"UNKNOWN","speed":0,"ts":1795655983004}
+            }
+        """.trimIndent()
+
+        val parsed = CloudTelemetrySyncManager.parseTrailJsonMapToSamples(sid, legacyJson)
+        assertEquals(2, parsed.size)
+        assertEquals(-93, parsed[0].metrics.lte?.rsrp)
+        assertNull(parsed[0].metrics.lte?.rssnr)
+        assertNull(parsed[0].metricsSim2)
+        assertEquals(RatType.UNKNOWN, parsed[1].metrics.ratType)
+        assertNull(parsed[1].metrics.lte)
+        assertNull(parsed[1].metricsSim2)
     }
 }

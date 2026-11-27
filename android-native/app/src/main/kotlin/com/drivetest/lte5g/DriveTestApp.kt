@@ -5,6 +5,7 @@ import com.drivetest.lte5g.cloud.CloudConfigRepository
 import com.drivetest.lte5g.cloud.CloudTelemetrySyncManager
 import com.drivetest.lte5g.cloud.GoogleDriveAutoUploader
 import com.drivetest.lte5g.data.SessionRepository
+import com.drivetest.lte5g.updater.OtaUpdateManager
 
 /**
  * Initializes persistent session storage, crash recovery, and cloud managers once per process
@@ -17,5 +18,6 @@ class DriveTestApp : Application() {
         CloudConfigRepository.init(applicationContext)
         CloudTelemetrySyncManager.init(applicationContext)
         GoogleDriveAutoUploader.init(applicationContext)
+        OtaUpdateManager.init(applicationContext)
     }
 }
