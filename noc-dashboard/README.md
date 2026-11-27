@@ -1,70 +1,99 @@
-# Live Fleet NOC Dashboard — Drive Test LTE/5G v1.15.0
+# Live Fleet NOC Dashboard — Drive Test LTE/5G (`v1.15.0`)
 
-Web Console สำหรับศูนย์ปฏิบัติการโครงข่าย (Network Operations Center — NOC) แสดงตำแหน่งรถทดสอบสัญญาณภาคสนาม (Drive Test Fleet) แบบ Real-Time พร้อมวิเคราะห์ค่า RF Telemetry 5G NR / LTE (Dual-SIM), เล่นข้อมูลย้อนหลัง (Historical Session Playback) และแสดงแผนที่คลื่นความร้อนความครอบคลุม (Multi-Vehicle Coverage Heatmap) อัตโนมัติ
-
----
-
-## 🌟 ฟีเจอร์หลัก (Key Features)
-
-1. **Live Fleet Map (OpenStreetMap + Dark NOC Filter):**
-   - แผนที่ธีมมืด (Dark NOC) แสดงตำแหน่งรถทดสอบทุกคันพร้อมทิศทางหัวรถ (Bearing) และแถบแสงเรืองรองตามสถานะ (ไม่มี Watermark และไม่ต้องใช้ API Key)
-   - เส้นทางวิ่ง (Breadcrumb Trail) แยกสีตามเกณฑ์ RSRP มาตรฐาน 3GPP / ITU-R:
-     - 🟢 **≥ -80 dBm** (Excellent)
-     - 🔵 **-80 ถึง -90 dBm** (Good)
-     - 🟡 **-90 ถึง -100 dBm** (Fair)
-     - 🟠 **-100 ถึง -110 dBm** (Poor)
-     - 🔴 **< -110 dBm** (Coverage Hole)
-2. **Historical Session Playback (Timeline Scrubber):**
-   - สลับโหมด 'LIVE FLEET' และ 'HISTORICAL PLAYBACK' ได้อย่างราบรื่น
-   - ดึงรายการบันทึกย้อนหลังจาก Firebase RTDB (`/fleet/sessions` และ `/fleet/trails`)
-   - แถบควบคุม Play/Pause, Step Forward/Back, ปรับความเร็ว 1x/2x/5x พร้อมไทม์ไลน์เลื่อนดูพิกัดและค่า RF ทุกจุด
-   - แอนิเมชันหัวรถและเกจ Dual-SIM RF Inspector ขยับตามข้อมูลจริงในอดีตแบบเรียลไทม์
-3. **Multi-Vehicle Coverage Heatmap (IDW Interpolation):**
-   - เอนจินคำนวณการกระจายคลื่นความครอบคลุมเชิงพื้นที่ (Inverse Distance Weighting — IDW) บน HTML5 Canvas ร่วมกับ Leaflet Map
-   - รองรับการแสดงผลทั้งมิติ **RSRP** (-135 ถึง -55 dBm) และ **SINR** (-10 ถึง 30 dB)
-   - รวมข้อมูลพิกัดและคลื่นสัญญาณจากรถทุกคันใน Fleet หรือจาก Session ย้อนหลัง
-4. **Dual-SIM Telemetry Inspector:**
-   - ตรวจสอบค่าสัญญาณสดของรถที่เลือกเปรียบเทียบ **SIM 1 (Primary)** vs **SIM 2 (Benchmark)**:
-     - Operator, RAT (5G SA / NSA / LTE), Band, PCI, Cell ID
-     - RSRP และ SINR พร้อมหลอดแสดงผลแบบไดนามิก
-     - คำนวณค่าความต่าง **Δ RSRP (RSRP Advantage)** แบบ Real-Time
-5. **Real-Time RF Anomaly Alert Feed:**
-   - ตรวจจับจุดอับสัญญาณ (`COVERAGE_HOLE`: RSRP < -110 dBm)
-   - ตรวจจับพื้นที่สัญญาณรบกวนสูง (`INTERFERENCE`: RSRP ≥ -95 dBm แต่ SINR < 0 dB)
-   - คลิกที่การแจ้งเตือนเพื่อบิน (Fly-to) ไปยังพิกัดที่มีปัญหาบนแผนที่ได้ทันที
-6. **Pure 100% Real-Time Firebase Sync:**
-   - เชื่อมต่อ **Firebase Realtime Database** (`/fleet/vehicles`, `/fleet/sessions`, `/fleet/trails`) แบบสด
-   - ตั้งค่าผ่าน `env.js` / `.env` อัตโนมัติ ไม่ต้องคลิกตั้งค่าหรือกรอก URL ซ้ำซ้อน
-   - รองรับทั้งการเปิดผ่าน Browser ธรรมดา (`file://`) หรือผ่าน Web Server (Nginx / Vercel / GitHub Pages / Vite)
+Web Console สำหรับศูนย์ปฏิบัติการโครงข่าย (Network Operations Center — NOC) แสดงตำแหน่งรถทดสอบสัญญาณภาคสนามแบบ Real-Time พร้อมวิเคราะห์ค่า RF Telemetry 5G NR / LTE แบบ Dual-SIM, เล่นข้อมูลย้อนหลัง (Historical Session Playback) และสร้างแผนที่ความครอบคลุมสัญญาณ (Multi-Vehicle Coverage Heatmap) อัตโนมัติโดยไม่ต้องมีขั้นตอน build
 
 ---
 
-## 🚀 วิธีเปิดใช้งาน (How to Run)
+## ฟีเจอร์หลัก (Key Features)
+
+1. **Live Fleet Map (Leaflet 1.9.4 + Dark NOC OpenStreetMap):**
+   - แผนที่ธีมมืด (Dark NOC) ไม่มี watermark และไม่ต้องใช้ API Key แสดงตำแหน่งรถที่กำลังสตรีมสด (`isRecording === true` และ heartbeat ภายใน 2 นาที) พร้อมทิศทางหัวรถ (Bearing)
+   - แถบ KPI ด้านบนแสดง **ACTIVE FLEET**, **TOTAL SAMPLES**, **ANOMALIES** และสถานะ **SYNC SOURCE** (`FIREBASE LIVE` / `FIREBASE ERROR`)
+   - เส้นทางวิ่ง (Breadcrumb Trail) แยกสีตามเกณฑ์ RSRP มาตรฐาน 3GPP / ITU-R พร้อม Legend แบบพับเก็บได้:
+
+| Tier | ช่วงค่า RSRP | ช่วงค่า SINR | ระดับคุณภาพ |
+| --- | --- | --- | --- |
+| T1 | `>= -80 dBm` | `>= 20 dB` | Excellent |
+| T2 | `-80` ถึง `-90 dBm` | `13` ถึง `20 dB` | Good |
+| T3 | `-90` ถึง `-100 dBm` | `5` ถึง `13 dB` | Fair |
+| T4 | `-100` ถึง `-110 dBm` | `0` ถึง `5 dB` | Poor |
+| T5 | `< -110 dBm` | `< 0 dB` | Coverage Hole / Interference |
+
+2. **Historical Session Playback (Timeline Scrubber & Archive):**
+   - สลับโหมด **LIVE FLEET** และ **HISTORICAL PLAYBACK** จากแถบด้านบนได้ทันที
+   - ดึงรายการและเส้นทางย้อนหลังจาก Firebase RTDB (`/fleet/sessions` และ `/fleet/trails`) พร้อมระบบค้นหา (Vehicle / Session ID / SIM), กรองตามรถ (`All Vehicles`), เรียงลำดับ (`Date`, `RSRP`, `Points`) และปุ่มรีเฟรช
+   - แถบควบคุม Timeline Scrubber: Play/Pause, Step Back/Forward, ปรับความเร็ว `1x` / `2x` / `5x` พร้อมแอนิเมชันหัวรถ เส้นทางที่เล่นแล้ว และเกจ Dual-SIM RF Inspector แบบเรียลไทม์
+   - คีย์ลัดขณะอยู่ในโหมด Playback: `Space` (Play/Pause), `ArrowLeft` / `ArrowRight` (เลื่อนทีละ sample), `Esc` (ปิดหน้าต่างยืนยัน)
+3. **Multi-Vehicle Coverage Heatmap (`rf-heatmap.js` — IDW Interpolation):**
+   - เอนจินคำนวณการกระจายสัญญาณเชิงพื้นที่แบบ **Inverse Distance Weighting (IDW)** บน HTML5 Canvas ซิงก์กับ Leaflet โดยไม่มี dependency ภายนอกเพิ่ม
+   - สลับมิติได้ระหว่าง **RSRP** (`-135` ถึง `-55 dBm`) และ **SINR** (`-10` ถึง `30 dB`) พร้อมสไลเดอร์ปรับความโปร่งใส (`15%–95%`, ค่าเริ่มต้น `52%`) และปรับ Legend อัตโนมัติ
+   - ใช้งานได้ทั้งข้อมูลจากรถทุกคันในโหมด Live Fleet และข้อมูลเส้นทางในโหมด Historical Playback
+4. **Dual-SIM RF Inspector:**
+   - เปรียบเทียบสัญญาณสดหรือข้อมูลย้อนหลังของ **SIM 1 (Primary)** vs **SIM 2 (Benchmark)**:
+     - Operator, RAT / Band (`5G SA` / `NSA` / `LTE`), PCI / NCI / Cell ID
+     - เกจ RSRP และ SINR พร้อมหลอดแสดงผลตามระดับสี
+     - คำนวณ **RSRP Advantage (`Δ RSRP`)** แบบ Real-Time
+5. **Live RF Anomaly Feed & Fleet Controls:**
+   - ตรวจจับจุดอับสัญญาณ (`COVERAGE_HOLE`: `RSRP < -110 dBm`) และพื้นที่สัญญาณรบกวน (`INTERFERENCE`: `RSRP >= -95 dBm` แต่ `SINR < 0 dB`) คลิกที่รายการเพื่อบินไปยังพิกัดบนแผนที่ได้ทันที
+   - ปุ่มควบคุมบนแผนที่: **FIT ALL** (จัดกรอบแผนที่ให้เห็นทั้ง fleet/เส้นทาง), **CLEAR TRAILS** และ **PURGE OFFLINE** (มีหน้าต่างยืนยันก่อนลบรถที่ขาด heartbeat เกิน 2 นาทีออกจาก `/fleet/vehicles` โดยไม่กระทบข้อมูล historical sessions)
+6. **Responsive & Collapsible Layout:**
+   - **Desktop:** พับ/กางแผงด้านซ้าย (Fleet Roster / Sessions) และด้านขวา (Dual-SIM Inspector / Anomalies) เพื่อขยายพื้นที่แผนที่ได้เต็มจอ
+   - **Mobile / Tablet:** แถบแท็บด้านล่าง (`MAP`, `FLEET`, `RF INSPECTOR`), Floating Bottom Mini Drawer สำหรับรถที่เลือก และพับ Legend อัตโนมัติเมื่อหน้าจอแคบ (`<= 768px`)
+
+---
+
+## การตั้งค่า (Configuration)
+
+กำหนดค่าเชื่อมต่อ Firebase Realtime Database ที่ไฟล์ `noc-dashboard/env.js`:
+
+```js
+window.ENV = {
+  FIREBASE_DB_URL: "https://<your-project>-default-rtdb.<region>.firebasedatabase.app",
+  FIREBASE_AUTH_TOKEN: ""
+};
+```
+
+- โหมด Live Fleet จะ poll `/fleet/vehicles.json` ทุก `1.5` วินาที
+- กฎและ index ของฐานข้อมูลอยู่ใน [firebase/database.rules.json](../firebase/database.rules.json) (paths: `/fleet/vehicleClaims`, `/fleet/vehicles`, `/fleet/sessions`, `/fleet/trails`)
+- ห้ามใส่ credential ลับลงในไฟล์ที่ถูกเสิร์ฟให้เบราว์เซอร์ (ดู `.assetsignore` สำหรับไฟล์ที่ถูกกันออกจาก Cloudflare Workers static assets)
+
+---
+
+## วิธีเปิดใช้งาน (How to Run)
 
 ### วิธีที่ 1: เปิดไฟล์ตรงๆ (Zero Setup)
-ดับเบิลคลิกเปิดไฟล์ `noc-dashboard/index.html` บนเบราว์เซอร์ (Chrome / Edge / Firefox) ได้ทันที
+เปิดไฟล์ `noc-dashboard/index.html` ด้วยเบราว์เซอร์ (Chrome / Edge / Firefox) ได้ทันที
 
 ### วิธีที่ 2: รันผ่าน Local Web Server (แนะนำ)
-```bash
-# ใช้ Go Local Server (จากโฟลเดอร์ noc-dashboard)
+
+```powershell
+# 1. ใช้ Go Local Server (จากโฟลเดอร์ noc-dashboard; ปิด cache ด้วย no-store และบล็อก dotfiles/.go/go.mod)
+cd noc-dashboard
 go run .
-# หรือเปิดเบราว์เซอร์อัตโนมัติ / เปลี่ยนพอร์ต
+# ตัวเลือกเสริม: -host (default 127.0.0.1), -port (default 3000 หรือ env PORT), -dir, -open
 go run . -port 3000 -open
 
-# หรือใช้ npx serve
+# 2. หรือใช้ Node / Python จาก root ของ repo
 npx serve noc-dashboard -p 3000
-
-# หรือใช้ Python
 python -m http.server 3000 --directory noc-dashboard
 ```
-เปิดเบราว์เซอร์ไปที่ `http://127.0.0.1:3000` (หรือ `http://localhost:3000`)
+
+เปิดเบราว์เซอร์ไปที่ `http://127.0.0.1:3000`
+
+### วิธีที่ 3: Cloudflare Workers (Dev & Production)
+
+อิงการตั้งค่าจาก `wrangler.jsonc` ที่ root ของ repo (เสิร์ฟ `noc-dashboard/` เป็น static assets ร่วมกับ Worker `worker/drive-upload.js`):
+
+```powershell
+npx wrangler dev
+npx wrangler deploy
+```
 
 ---
 
-## 📡 วิธีเชื่อมต่อกับแอป Android (Drive Test LTE/5G v1.13.0)
+## วิธีเชื่อมต่อกับแอป Android (`Drive Test LTE/5G v1.13.16`)
 
-1. เปิดแอป **Drive Test LTE/5G** บนมือถือ
-2. ระบบตั้งค่า Firebase Realtime Database และเปิดการส่ง Telemetry อัตโนมัติมาให้อยู่แล้ว
-3. (ตัวเลือก) ไปที่แท็บ **Settings** เพื่อเปลี่ยน **Vehicle ID** (เช่น `DT-01`) หรือ **ชื่อรถ** (เช่น `Unit 01`)
-4. กดปุ่ม **START** บนหน้าหลักเพื่อเริ่มทดสอบสัญญาณภาคสนาม
-5. เมื่อรถเริ่มเคลื่อนที่ พิกัด เส้นทาง และค่าสัญญาณ RF Dual-SIM จะปรากฏบนหน้าจอ NOC Dashboard สดทันที!
+1. เปิดแอป **Drive Test LTE/5G** บนมือถือ (ตั้งค่า Firebase RTDB และการสตรีม Telemetry ไว้พร้อมใช้งาน)
+2. ระบบจะจอง **Vehicle ID** ที่ไม่ซ้ำกันอัตโนมัติผ่าน `/fleet/vehicleClaims` (สามารถแก้ไขชื่อ/รหัสรถได้ในแท็บ **Settings**)
+3. กดปุ่ม **START** บนหน้าหลักเพื่อเริ่มบันทึกและสตรีมข้อมูลภาคสนาม
+4. เมื่ออุปกรณ์ส่งพิกัดและค่า RF Dual-SIM รถจะปรากฏบนหน้าจอ NOC Dashboard แบบสดทันที และบันทึกเข้า Historical Playback เมื่อจบ session

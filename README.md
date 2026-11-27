@@ -1,89 +1,107 @@
-# RF Field Suite — 5G NR / LTE Drive Test & Route Diagnostics (`v1.14.0`)
+# Drive Test LTE / 5G — RF Field Suite & Live Fleet NOC
 
-A local-first web application replicating the full capabilities, UI screens, data schema, and RF engineering analytics of **GSM Drive Test: 5G LTE RF (`com.drivetest.app` v1.8.0)**, built following the [replica-skill](https://github.com/Jakeschincariol/replica-skill) clean-room methodology, complete with PWA offline-first support and Android Capacitor/Native runtime.
+ชุดเครื่องมือทดสอบสัญญาณโครงข่ายมือถือ **5G NR (SA/NSA) / LTE** แบบครบวงจร ประกอบด้วยแอป Android Native (`v1.13.16`), ศูนย์ควบคุม **Live Fleet NOC Dashboard** (`v1.15.0`), **Cloudflare Worker** สำหรับอัปโหลดไฟล์ขึ้น Google Drive ฝั่ง server และ **Firebase Realtime Database** สำหรับซิงก์ข้อมูล Telemetry แบบ Real-Time
 
-- **Live Web App:** [https://sigpath-web.saweksoot.workers.dev/](https://sigpath-web.saweksoot.workers.dev/)
+- **Repository:** [https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF](https://github.com/EEMEEMMEEx/Drive-Test-5G-LTE-RF)
 - **GitHub Pages Landing Page:** [https://EEMEEMMEEx.github.io/Drive-Test-5G-LTE-RF/](https://EEMEEMMEEx.github.io/Drive-Test-5G-LTE-RF/)
+- **NOC Dashboard Docs:** [noc-dashboard/README.md](noc-dashboard/README.md)
+
+---
+
+## Repository Structure
+
+| Path | รายละเอียด |
+| --- | --- |
+| `android-native/` | แอป Android Native (Kotlin + Jetpack Compose, `com.drivetest.lte5g`, `v1.13.16` / `versionCode 60`) |
+| `noc-dashboard/` | Live Fleet NOC Console (`v1.15.0`) — Leaflet GIS, Historical Playback, IDW RF Heatmap และ Go local dev server |
+| `worker/` | Cloudflare Worker (`drive-upload.js`) สำหรับ proxy `POST /api/drive-upload` และเสิร์ฟไฟล์ static ของ NOC |
+| `firebase/` | กฎความปลอดภัยและ index ของ Firebase Realtime Database (`database.rules.json`) |
+| `docs/` | GitHub Pages (`index.html`), รายงานวิเคราะห์ และ Runbook ด้าน Release / Security |
+| `scripts/` | สคริปต์เสริม (`convert_trails.py`, `extract_apk_details.py`, `generate-pwa-icons.mjs`) |
+| `designs/` | ไฟล์ออกแบบ UI (`dashboard.figcraft`) |
+
+---
 
 ## Key Features
 
-- **PWA & Android Native Runtime (v1.14.0):**
-  - **PWA Offline-First:** Service worker precaching, Web App Manifest, offline map tile caching (`stale-while-revalidate` / `network-first`), and standalone install prompt.
-  - **Capacitor Android Wrapper:** Bridge plugin (`DriveTestPlugin.java`) with foreground service (`DriveTestForegroundService.java`) for real cellular telephony radio metrics and GNSS location tracking on device.
-  - **Android Native Project (`android-native/`):** Standalone Kotlin Jetpack Compose app (`v1.13.3`) with dual-SIM benchmark logging (live SIM 2 dashboard gauges, dual-SIM route map layers with 5 color modes, isolated KMZ/CSV SIM layers), route START/END markers with live route stats chips (distance, time, avg RSRP), In-Place Telemetry Dynamic Island Fluid Cloud capsule (with Telemetry HUD tile, custom Stop/New Session actions, and suppressed audio scrubber), Play In-App Updates, Google Maps SDK, 3D KMZ export with Google Earth styling, VectorCraft official logo, real-time telephony collector, and background foreground service.
-- **Screen S01 — Live Drive Test Dashboard (`DriveTestDashboard`):**
-  - Real-time semi-circular RSRP gauge (`-135` to `-55 dBm`) with live RSRQ, SINR, RSSI, CSI-RSRP, CQI (`1..15`), and Timing Advance (`TA`).
-  - Serving Cell & **5G NR (`SA` / `NSA`) + LTE Carrier Aggregation (`CA`)** component monitor (`Band`, `EARFCN`, `DL Frequency`, `Bandwidth`, `PCI`, `Cell ID`, `TAC/LAC`, `PLMN`).
-  - Dual-SIM slot selector (`SIM 1 · AIS 5G SA`, `SIM 2 · TRUE-DTAC 5G`), Sampling Cadence selector (`Eco · 5 s`, `Standard · 2 s`, `Precise · 1 s`), and **Dual-SIM Benchmark logging toggle** (SIM 2 generation on/off).
-  - **SIM 1 LIVE** card with RAT badge + **SIM 2 LIVE** card (operator, RAT, RSRP/RSRQ/SINR) + **dual-SIM RSRP trend chart** with legend (SIM 1 solid / SIM 2 dashed).
-  - GNSS / GPS Telemetry (`Latitude`, `Longitude`, `Altitude`, `Speed km/h`, `Bearing`, `Accuracy`) supporting both **Browser Geolocation API** and the **5G/LTE RF Route Simulator** (`Urban Route`, `Highway`, `Site Audit`, `Indoor`).
-  - Neighboring Cells table with live RSRP delta calculation, configurable Weak Signal RSRP Alert banner, Active Throughput & Latency Speed Test (`PING` -> `DOWNLOAD` -> `UPLOAD` -> `DONE`), Continuous Light Network Probe, and fullscreen **Car HUD Mode**.
-- **Screen S02 — Interactive Route Map (`RouteMapView`):**
-  - Interactive Leaflet map + Vector Route Inspector supporting **5 Color Modes** (`BY_RSRP`, `BY_RSRQ`, `BY_SINR`, `BY_TECHNOLOGY`, `BY_SPEED`) and **4 Color Palettes** (`CLASSIC`, `THERMIQUE`, `VIRIDIS`, `OCEAN`).
-  - Layer toggles for **Serving Sector Lines**, **Neighbor Candidates**, **Handover Events** (including `<30 s` Ping-Pong detection), **Missed Handovers** (`marginDb >= 6 dB`), and **SIM 2 Route** overlay (dashed dual-SIM polyline).
-  - Route **START/END markers** + floating stats chips (**Samples**, **Dist**, **Time**, **Avg RSRP**, **Handovers**, **Missed HO**).
-- **Screen S03 — Campaigns Manager & Multi-Format Exporter (`CampaignListView`):**
-  - Searchable campaign list with RSRP sparklines, multi-select batch operations, Delete with Undo, and per-campaign **Dual-SIM Benchmark** block (SIM 1/2 avg RSRP & SINR, RSRP/SINR Δ chips, WINNER badge).
-  - Exports to **CSV** (exact 23-column APK schema), **OpenGIS KML 2.2** (`.kml`), **GeoJSON** (`.geojson`), and printable **PDF Engineering Report**, plus **CSV Log Import**.
-- **Screen S04 — 8-Tab Analytics & Automated Route Diagnostics (`AnalyticsView`):**
-  - `Signal` (Stats & RSRP/RSRQ time series), `CDF` (Cumulative Distribution Function with P10/P50/P90), `Network` (2G/3G/4G/5G breakdown & 5G NR SA+NSA usage %), `Bands` (Frequency band breakdown), `Trace` (2D heatmap), `Sites & Mobility` (Cell site inventory + Handover/Ping-Pong/Missed Handover log), `Diagnosis` (Automated 0–100 Route Score, configurable `DiagnosticThresholds`, and 5 problem area types), `Advanced Correlation` (`MAP`, `TIMELINE`, and `CELLS` correlation views), and spatial **Campaign Comparison** (`RSRP` / `RSRQ` / `SINR` delta).
-- **Screen S05 — Home Screen Widgets HUD & Interactive Spotlight Guide:**
-  - Live preview of `GSM Signal Widget` and `GSM Campaign Widget` + 5-step interactive spotlight tutorial and 5-language support (`EN`, `TH`, `FR`, `DE`, `ES`).
+### 1. Android Native App (`android-native/` · `v1.13.16`)
 
-## Project Documentation & Replica Artifacts
+- **Live Dual-SIM RF Dashboard (`DashboardScreen`):**
+  - ตรวจจับและแสดงผลค่าสัญญาณสด **5G NR (SA / NSA) + LTE** รองรับ Dual-SIM (`SIM 1 Primary` และ `SIM 2 Benchmark`), RSRP / RSRQ / SINR / PCI / NCI / Band / EARFCN พร้อมกราฟแนวโน้ม RSRP แบบ Dual-SIM
+  - แถบสถานะ RSRP สดพร้อมการตรวจสอบช่วงค่าตามมาตรฐาน 3GPP และเครื่องมือ **RAT Lock** (`RatLockManager`)
+- **Interactive Route Map (`DriveTestMapScreen`):**
+  - แผนที่ **Google Maps SDK** (`maps-compose`) รองรับ **5 Color Modes**, เลเยอร์เส้นทาง Dual-SIM แยกอิสระ, หมุด `START` / `END` และแถบสถิติเส้นทางสด
+- **Crash-Safe Recording & Background Telemetry (`DriveTestForegroundService`):**
+  - บันทึกข้อมูลแบบ NDJSON ที่ทนต่อการปิดแอป/crash, ใช้ `WakeLock`, กู้คืนด้วย `START_STICKY`, โหลดตัวอย่างแบบ lazy-load, ตัวกรองพิกัด GPS ค้าง (`stale GPS guard`), แจ้งเตือนสถานะแบบ 2 ภาษา (EN/TH) และกู้คืนคิวอัปโหลดเมื่อกลับมาออนไลน์
+- **Sessions & Multi-Format GIS / Report Export (`SessionsScreen`):**
+  - ส่งออกข้อมูลได้ 5 รูปแบบ: **CSV**, **3D KMZ / KML** (แยกเลเยอร์ SIM 1/SIM 2 สำหรับ Google Earth), **GeoJSON** (รองรับ Dual-SIM), **MapInfo MIF/MID** (ZIP) และ **PDF Site Acceptance Report**
+- **RF Analytics & Gemini AI Diagnostics (`AnalyticsScreen`):**
+  - วิเคราะห์สถิติสัญญาณ Dual-SIM, ตรวจจับจุดอับสัญญาณ/สัญญาณรบกวน และสรุปคำแนะนำเชิงวิศวกรรมผ่าน **Gemini RF Advisor** (`GeminiRfAdvisor`)
+- **Live Fleet Sync & Auto-Upload (`CloudTelemetrySyncManager`, `GoogleDriveUploadWorker`):**
+  - สตรีม Telemetry แบบ Real-Time ขึ้น Firebase RTDB (`/fleet/vehicles`, `/fleet/sessions`, `/fleet/trails`) พร้อมระบบจอง **Vehicle ID** แบบ atomic ผ่าน `/fleet/vehicleClaims` เพื่อป้องกันชื่อรถชนกัน
+  - อัปโหลดไฟล์ผลทดสอบขึ้น Google Drive อัตโนมัติบน Wi-Fi ผ่าน `WorkManager` → Cloudflare Worker (`POST /api/drive-upload`)
+- **Dual-Channel App Updates (`OtaUpdateManager`, `PlayUpdateManager`):**
+  - **Sideload build:** ตรวจสอบและติดตั้งอัปเดตจาก GitHub Releases ผ่าน Android `PackageInstaller` พร้อมตรวจสอบ **SHA-256** ก่อนติดตั้ง (ซ่อน UI ของ Play Store อัตโนมัติ)
+  - **Google Play build:** รองรับ Google Play In-App Updates (`app-update-ktx`)
 
-- [Reverse Engineering Analysis Report](docs/reverse-engineering-report.md)
-- [Play Protect บล็อกการติดตั้ง APK (วิเคราะห์ + วิธีแก้ฝั่งผู้ใช้)](docs/play-protect-install.md)
-- [Incident: Google OAuth token หลุดไปกับ APK (revoke / audit / rotate)](docs/security-token-incident.md)
-- [Runbook: แจกจ่ายผ่าน Play internal testing + ย้ายจาก sideload](docs/play-release-runbook.md)
-- [Replica Recon Map](replica/recon.md) & [Feature Matrix (`features.csv`)](replica/features.csv)
-- [Replica Architecture](replica/architecture.md) & [SQL Schema (`schema.sql`)](replica/schema.sql)
-- [Design Tokens (`tokens.json`)](replica/design/tokens.json) & [Component Specs](replica/design/components.md)
-- [Test Plan](replica/test-plan.md) & [Bug Log](replica/bugs.md)
+### 2. Live Fleet NOC Dashboard (`noc-dashboard/` · `v1.15.0`)
 
-## Android Native Build (`android-native/`)
+- แผนที่ Dark NOC (OpenStreetMap + Leaflet 1.9.4) แสดงตำแหน่งรถที่กำลังบันทึกสดทุกคันพร้อมทิศทางหัวรถและเส้นทางสีตามเกณฑ์ RSRP 5 ระดับ
+- **Historical Session Playback:** ค้นหา กรองตามรถ เรียงลำดับ และเล่นเส้นทางย้อนหลังด้วย Timeline Scrubber (`1x` / `2x` / `5x`) พร้อมคีย์ลัด
+- **Multi-Vehicle RF Coverage Heatmap:** เอนจิน **IDW Interpolation** บน HTML5 Canvas สลับดูได้ทั้ง **RSRP** และ **SINR** พร้อมปรับความโปร่งใส (`15%–95%`)
+- **Dual-SIM RF Inspector & Live Anomaly Feed:** เปรียบเทียบ SIM 1 vs SIM 2 พร้อมค่า `Δ RSRP` และแจ้งเตือน `COVERAGE_HOLE` / `INTERFERENCE` แบบคลิกบินไปพิกัดได้ทันที
+- รายละเอียดการใช้งานและการรันทั้งหมดดูที่ [noc-dashboard/README.md](noc-dashboard/README.md)
 
-แอป Kotlin + Jetpack Compose อยู่ใน `android-native/` ใช้ Gradle wrapper ของตัวเอง (ไม่ใช้ `npm`)
+---
+
+## Android Native Build & Configuration
+
+โปรเจกต์รองรับการรัน Gradle Wrapper ได้ทั้งจาก root repo และจากโฟลเดอร์ `android-native/` (ต้องใช้ **JDK 17**, Android `minSdk 29`, `compileSdk / targetSdk 37`)
 
 ```powershell
-cd android-native
+# รันจาก root ของ repo (หรือ cd android-native)
+.\gradlew.bat :app:testDebugUnitTest
 .\gradlew.bat :app:assembleDebug
 .\gradlew.bat :app:bundleRelease   # ต้องตั้งค่า release signing ด้านล่างก่อน
 ```
 
-ตั้งค่า `android-native/local.properties` (git-ignored, ห้าม commit) โดยคัดลอกจาก `local.properties.example`
+สร้างไฟล์ `android-native/local.properties` (git-ignored, ห้าม commit) โดยคัดลอกจาก `android-native/local.properties.example`:
 
 | Key | จำเป็น | ใช้ทำอะไร |
 | --- | --- | --- |
 | `sdk.dir` | ใช่ | ตำแหน่ง Android SDK |
 | `MAPS_API_KEY` | ใช่ | Google Maps SDK |
-| `RELEASE_KEYSTORE_PATH`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` | ใช่ (สำหรับ release) | เซ็น release build / AAB |
-| `CLOUD_UPLOAD_URL` | ไม่บังคับ | endpoint ของ Worker รับอัปโหลด Drive: `https://<worker-host>/api/drive-upload` (ยังไม่ deploy — ดูหมายเหตุด้านล่าง) |
-| `GEMINI_API_KEY`, `FIREBASE_DB_URL`, `FIREBASE_AUTH_TOKEN` | ไม่บังคับ | cloud sync / telemetry เสริม (`FIREBASE_AUTH_TOKEN` ถูกใช้เป็น header `x-app-auth` ด้วย — อย่าใช้ค่าที่ละเอียดอ่อนร่วมกัน) |
+| `RELEASE_KEYSTORE_PATH`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD` | ใช่ (สำหรับ release) | เซ็น release APK / AAB |
+| `CLOUD_UPLOAD_URL` | ไม่บังคับ | endpoint ของ Worker รับอัปโหลด Drive (`https://<worker-host>/api/drive-upload`) |
+| `GEMINI_API_KEY`, `FIREBASE_DB_URL`, `FIREBASE_AUTH_TOKEN` | ไม่บังคับ | AI advisor / cloud sync (`FIREBASE_AUTH_TOKEN` ถูกส่งเป็น header `x-app-auth` ด้วย — อย่าใช้ค่าลับร่วมกับระบบอื่น) |
 
-การเปลี่ยนแปลงที่ต้องรู้:
+### Security & Release Notes
 
-- **`GDRIVE_ACCESS_TOKEN` และ `GDRIVE_FOLDER_ID` ถูกถอดออกจาก `local.properties` และ `BuildConfig` แล้ว** — ค่าเดิมเคยถูกฝังลง APK ที่แจก ที่แทนคือการอัปโหลดผ่าน Cloudflare Worker ที่ถือ credential ของ Google ฝั่ง server (`worker/drive-upload.js`, route `POST /api/drive-upload`, ผูกผ่าน `wrangler.jsonc:7`): ตั้ง secret ด้วย `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` / `APP_AUTH_TOKEN` / `GDRIVE_FOLDER_ID` (ตรวจด้วย `wrangler secret list`) แล้ว `wrangler deploy` และตั้ง `CLOUD_UPLOAD_URL` ฝั่งแอป ห้ามใส่ token ของ Google ลง `local.properties`, `BuildConfig` หรือไฟล์ที่ commit อีก — ดู [Incident runbook](docs/security-token-incident.md) (รวมถึง follow-up เรื่อง `x-app-auth` ที่ยังอิง `FIREBASE_AUTH_TOKEN` ซึ่งฝังอยู่ใน APK)
-  - **ยังไม่ deploy ณ 2026-11-12:** ถ้าไม่ตั้ง `CLOUD_UPLOAD_URL` การอัปโหลดจะถูกข้าม (status `NONE`) และ session ยังอยู่ในเครื่องครบ ไม่มี data loss; ถ้าตั้งแล้ว endpoint ล่มจะได้ status `FAILED` + retry 3 ครั้ง ไม่ crash
-- **release build ต้องเซ็นด้วย release keystore** — ถ้าตั้งค่าไม่ครบ Gradle จะ fallback ไป debug signing (`android-native/app/build.gradle.kts` ในบล็อก `signingConfigs`) ซึ่งทำให้ AAB อัปโหลด Play ไม่ผ่าน และผู้ใช้ติดตั้งทับตัวเดิมไม่ได้เพราะ signature ไม่ตรง ต้องเห็นว่า build log ไม่มีบรรทัด `Release keystore not configured; falling back to debug signing.`
-- **การแจกจ่ายเปลี่ยนจาก APK บน GitHub Releases + OTA ที่ติดตั้งเอง → Play internal testing + Play In-App Updates** การย้ายจาก sideload ต้อง export session ก่อนถอนแอป ดู [Release runbook](docs/play-release-runbook.md)
+- **Server-side Drive Upload (`worker/drive-upload.js`):** `GDRIVE_ACCESS_TOKEN` และ `GDRIVE_FOLDER_ID` ถูกถอดออกจาก `local.properties` และ `BuildConfig` แล้ว พร้อม task `guardNoDriveToken` ใน `android-native/app/build.gradle.kts` ที่จะทำให้ build ล้มเหลวทันทีหากมี token `ya29.` หรือ `GDRIVE_ACCESS_TOKEN` หลุดกลับเข้ามาใน `BuildConfig`
+  - ตั้งค่า secret ฝั่ง Cloudflare Worker ด้วย `wrangler secret put` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `APP_AUTH_TOKEN`, และ `GDRIVE_FOLDER_ID` ถ้าต้องการ) แล้ว deploy ด้วย `npx wrangler deploy`
+  - หากไม่ตั้ง `CLOUD_UPLOAD_URL` การอัปโหลดจะถูกข้ามอย่างปลอดภัย (สถานะ `NONE`) โดยข้อมูล session ยังอยู่ในเครื่องครบ
+- **Release Signing:** หากตั้งค่า keystore ไม่ครบ Gradle จะ fallback ไปใช้ debug signing และพิมพ์คำเตือน `Release keystore not configured; falling back to debug signing.` ซึ่งจะไม่สามารถอัปโหลด AAB ขึ้น Play Console หรือติดตั้งทับ release เดิมได้
+- **Distribution:** รองรับทั้งการแจกจ่ายผ่าน Play internal testing (Play In-App Updates) และ sideload APK ผ่าน GitHub Releases (PackageInstaller + SHA-256 verification) — ดูรายละเอียดการย้ายช่องทางติดตั้งใน [Release Runbook](docs/play-release-runbook.md)
 
-## Quick Start & Verification
+---
 
-```bash
-# Install dependencies
-npm install
+## Cloud Infrastructure (Cloudflare Workers & Firebase RTDB)
 
-# Run unit & component test suite (Vitest)
-npm test
+```powershell
+# Deploy NOC Dashboard + /api/drive-upload Worker (อิง wrangler.jsonc)
+npx wrangler dev
+npx wrangler deploy
 
-# Run TypeScript typecheck & production build
-npm run typecheck
-npm run build
-
-# Run replica-skill verification tools
-python replica-skill/replica-diff/parity.py replica/features.csv --fail-under 100
-python replica-skill/replica-design/contrast.py replica/design/tokens.json
-python replica-skill/replica-brand/sweep.py src --config replica/brand.json
+# Deploy Firebase Realtime Database rules (อิง firebase.json + firebase/database.rules.json)
+firebase deploy --only database
 ```
 
+---
+
+## Project Documentation
+
+- [Live Fleet NOC Dashboard Guide](noc-dashboard/README.md)
+- [Reverse Engineering Analysis Report](docs/reverse-engineering-report.md)
+- [Play Protect บล็อกการติดตั้ง APK (วิเคราะห์ + วิธีแก้ฝั่งผู้ใช้)](docs/play-protect-install.md)
+- [Incident: Google OAuth token หลุดไปกับ APK (revoke / audit / rotate)](docs/security-token-incident.md)
+- [Runbook: แจกจ่ายผ่าน Play internal testing + ย้ายจาก sideload](docs/play-release-runbook.md)
