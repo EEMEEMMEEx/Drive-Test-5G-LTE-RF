@@ -312,4 +312,44 @@ class CloudTelemetrySyncManagerTest {
         assertTrue(lines[0].contains("\"sm\":\"{\\\"sm\\\":1}\""))
         assertFalse(lines[1].contains("\"sm\":"))
     }
+
+    @Test
+    fun extractOfflineQueuedSamplesForSession_filtersBySessionAndPreservesQueue() {
+        val sid = 1795574251243L
+        CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{}",
+            sessionId = sid.toString(),
+            trailPointJson = """{"ts":${sid + 2000L},"lat":17.95,"lon":103.11,"rsrp":-94,"sinr":1.8,"pci":86,"rat":"LTE","speed":20.0}"""
+        )
+        CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{}",
+            sessionId = "9999999999999",
+            trailPointJson = """{"ts":${sid + 3000L},"lat":17.96,"lon":103.12,"rsrp":-88,"sinr":5.0,"pci":12,"rat":"NR_SA","speed":30.0}"""
+        )
+
+        val extracted = CloudTelemetrySyncManager.extractOfflineQueuedSamplesForSession(sid)
+        assertEquals(1, extracted.size)
+        assertEquals(sid + 2000L, extracted[0].timestamp)
+        assertEquals(-94, extracted[0].metrics.lte?.rsrp)
+        assertEquals(86, extracted[0].metrics.lte?.pci)
+        assertEquals(2, CloudTelemetrySyncManager.getOfflineQueueCount())
+    }
+
+    @Test
+    fun parseTrailJsonMapToSamples_sortsChronologicallyAndMapsRfFields() {
+        val sid = 1795574251243L
+        val json = """
+            {
+              "-K2": {"ts": ${sid + 5000L}, "lat": 17.96, "lon": 103.12, "rsrp": -95, "sinr": 2.0, "pci": 86, "rat": "LTE", "speed": 40.0},
+              "-K1": {"ts": ${sid + 1000L}, "lat": 17.95, "lon": 103.11, "rsrp": -93, "sinr": 3.0, "pci": 86, "rat": "LTE", "speed": 30.0}
+            }
+        """.trimIndent()
+
+        val samples = CloudTelemetrySyncManager.parseTrailJsonMapToSamples(sid, json)
+        assertEquals(2, samples.size)
+        assertEquals(sid + 1000L, samples[0].timestamp)
+        assertEquals(sid + 5000L, samples[1].timestamp)
+        assertEquals(-93, samples[0].metrics.lte?.rsrp)
+        assertEquals(86, samples[1].metrics.lte?.pci)
+    }
 }

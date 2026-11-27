@@ -3,6 +3,9 @@ package com.drivetest.lte5g.location
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
@@ -29,6 +32,8 @@ class LocationCollector(
 
     private val fusedClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
+    private val locationManager: LocationManager? =
+        context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
 
     private val _currentLocation = MutableStateFlow<Location?>(null)
     val currentLocation: StateFlow<Location?> = _currentLocation.asStateFlow()
@@ -39,20 +44,38 @@ class LocationCollector(
     @Volatile
     private var isTracking = false
     @Volatile
+    private var isGpsFallbackRegistered = false
+    @Volatile
     private var lastFixElapsedRealtimeMs: Long? = null
+
+    private fun acceptLocation(location: Location) {
+        if (location.hasAccuracy() && location.accuracy > maxAccuracyThresholdMeters) {
+            SessionDiagnostics.incDroppedInaccurateGps()
+            Log.d(TAG, "Discarded inaccurate GPS point: ${location.accuracy}m > ${maxAccuracyThresholdMeters}m")
+            return
+        }
+        lastFixElapsedRealtimeMs = SystemClock.elapsedRealtime()
+        _isGpsStale.value = false
+        _currentLocation.value = location
+    }
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             val location = result.lastLocation ?: return
-            if (location.hasAccuracy() && location.accuracy > maxAccuracyThresholdMeters) {
-                SessionDiagnostics.incDroppedInaccurateGps()
-                Log.d(TAG, "Discarded inaccurate GPS point: ${location.accuracy}m > ${maxAccuracyThresholdMeters}m")
-                return
-            }
-            lastFixElapsedRealtimeMs = SystemClock.elapsedRealtime()
-            _isGpsStale.value = false
-            _currentLocation.value = location
+            acceptLocation(location)
         }
+    }
+
+    // Direct GNSS fallback for SIM-only / offline devices where FusedLocation NLP/AGPS may stall
+    private val directGpsListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            acceptLocation(location)
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+        override fun onProviderEnabled(provider: String) {}
+        override fun onProviderDisabled(provider: String) {}
     }
 
     fun lastFixAgeMs(): Long? {
@@ -104,13 +127,35 @@ class LocationCollector(
             isTracking = true
             fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
                 .addOnFailureListener { err ->
-                    isTracking = false
                     Log.e(TAG, "Async requestLocationUpdates failed", err)
                 }
+            registerDirectGpsFallback(intervalMs)
             Log.d(TAG, "Started location tracking with interval ${intervalMs}ms")
         } catch (e: Exception) {
             isTracking = false
             Log.e(TAG, "Failed to start location updates", e)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerDirectGpsFallback(intervalMs: Long) {
+        val lm = locationManager ?: return
+        try {
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                if (isGpsFallbackRegistered) {
+                    lm.removeUpdates(directGpsListener)
+                }
+                lm.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    intervalMs,
+                    0f,
+                    directGpsListener,
+                    Looper.getMainLooper()
+                )
+                isGpsFallbackRegistered = true
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Direct GPS_PROVIDER fallback unavailable: ${e.message}")
         }
     }
 
@@ -129,9 +174,9 @@ class LocationCollector(
             fusedClient.removeLocationUpdates(locationCallback)
             fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
                 .addOnFailureListener { err ->
-                    isTracking = false
                     Log.e(TAG, "Async updateInterval requestLocationUpdates failed", err)
                 }
+            registerDirectGpsFallback(intervalMs)
             Log.d(TAG, "Updated location tracking interval to ${intervalMs}ms")
         } catch (e: Exception) {
             isTracking = false
@@ -148,6 +193,10 @@ class LocationCollector(
         }
         try {
             fusedClient.removeLocationUpdates(locationCallback)
+            if (isGpsFallbackRegistered) {
+                locationManager?.removeUpdates(directGpsListener)
+                isGpsFallbackRegistered = false
+            }
             Log.d(TAG, "Stopped location tracking")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop location updates", e)

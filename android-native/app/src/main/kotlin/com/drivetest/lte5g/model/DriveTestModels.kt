@@ -104,6 +104,7 @@ data class DriveTestSession(
     val name: String = "Session #1",
     val startTime: Long = System.currentTimeMillis(),
     val endTime: Long? = null,
+    val lastSampleTime: Long? = null,
     val ratLockMode: RatLockMode = RatLockMode.AUTO,
     val cadence: MeasurementCadence = MeasurementCadence.PRECISE,
     val sampleCount: Int = 0,

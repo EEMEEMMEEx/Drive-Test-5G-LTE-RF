@@ -87,9 +87,14 @@ object RfAnalyticsEngine {
         }
 
         // Dual-SIM Summary if benchmark present
-        val dualSimSummary = if (samples.any { it.metricsSim2 != null }) {
-            val sim1AvgRsrp = rsrpList.average()
-            val sim2RsrpList = samples.mapNotNull { it.metricsSim2?.nr?.ssRsrp?.toDouble() ?: it.metricsSim2?.lte?.rsrp?.toDouble() }
+        val hasSim2 = samples.any { it.metricsSim2 != null }
+        val sim2RsrpList = if (hasSim2) {
+            samples.mapNotNull { it.metricsSim2?.nr?.ssRsrp?.toDouble() ?: it.metricsSim2?.lte?.rsrp?.toDouble() }
+        } else emptyList()
+        val rsrpCdfSim2 = if (sim2RsrpList.isNotEmpty()) calculateCdf(sim2RsrpList) else null
+
+        val dualSimSummary = if (hasSim2) {
+            val sim1AvgRsrp = if (rsrpList.isNotEmpty()) rsrpList.average() else 0.0
             val sim2AvgRsrp = if (sim2RsrpList.isNotEmpty()) sim2RsrpList.average() else 0.0
             val delta = sim1AvgRsrp - sim2AvgRsrp
             "SIM 1 (${String.format("%.1f", sim1AvgRsrp)} dBm) vs SIM 2 (${String.format("%.1f", sim2AvgRsrp)} dBm) · Δ ${String.format("%+.1f", delta)} dB"
@@ -102,6 +107,7 @@ object RfAnalyticsEngine {
             durationSeconds = durationSeconds,
             distanceMeters = distanceMeters,
             rsrpCdf = rsrpCdf,
+            rsrpCdfSim2 = rsrpCdfSim2,
             rsrqCdf = rsrqCdf,
             sinrCdf = sinrCdf,
             ratDistribution = ratDistribution,

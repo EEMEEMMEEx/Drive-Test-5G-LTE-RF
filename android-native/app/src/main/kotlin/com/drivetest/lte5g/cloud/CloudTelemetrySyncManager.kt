@@ -2,8 +2,11 @@ package com.drivetest.lte5g.cloud
 
 import android.content.Context
 import android.util.Log
+import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
 import com.drivetest.lte5g.model.DriveTestSession
+import com.drivetest.lte5g.model.LteMetrics
+import com.drivetest.lte5g.model.NrMetrics
 import com.drivetest.lte5g.model.RatLockMode
 import com.drivetest.lte5g.model.RatType
 import kotlinx.coroutines.CoroutineDispatcher
@@ -488,6 +491,12 @@ object CloudTelemetrySyncManager {
         }
     }
 
+    fun flushOfflineQueueIfAny() {
+        val config = CloudConfigRepository.config.value
+        if (!config.liveTelemetryEnabled || config.firebaseDbUrl.isBlank()) return
+        flushOfflineQueueAsync(config)
+    }
+
     private fun flushOfflineQueueAsync(config: CloudConfig) {
         val dir = storageDir ?: return
         val file = File(dir, "cloud_offline_queue.jsonl")
@@ -599,5 +608,116 @@ object CloudTelemetrySyncManager {
         } finally {
             conn?.disconnect()
         }
+    }
+
+    /**
+     * Extracts any queued offline trail points for [sessionId] from `cloud_offline_queue.jsonl`
+     * without removing them from the upload queue, so crash recovery can restore local samples.
+     */
+    @Synchronized
+    fun extractOfflineQueuedSamplesForSession(sessionId: Long): List<DriveTestSample> {
+        val dir = storageDir ?: return emptyList()
+        val file = File(dir, "cloud_offline_queue.jsonl")
+        if (!file.exists() || file.length() == 0L) return emptyList()
+        val targetSid = sessionId.toString()
+        val recovered = ArrayList<DriveTestSample>()
+        var nextId = 1L
+        try {
+            file.forEachLine { line ->
+                if (line.isBlank()) return@forEachLine
+                try {
+                    val obj = JSONObject(line)
+                    if (obj.optString("sid") != targetSid) return@forEachLine
+                    val tpRaw = obj.optString("tp")
+                    if (tpRaw.isBlank()) return@forEachLine
+                    val tp = JSONObject(tpRaw)
+                    parseTrailPointToSample(sessionId, nextId++, tp)?.let { recovered.add(it) }
+                } catch (_: Exception) {
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed extracting offline queued samples for $sessionId: ${e.message}")
+        }
+        return recovered.sortedBy { it.timestamp }
+    }
+
+    /**
+     * Fetches breadcrumb trail points for [sessionId] from Firebase RTDB `/fleet/trails/{sessionId}.json`
+     * to reconcile local sessions that lost samples prior to crash-safe NDJSON persistence.
+     */
+    fun fetchTrailPointsForSession(sessionId: Long, config: CloudConfig = CloudConfigRepository.config.value): List<DriveTestSample> {
+        if (config.firebaseDbUrl.isBlank()) return emptyList()
+        val baseUrl = config.firebaseDbUrl.trimEnd('/')
+        val authParam = if (config.firebaseAuthToken.isNotBlank()) "?auth=${config.firebaseAuthToken}" else ""
+        val trailUrl = "$baseUrl/fleet/trails/$sessionId.json$authParam"
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = (URL(trailUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8000
+                readTimeout = 10000
+                doInput = true
+                setRequestProperty("Accept", "application/json")
+            }
+            if (conn.responseCode !in 200..299) {
+                return emptyList()
+            }
+            val body = conn.inputStream.bufferedReader().use(BufferedReader::readText)
+            parseTrailJsonMapToSamples(sessionId, body)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed fetching Firebase trail for $sessionId: ${e.message}")
+            emptyList()
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
+    internal fun parseTrailJsonMapToSamples(sessionId: Long, jsonBody: String): List<DriveTestSample> {
+        val trimmed = jsonBody.trim()
+        if (trimmed.isEmpty() || trimmed == "null") return emptyList()
+        val root = JSONObject(trimmed)
+        val result = ArrayList<DriveTestSample>(root.length())
+        var nextId = 1L
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val tp = root.optJSONObject(key) ?: continue
+            parseTrailPointToSample(sessionId, nextId++, tp)?.let { result.add(it) }
+        }
+        return result.sortedBy { it.timestamp }.mapIndexed { idx, s -> s.copy(id = idx + 1L) }
+    }
+
+    private fun parseTrailPointToSample(sessionId: Long, sampleId: Long, tp: JSONObject): DriveTestSample? {
+        val ts = tp.optLong("ts", 0L)
+        if (ts <= 0L) return null
+        val lat = tp.optDouble("lat", Double.NaN)
+        val lon = tp.optDouble("lon", Double.NaN)
+        if (lat.isNaN() || lon.isNaN()) return null
+        val ratStr = tp.optString("rat", RatType.UNKNOWN.name)
+        val rat = try { RatType.valueOf(ratStr) } catch (_: Exception) { RatType.UNKNOWN }
+        val rsrp = if (tp.has("rsrp") && !tp.isNull("rsrp")) tp.optInt("rsrp") else null
+        val sinr = if (tp.has("sinr") && !tp.isNull("sinr")) tp.optDouble("sinr") else null
+        val pci = if (tp.has("pci") && !tp.isNull("pci")) tp.optInt("pci") else null
+        val speed = tp.optDouble("speed", 0.0).toFloat()
+
+        val lte = if (rat == RatType.LTE || rat == RatType.NR_NSA) {
+            LteMetrics(pci = pci, eci = null, tac = null, earfcn = null, band = null, rsrp = rsrp, rsrq = null, rssnr = sinr, cqi = null)
+        } else null
+        val nr = if (rat == RatType.NR_SA) {
+            NrMetrics(pci = pci, nci = null, tac = null, nrArfcn = null, band = null, ssRsrp = rsrp, ssRsrq = null, ssSinr = sinr, csiRsrp = null, csiRsrq = null, csiSinr = null, isNsa = false)
+        } else null
+
+        return DriveTestSample(
+            id = sampleId,
+            sessionId = sessionId,
+            timestamp = ts,
+            latitude = lat,
+            longitude = lon,
+            altitude = 0.0,
+            speedKmh = speed,
+            bearing = 0f,
+            accuracyMeters = 0f,
+            metrics = CellMetrics(ratType = rat, lte = lte, nr = nr)
+        )
     }
 }

@@ -56,6 +56,7 @@ def load_trail_points(json_path: Path, session_label: str) -> list[dict[str, Any
                 "rat": str(val.get("rat") or "UNKNOWN"),
                 "pci": int(val.get("pci")) if val.get("pci") is not None else 0,
                 "rsrp": int(val.get("rsrp")) if val.get("rsrp") is not None else -140,
+                "sinr": val.get("sinr"),
             }
         )
 
@@ -87,6 +88,7 @@ def write_csv(points: list[dict[str, Any]], out_path: Path) -> None:
                 "PCI",
                 "RSRP_dBm",
                 "RSRP_Tier",
+                "SINR_dB",
             ]
         )
         for p in points:
@@ -105,6 +107,7 @@ def write_csv(points: list[dict[str, Any]], out_path: Path) -> None:
                     p["pci"],
                     p["rsrp"],
                     tier_index(p["rsrp"]),
+                    "" if p["sinr"] is None else p["sinr"],
                 ]
             )
 
@@ -195,6 +198,8 @@ def render_session_folder(points: list[dict[str, Any]], folder_name: str) -> str
         color_hex = HTML_COLORS[tier - 1]
         rat_esc = html.escape(p["rat"])
         sess_esc = html.escape(p["session"])
+        sinr_row = f"<tr><td><b>SINR</b></td><td>{p['sinr']} dB</td></tr>" if p["sinr"] is not None else ""
+        sinr_data = f'\n                    <Data name="SINR_dB"><value>{p["sinr"]}</value></Data>' if p["sinr"] is not None else ""
         chunks.append(
             f"""            <Placemark>
                 <name>{rat_esc} PCI:{p['pci']} ({p['rsrp']}dBm)</name>
@@ -207,6 +212,7 @@ def render_session_folder(points: list[dict[str, Any]], folder_name: str) -> str
                         </div>
                         <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse; width:100%; font-size:12px;">
                             <tr><td><b>RSRP</b></td><td><b style="color:{color_hex};">{p['rsrp']} dBm</b></td></tr>
+                            {sinr_row}
                             <tr><td><b>PCI</b></td><td>{p['pci']}</td></tr>
                             <tr><td><b>Speed</b></td><td>{p['speed']:.1f} km/h</td></tr>
                         </table>
@@ -218,7 +224,7 @@ def render_session_folder(points: list[dict[str, Any]], folder_name: str) -> str
                     <Data name="Session"><value>{sess_esc}</value></Data>
                     <Data name="RAT"><value>{rat_esc}</value></Data>
                     <Data name="PCI"><value>{p['pci']}</value></Data>
-                    <Data name="RSRP_dBm"><value>{p['rsrp']}</value></Data>
+                    <Data name="RSRP_dBm"><value>{p['rsrp']}</value></Data>{sinr_data}
                     <Data name="Speed_kmh"><value>{p['speed']:.1f}</value></Data>
                 </ExtendedData>
             </Placemark>"""

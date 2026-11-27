@@ -2,6 +2,8 @@ package com.drivetest.lte5g.data
 
 import android.content.Context
 import android.util.Log
+import com.drivetest.lte5g.cloud.CloudConfigRepository
+import com.drivetest.lte5g.cloud.CloudTelemetrySyncManager
 import com.drivetest.lte5g.model.CellMetrics
 import com.drivetest.lte5g.model.DriveTestSample
 import com.drivetest.lte5g.model.DriveTestSession
@@ -177,8 +179,8 @@ object SessionRepository {
     private const val POINTER_FILE_NAME = "active_session.pointer.json"
     private const val FLUSH_AWAIT_TIMEOUT_SEC = 10L
 
-    internal var flushBatchSize: Int = 10
-    internal var flushIntervalMs: Long = 15_000L
+    internal var flushBatchSize: Int = 5
+    internal var flushIntervalMs: Long = 5_000L
 
     @Volatile
     private var writerThread: Thread? = null
@@ -226,8 +228,8 @@ object SessionRepository {
         loadedSampleSessionIds.clear()
         lastSessionId = 0L
         hasLoadedOnce = false
-        flushBatchSize = 10
-        flushIntervalMs = 15_000L
+        flushBatchSize = 5
+        flushIntervalMs = 5_000L
         SessionDiagnostics.resetForTesting()
     }
 
@@ -417,7 +419,9 @@ object SessionRepository {
             ?: ActiveSessionAccumulator(current.id, current.samples).also { activeAccumulator = it }
 
         val updatedSamples = acc.add(sample)
+        val updatedLastSampleTime = maxOf(current.lastSampleTime ?: 0L, sample.timestamp)
         val updatedSession = current.copy(
+            lastSampleTime = updatedLastSampleTime,
             sampleCount = updatedSamples.size,
             avgRsrp = acc.avgRsrp(),
             avgRsrq = acc.avgRsrq(),
@@ -493,8 +497,14 @@ object SessionRepository {
                 emptyList()
             }
 
+            val resolvedEndTime = acc?.lastSampleTimestamp
+                ?: current.lastSampleTime
+                ?: current.samples.maxOfOrNull { it.timestamp }
+                ?: current.startTime
+
             val finished = current.copy(
-                endTime = System.currentTimeMillis(),
+                endTime = resolvedEndTime,
+                lastSampleTime = acc?.lastSampleTimestamp ?: current.lastSampleTime,
                 isRecording = false
             )
 
@@ -918,22 +928,40 @@ object SessionRepository {
             return session
         }
 
-        val recomputed = recomputeAggregates(session)
+        var recomputed = recomputeAggregates(session)
         if (!recomputed.isRecording && recomputed.endTime != null) {
             return recomputed
         }
 
-        val recoveredEndTime = recomputed.samples.lastOrNull()?.timestamp
+        var recoveredFromOfflineQueue = false
+        if (recomputed.samples.isEmpty()) {
+            val queuedSamples = CloudTelemetrySyncManager.extractOfflineQueuedSamplesForSession(recomputed.id)
+            if (queuedSamples.isNotEmpty()) {
+                recomputed = recomputeAggregates(recomputed.copy(samples = queuedSamples))
+                recoveredFromOfflineQueue = true
+                val samplesFile = File(dir, "session_${recomputed.id}$SAMPLES_SUFFIX")
+                writeSamplesNdjsonSync(samplesFile, queuedSamples)
+            }
+        }
+
+        val recoveredEndTime = recomputed.samples.maxOfOrNull { it.timestamp }
+            ?: recomputed.lastSampleTime
             ?: sourceLastModified.takeIf { it > recomputed.startTime }
             ?: recomputed.startTime
         val exitReason = SessionDiagnostics.lastProcessExitReason
-        val note = if (exitReason != null) {
-            "Recovered ($exitReason)"
-        } else {
-            "Recovered after unexpected termination"
+        val note = when {
+            recoveredFromOfflineQueue && exitReason != null ->
+                "Recovered ${recomputed.sampleCount} samples from offline queue ($exitReason)"
+            recoveredFromOfflineQueue ->
+                "Recovered ${recomputed.sampleCount} samples from offline queue"
+            exitReason != null ->
+                "Recovered ($exitReason)"
+            else ->
+                "Recovered after unexpected termination"
         }
         val finalized = recomputed.copy(
             endTime = recoveredEndTime,
+            lastSampleTime = recomputed.samples.maxOfOrNull { it.timestamp } ?: recomputed.lastSampleTime,
             isRecording = false,
             recoveredFromCrash = true,
             recoveryNote = note
@@ -973,6 +1001,7 @@ object SessionRepository {
         }
         val acc = ActiveSessionAccumulator(session.id, session.samples)
         return session.copy(
+            lastSampleTime = session.samples.maxOfOrNull { it.timestamp } ?: session.lastSampleTime,
             sampleCount = session.samples.size,
             avgRsrp = acc.avgRsrp(),
             avgRsrq = acc.avgRsrq(),
@@ -980,6 +1009,88 @@ object SessionRepository {
             avgRsrpSim2 = acc.avgRsrpSim2(),
             avgSinrSim2 = acc.avgSinrSim2()
         )
+    }
+
+    private fun writeSamplesNdjsonSync(samplesFile: File, samples: List<DriveTestSample>) {
+        if (samples.isEmpty()) return
+        val sb = StringBuilder(samples.size * 256)
+        for (s in samples) {
+            sb.append(sampleToJson(s).toString()).append('\n')
+        }
+        FileOutputStream(samplesFile, false).use { fos ->
+            fos.write(sb.toString().toByteArray(Charsets.UTF_8))
+            fos.flush()
+            try {
+                fos.fd.sync()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Reconciles a 0-sample recovered/finalized session using samples fetched from Firebase RTDB
+     * or another recovery source, persisting NDJSON and updating metadata & StateFlows.
+     */
+    fun reconcileSessionFromSamples(sessionId: Long, recoveredSamples: List<DriveTestSample>, sourceLabel: String = "cloud"): DriveTestSession? {
+        if (recoveredSamples.isEmpty()) return null
+        val dir = storageDir ?: return null
+        val sorted = recoveredSamples.sortedBy { it.timestamp }
+        val updated = diskLock.withLock {
+            val existing = synchronized(this) { _sessions.value.firstOrNull { it.id == sessionId } } ?: return@withLock null
+            if (existing.sampleCount > 0) return@withLock existing
+            val samplesFile = File(dir, "session_${sessionId}$SAMPLES_SUFFIX")
+            writeSamplesNdjsonSync(samplesFile, sorted)
+            val recomputed = recomputeAggregates(existing.copy(samples = sorted))
+            val lastTs = sorted.last().timestamp
+            val finalized = recomputed.copy(
+                endTime = lastTs,
+                lastSampleTime = lastTs,
+                isRecording = false,
+                recoveredFromCrash = true,
+                recoveryNote = "Reconciled ${sorted.size} samples from $sourceLabel"
+            )
+            writeMetaFileAtomically(dir, finalized)
+            SessionDiagnostics.recordEvent(
+                sessionId = sessionId,
+                event = "CLOUD_TRAIL_RECONCILED",
+                details = mapOf("samples" to sorted.size, "endTime" to lastTs, "source" to sourceLabel)
+            )
+            finalized
+        } ?: return null
+
+        synchronized(this) {
+            loadedSampleSessionIds.add(sessionId)
+            replaceSessionInList(updated)
+            if (_selectedSessionForMap.value?.id == sessionId) {
+                _selectedSessionForMap.value = updated
+            }
+        }
+        return updated
+    }
+
+    /**
+     * Best-effort background reconciliation for any finalized/recovered sessions that still show 0 samples
+     * locally (e.g. sessions recorded on v1.13.4 before crash-safe NDJSON persistence).
+     */
+    fun reconcileEmptyRecoveredSessionsFromCloudAsync() {
+        val config = CloudConfigRepository.config.value
+        if (config.firebaseDbUrl.isBlank()) return
+        val candidates = synchronized(this) {
+            _sessions.value.filter { !it.isRecording && it.sampleCount == 0 }
+        }
+        if (candidates.isEmpty()) return
+        writerExecutor.execute {
+            for (candidate in candidates) {
+                try {
+                    val cloudSamples = CloudTelemetrySyncManager.fetchTrailPointsForSession(candidate.id, config)
+                    if (cloudSamples.isNotEmpty()) {
+                        reconcileSessionFromSamples(candidate.id, cloudSamples, "Firebase trail")
+                    }
+                } catch (e: Exception) {
+                    safeLogWarn("Cloud trail reconciliation skipped for ${candidate.id}: ${e.message}")
+                }
+            }
+        }
     }
 
     private fun readSamplesNdjson(file: File, sessionId: Long): List<DriveTestSample> {
@@ -1012,6 +1123,7 @@ object SessionRepository {
     private fun loadSavedSessions() {
         writerExecutor.execute {
             loadSavedSessionsSync()
+            reconcileEmptyRecoveredSessionsFromCloudAsync()
         }
     }
 
@@ -1200,6 +1312,7 @@ object SessionRepository {
         obj.put("name", session.name)
         obj.put("startTime", session.startTime)
         obj.put("endTime", session.endTime ?: JSONObject.NULL)
+        obj.put("lastSampleTime", session.lastSampleTime ?: JSONObject.NULL)
         obj.put("ratLockMode", session.ratLockMode.name)
         obj.put("cadence", session.cadence.name)
         obj.put("sampleCount", session.sampleCount)
@@ -1224,6 +1337,7 @@ object SessionRepository {
         val name = obj.optString("name", "Session #$sessionNumber")
         val startTime = obj.getLong("startTime")
         val endTime = if (obj.isNull("endTime")) null else obj.optLong("endTime")
+        val lastSampleTime = if (obj.isNull("lastSampleTime")) null else obj.optLong("lastSampleTime")
         val ratLockMode = parseRatLockMode(obj.optString("ratLockMode", RatLockMode.AUTO.name))
         val cadence = parseCadence(obj.optString("cadence", MeasurementCadence.PRECISE.name))
         val sampleCount = if (samples.isNotEmpty()) samples.size else obj.optInt("sampleCount", 0)
@@ -1246,6 +1360,7 @@ object SessionRepository {
             name = name,
             startTime = startTime,
             endTime = endTime,
+            lastSampleTime = lastSampleTime,
             ratLockMode = ratLockMode,
             cadence = cadence,
             sampleCount = sampleCount,

@@ -492,9 +492,11 @@ class DriveTestForegroundService : Service() {
                             lastGpsFixAgeMs = locationCollector.lastFixAgeMs()
                         )
                     }
-                    if (nowElapsed - lastWakeLockRenewElapsedMs >= WAKELOCK_RENEW_INTERVAL_MS) {
+                    if (nowElapsed - lastWakeLockRenewElapsedMs >= WAKELOCK_RENEW_INTERVAL_MS ||
+                        wakeLock?.isHeld != true
+                    ) {
                         lastWakeLockRenewElapsedMs = nowElapsed
-                        wakeLock?.acquire(WAKELOCK_TIMEOUT_MS)
+                        acquireWakeLock(activeSessionId)
                     }
                 } catch (ce: CancellationException) {
                     throw ce
@@ -548,6 +550,23 @@ class DriveTestForegroundService : Service() {
                     sessionId = sid,
                     event = "ON_TRIM_MEMORY",
                     details = mapOf("level" to level)
+                )
+            }
+            serviceScope.launch(Dispatchers.IO) {
+                SessionRepository.flushActiveSessionSync()
+            }
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        if (_isRecording.value) {
+            val sid = SessionRepository.activeSession.value?.id
+            if (sid != null) {
+                SessionDiagnostics.recordEvent(
+                    sessionId = sid,
+                    event = "TASK_REMOVED",
+                    details = mapOf("batteryPct" to getBatteryPercentage())
                 )
             }
             serviceScope.launch(Dispatchers.IO) {

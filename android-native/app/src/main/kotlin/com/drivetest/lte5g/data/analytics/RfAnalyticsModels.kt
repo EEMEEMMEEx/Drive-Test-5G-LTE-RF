@@ -59,6 +59,7 @@ data class RfSessionAnalytics(
     val durationSeconds: Long,
     val distanceMeters: Double,
     val rsrpCdf: CdfDistribution?,
+    val rsrpCdfSim2: CdfDistribution? = null,
     val rsrqCdf: CdfDistribution?,
     val sinrCdf: CdfDistribution?,
     val ratDistribution: Map<RatType, Int>,

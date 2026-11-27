@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -222,7 +223,7 @@ fun AnalyticsScreen(
                 // 3. CDF DISTRIBUTION VISUALIZER
                 item {
                     analytics.rsrpCdf?.let { cdf ->
-                        CdfDistributionCard(cdf = cdf)
+                        CdfDistributionCard(cdf = cdf, cdfSim2 = analytics.rsrpCdfSim2)
                     }
                 }
 
@@ -747,8 +748,14 @@ private fun GeminiAdvisorCard(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CdfDistributionCard(cdf: CdfDistribution) {
+fun CdfDistributionCard(cdf: CdfDistribution, cdfSim2: CdfDistribution? = null) {
+    val combinedMin = minOf(cdf.min, cdfSim2?.min ?: cdf.min).toFloat()
+    val combinedMax = maxOf(cdf.max, cdfSim2?.max ?: cdf.max).toFloat()
+    val range = if (combinedMax > combinedMin) combinedMax - combinedMin else 1f
+    val midVal = (combinedMin + combinedMax) / 2f
+
     Card(
         colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
         border = BorderStroke(1.dp, TelemetryCardStroke),
@@ -758,84 +765,183 @@ private fun CdfDistributionCard(cdf: CdfDistribution) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "Cumulative Distribution Function (CDF)",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = Color.White
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 Text(
                     text = "RSRP (dBm)",
                     fontSize = 11.sp,
-                    color = TelemetryCyan
+                    fontWeight = FontWeight.SemiBold,
+                    color = TelemetryCyan,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Canvas CDF Curve
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .background(Color(0xFF090E17), RoundedCornerShape(8.dp))
-                    .padding(8.dp)
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val width = size.width
-                    val height = size.height
-                    val minVal = cdf.min.toFloat()
-                    val maxVal = cdf.max.toFloat()
-                    val range = if (maxVal > minVal) maxVal - minVal else 1f
-
-                    // Draw reference grid lines (0%, 50%, 100%)
-                    drawLine(Color(0xFF1E293B), Offset(0f, height * 0.1f), Offset(width, height * 0.1f), strokeWidth = 1f)
-                    drawLine(Color(0xFF1E293B), Offset(0f, height * 0.5f), Offset(width, height * 0.5f), strokeWidth = 1f)
-                    drawLine(Color(0xFF1E293B), Offset(0f, height * 0.9f), Offset(width, height * 0.9f), strokeWidth = 1f)
-
-                    val path = Path()
-                    var isFirst = true
-
-                    cdf.points.forEach { (valD, pctD) ->
-                        val x = ((valD.toFloat() - minVal) / range) * width
-                        val y = height - (pctD.toFloat() / 100f * height)
-
-                        if (isFirst) {
-                            path.moveTo(x, y)
-                            isFirst = false
-                        } else {
-                            path.lineTo(x, y)
-                        }
-                    }
-
-                    drawPath(
-                        path = path,
-                        color = Color(0xFF06B6D4),
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                    )
-
-                    // Draw P50 marker
-                    val p50X = ((cdf.p50.toFloat() - minVal) / range) * width
-                    val p50Y = height - (0.5f * height)
-                    drawCircle(color = Color(0xFF38BDF8), radius = 4.dp.toPx(), center = Offset(p50X, p50Y))
+            if (cdfSim2 != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CdfLegendItem(color = Color(0xFF06B6D4), label = "SIM 1")
+                    CdfLegendItem(color = Sim2Tier1, label = "SIM 2")
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+
+            // Highlighted P50 marker pill
+            Surface(
+                color = Color(0xFF06B6D4).copy(alpha = 0.14f),
+                shape = RoundedCornerShape(6.dp),
+                border = BorderStroke(1.dp, Color(0xFF06B6D4).copy(alpha = 0.4f))
             ) {
-                Text("Min: ${String.format("%.0f", cdf.min)} dBm", fontSize = 10.sp, color = Color(0xFF64748B))
-                Text("P10: ${String.format("%.0f", cdf.p10)} dBm", fontSize = 10.sp, color = Color(0xFFEAB308))
-                Text("P50: ${String.format("%.0f", cdf.p50)} dBm", fontSize = 10.sp, color = Color(0xFF06B6D4))
-                Text("P90: ${String.format("%.0f", cdf.p90)} dBm", fontSize = 10.sp, color = Color(0xFF10B981))
-                Text("Max: ${String.format("%.0f", cdf.max)} dBm", fontSize = 10.sp, color = Color(0xFF64748B))
+                Text(
+                    text = "P50 Marker: ${String.format(Locale.US, "%.0f", cdf.p50)} dBm (50%)",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF38BDF8),
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Chart area with Y-axis ticks (100%, 50%, 0%) + X-axis ticks (dBm)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF090E17), RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(end = 6.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text("100%", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                        Text("50%", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                        Text("0%", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                    }
+
+                    Canvas(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        val width = size.width
+                        val height = size.height
+
+                        // Subtle horizontal grid lines (100%, 50%, 0%)
+                        drawLine(Color(0xFF1E293B), Offset(0f, 0f), Offset(width, 0f), strokeWidth = 1f)
+                        drawLine(Color(0xFF1E293B), Offset(0f, height * 0.5f), Offset(width, height * 0.5f), strokeWidth = 1f)
+                        drawLine(Color(0xFF1E293B), Offset(0f, height), Offset(width, height), strokeWidth = 1f)
+
+                        fun drawCdfCurve(dist: CdfDistribution, curveColor: Color, markerColor: Color) {
+                            val path = Path()
+                            var isFirst = true
+                            dist.points.forEach { (valD, pctD) ->
+                                val x = (((valD.toFloat() - combinedMin) / range) * width).coerceIn(0f, width)
+                                val y = (height - (pctD.toFloat() / 100f * height)).coerceIn(0f, height)
+                                if (isFirst) {
+                                    path.moveTo(x, y)
+                                    isFirst = false
+                                } else {
+                                    path.lineTo(x, y)
+                                }
+                            }
+                            drawPath(
+                                path = path,
+                                color = curveColor,
+                                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                            val p50X = (((dist.p50.toFloat() - combinedMin) / range) * width).coerceIn(0f, width)
+                            val p50Y = height * 0.5f
+                            drawCircle(color = markerColor, radius = 4.5.dp.toPx(), center = Offset(p50X, p50Y))
+                        }
+
+                        drawCdfCurve(cdf, Color(0xFF06B6D4), Color(0xFF38BDF8))
+                        if (cdfSim2 != null) {
+                            drawCdfCurve(cdfSim2, Sim2Tier1, Sim2Tier1)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 28.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("${String.format(Locale.US, "%.0f", combinedMin)} dBm", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                    Text("${String.format(Locale.US, "%.0f", midVal)} dBm", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                    Text("${String.format(Locale.US, "%.0f", combinedMax)} dBm", fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 1, softWrap = false)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Percentile chips in FlowRow so labels never concatenate or split
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                CdfStatChip("Min: ${String.format(Locale.US, "%.0f", cdf.min)} dBm", Color(0xFF94A3B8))
+                CdfStatChip("P10: ${String.format(Locale.US, "%.0f", cdf.p10)} dBm", Color(0xFFEAB308))
+                CdfStatChip("P50: ${String.format(Locale.US, "%.0f", cdf.p50)} dBm", Color(0xFF06B6D4))
+                CdfStatChip("P90: ${String.format(Locale.US, "%.0f", cdf.p90)} dBm", Color(0xFF10B981))
+                CdfStatChip("Max: ${String.format(Locale.US, "%.0f", cdf.max)} dBm", Color(0xFF94A3B8))
             }
         }
+    }
+}
+
+@Composable
+private fun CdfLegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape)
+        )
+        Text(text = label, fontSize = 10.sp, color = Color(0xFFCBD5E1), maxLines = 1, softWrap = false)
+    }
+}
+
+@Composable
+private fun CdfStatChip(text: String, accentColor: Color) {
+    Surface(
+        color = accentColor.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
+    ) {
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = accentColor,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+        )
     }
 }
 

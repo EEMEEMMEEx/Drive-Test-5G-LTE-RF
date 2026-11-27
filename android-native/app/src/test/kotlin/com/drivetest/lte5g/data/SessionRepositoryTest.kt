@@ -488,4 +488,116 @@ class SessionRepositoryTest {
         val stillUnloaded2 = SessionRepository.sessions.value.find { it.id == s2.id }!!
         assertTrue(stillUnloaded2.samples.isEmpty())
     }
+
+    @Test
+    fun testFinishCurrentSession_usesLastSampleTimestampInsteadOfWallClock() {
+        val session = SessionRepository.createNewSession(name = "Duration From Last Sample")
+        val lastTs = session.startTime + 4_465_000L // ~74m 25s
+        SessionRepository.addSample(makeLteSample(session.id, 1L, session.startTime + 1000L, rsrp = -90))
+        SessionRepository.addSample(makeLteSample(session.id, 2L, lastTs, rsrp = -94))
+        SessionRepository.finishCurrentSession()
+
+        val finished = SessionRepository.sessions.value.find { it.id == session.id }!!
+        assertFalse(finished.isRecording)
+        assertEquals(lastTs, finished.endTime)
+        assertEquals(lastTs, finished.lastSampleTime)
+    }
+
+    @Test
+    fun testCrashRecovery_recoversSamplesFromOfflineQueueWhenLocalNdjsonEmpty() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val queueDir = tempFolder.newFolder("cloud_queue_recovery")
+        com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.resetForTesting()
+        com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.setStorageDirForTesting(queueDir)
+
+        val sid = 1795574251243L
+        val metaFile = File(testDir, "session_$sid.meta.json")
+        metaFile.writeText(
+            """
+            {
+              "id": $sid,
+              "sessionNumber": 1,
+              "name": "Session #1 (2026-11-25 09:37)",
+              "startTime": $sid,
+              "endTime": null,
+              "ratLockMode": "AUTO",
+              "cadence": "PRECISE",
+              "sampleCount": 0,
+              "isRecording": true
+            }
+            """.trimIndent()
+        )
+
+        val t1 = sid + 1000L
+        val t2 = sid + 4_465_000L
+        com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{}",
+            sessionId = sid.toString(),
+            trailPointJson = """{"ts":$t1,"lat":17.95,"lon":103.11,"rsrp":-92,"sinr":4.0,"pci":86,"rat":"LTE","speed":30.0}"""
+        )
+        com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.saveToOfflineQueue(
+            heartbeatJson = "{}",
+            sessionId = sid.toString(),
+            trailPointJson = """{"ts":$t2,"lat":17.96,"lon":103.12,"rsrp":-96,"sinr":2.0,"pci":86,"rat":"LTE","speed":35.0}"""
+        )
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val recovered = SessionRepository.sessions.value.find { it.id == sid }!!
+        assertFalse(recovered.isRecording)
+        assertTrue(recovered.recoveredFromCrash)
+        assertEquals(2, recovered.sampleCount)
+        assertEquals(t2, recovered.endTime)
+        assertEquals(t2, recovered.lastSampleTime)
+        assertEquals(-94, recovered.avgRsrp)
+    }
+
+    @Test
+    fun testReconcileSessionFromSamples_restoresZeroSampleRecoveredSessionFromCloudTrail() {
+        val testDir = tempFolder.root.listFiles()?.firstOrNull() ?: tempFolder.root
+        val sid = 1795574251243L
+        val metaFile = File(testDir, "session_$sid.meta.json")
+        metaFile.writeText(
+            """
+            {
+              "id": $sid,
+              "sessionNumber": 1,
+              "name": "Session #1 (2026-11-25 09:37)",
+              "startTime": $sid,
+              "endTime": $sid,
+              "ratLockMode": "AUTO",
+              "cadence": "PRECISE",
+              "sampleCount": 0,
+              "isRecording": false,
+              "recoveredFromCrash": true,
+              "recoveryNote": "Recovered (USER_REQUESTED (stop com.drivetest.lte5g due to installPackageLI, pss=93520KB))"
+            }
+            """.trimIndent()
+        )
+
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+
+        val trailJson = """
+            {
+              "-Oabc1": {"ts": ${sid + 1000L}, "lat": 17.95, "lon": 103.11, "rsrp": -92, "sinr": 3.5, "pci": 86, "rat": "LTE", "speed": 25.0},
+              "-Oabc2": {"ts": ${sid + 4465000L}, "lat": 17.98, "lon": 103.15, "rsrp": -96, "sinr": 1.5, "pci": 86, "rat": "LTE", "speed": 40.0}
+            }
+        """.trimIndent()
+        val parsed = com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.parseTrailJsonMapToSamples(sid, trailJson)
+        val reconciled = SessionRepository.reconcileSessionFromSamples(sid, parsed, "Firebase trail")
+
+        assertNotNull(reconciled)
+        assertEquals(2, reconciled!!.sampleCount)
+        assertEquals(sid + 4465000L, reconciled.endTime)
+        assertEquals(-94, reconciled.avgRsrp)
+
+        // Reload from disk to confirm NDJSON & meta persisted
+        SessionRepository.resetForTesting()
+        SessionRepository.initStorage(testDir)
+        val reloaded = SessionRepository.sessions.value.find { it.id == sid }!!
+        assertEquals(2, reloaded.sampleCount)
+        assertEquals(sid + 4465000L, reloaded.endTime)
+    }
 }

@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -88,6 +91,11 @@ fun SessionsScreen(
     var renameInput by remember { mutableStateOf("") }
 
     var sessionToDelete by remember { mutableStateOf<DriveTestSession?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        SessionRepository.reconcileEmptyRecoveredSessionsFromCloudAsync()
+        com.drivetest.lte5g.cloud.CloudTelemetrySyncManager.flushOfflineQueueIfAny()
+    }
 
     androidx.compose.runtime.LaunchedEffect(sessionForExportMenu?.id) {
         val target = sessionForExportMenu ?: return@LaunchedEffect
@@ -737,6 +745,28 @@ fun SessionsScreen(
     }
 }
 
+internal fun formatRecoverySummary(rawNote: String?): String {
+    if (rawNote.isNullOrBlank()) return "Recovered after unexpected stop"
+    return when {
+        rawNote.contains("killDueToPackageUpdate", ignoreCase = true) ||
+            rawNote.contains("installPackageLI", ignoreCase = true) ->
+            "Recovered after app update"
+        rawNote.contains("Reconciled", ignoreCase = true) ||
+            rawNote.contains("offline queue", ignoreCase = true) ->
+            rawNote.substringBefore(" (").trim()
+        rawNote.contains("LOW_MEMORY", ignoreCase = true) ||
+            rawNote.contains("OOM", ignoreCase = true) ->
+            "Recovered after low memory"
+        rawNote.contains("USER_REQUESTED", ignoreCase = true) ->
+            "Recovered after system stop"
+        rawNote.contains("CRASH", ignoreCase = true) ||
+            rawNote.contains("EXCEPTION", ignoreCase = true) ->
+            "Recovered after unexpected crash"
+        else -> rawNote.substringBefore(" (").trim().ifBlank { "Recovered after unexpected stop" }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SessionItemCard(
     session: DriveTestSession,
@@ -751,13 +781,21 @@ fun SessionItemCard(
         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(session.startTime))
     }
 
-    val durationStr = remember(session.startTime, session.endTime) {
-        val durationMs = (session.endTime ?: System.currentTimeMillis()) - session.startTime
+    val durationStr = remember(session.startTime, session.endTime, session.lastSampleTime, session.samples.size) {
+        val effectiveEnd = session.endTime
+            ?: session.lastSampleTime
+            ?: session.samples.lastOrNull()?.timestamp
+            ?: session.startTime
+        val durationMs = maxOf(0L, effectiveEnd - session.startTime)
         val seconds = (durationMs / 1000) % 60
         val minutes = (durationMs / (1000 * 60)) % 60
         val hours = durationMs / (1000 * 60 * 60)
         if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m ${seconds}s"
     }
+
+    var showRecoveryDetails by remember(session.id) { mutableStateOf(false) }
+    val recoverySummary = remember(session.recoveryNote) { formatRecoverySummary(session.recoveryNote) }
+    val hasRawRecoveryDetails = !session.recoveryNote.isNullOrBlank() && session.recoveryNote != recoverySummary
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
@@ -767,137 +805,213 @@ fun SessionItemCard(
             .border(1.dp, TelemetryCardStroke, RoundedCornerShape(12.dp))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Header Row: Name & Action Icons
+            // Header Row: Name/Date/Recovery & 48dp Top-Aligned Action Icons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = session.name,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "$dateStr • Duration: $durationStr",
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = Color(0xFF94A3B8),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (session.recoveredFromCrash) {
-                        Text(
-                            text = session.recoveryNote ?: "Recovered after unexpected termination",
-                            fontSize = 10.sp,
-                            color = Color(0xFFFBBF24)
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = recoverySummary,
+                                fontSize = 11.sp,
+                                color = Color(0xFFFBBF24),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (hasRawRecoveryDetails) {
+                                Text(
+                                    text = if (showRecoveryDetails) "Hide" else "Details",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TelemetryCyan,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier
+                                        .clickable { showRecoveryDetails = !showRecoveryDetails }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
-                Row {
-                    IconButton(onClick = onRename, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    IconButton(onClick = onRename, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Rename",
+                            tint = Color(0xFF94A3B8),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (session.recoveredFromCrash && showRecoveryDetails && !session.recoveryNote.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    color = Color(0xFF090E17),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, Color(0xFF334155)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = session.recoveryNote,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFFCBD5E1),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
+                }
+            }
 
-            // Badges Row
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Badges FlowRow + Non-wrapping Right-Aligned Avg Stat
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(
-                    color = Color(0xFF1E293B),
-                    shape = RoundedCornerShape(4.dp)
+                FlowRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = session.ratLockMode.name.replace("_", " "),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TelemetryCyan,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-
-                Surface(
-                    color = Color(0xFF1E293B),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        text = session.cadence.label,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFBBF24),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-
-                Text(
-                    text = "${session.sampleCount} samples",
-                    fontSize = 11.sp,
-                    color = Color(0xFFCBD5E1)
-                )
-
-                if (session.recoveredFromCrash) {
                     Surface(
-                        color = Color(0xFF78350F),
+                        color = Color(0xFF1E293B),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = "RECOVERED",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFDE68A),
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            text = session.ratLockMode.name.replace("_", " "),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TelemetryCyan,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                         )
                     }
-                }
 
-                if (cloudStatus != CloudUploadStatus.NONE) {
                     Surface(
-                        color = when (cloudStatus) {
-                            CloudUploadStatus.UPLOADED -> Color(0xFF065F46)
-                            CloudUploadStatus.UPLOADING -> Color(0xFF0369A1)
-                            CloudUploadStatus.PENDING_WIFI -> Color(0xFF78350F)
-                            CloudUploadStatus.FAILED -> Color(0xFF7F1D1D)
-                            else -> Color.Transparent
-                        },
+                        color = Color(0xFF1E293B),
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = when (cloudStatus) {
-                                CloudUploadStatus.UPLOADED -> "☁️ UPLOADED"
-                                CloudUploadStatus.UPLOADING -> "🔄 UPLOADING..."
-                                CloudUploadStatus.PENDING_WIFI -> "⏳ WAITING WI-FI"
-                                CloudUploadStatus.FAILED -> "⚠️ FAILED"
-                                else -> ""
-                            },
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = when (cloudStatus) {
-                                CloudUploadStatus.UPLOADED -> Color(0xFFA7F3D0)
-                                CloudUploadStatus.UPLOADING -> Color(0xFFBAE6FD)
-                                CloudUploadStatus.PENDING_WIFI -> Color(0xFFFDE68A)
-                                CloudUploadStatus.FAILED -> Color(0xFFFCA5A5)
-                                else -> Color.White
-                            },
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            text = session.cadence.label,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFFBBF24),
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                         )
+                    }
+
+                    Text(
+                        text = "${session.sampleCount} samples",
+                        fontSize = 11.sp,
+                        color = Color(0xFFCBD5E1),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
+
+                    if (session.recoveredFromCrash) {
+                        Surface(
+                            color = Color(0xFF78350F),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "RECOVERED",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFDE68A),
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    if (cloudStatus != CloudUploadStatus.NONE) {
+                        Surface(
+                            color = when (cloudStatus) {
+                                CloudUploadStatus.UPLOADED -> Color(0xFF065F46)
+                                CloudUploadStatus.UPLOADING -> Color(0xFF0369A1)
+                                CloudUploadStatus.PENDING_WIFI -> Color(0xFF78350F)
+                                CloudUploadStatus.FAILED -> Color(0xFF7F1D1D)
+                                else -> Color.Transparent
+                            },
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = when (cloudStatus) {
+                                    CloudUploadStatus.UPLOADED -> "UPLOADED"
+                                    CloudUploadStatus.UPLOADING -> "UPLOADING..."
+                                    CloudUploadStatus.PENDING_WIFI -> "WAITING WI-FI"
+                                    CloudUploadStatus.FAILED -> "FAILED"
+                                    else -> ""
+                                },
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (cloudStatus) {
+                                    CloudUploadStatus.UPLOADED -> Color(0xFFA7F3D0)
+                                    CloudUploadStatus.UPLOADING -> Color(0xFFBAE6FD)
+                                    CloudUploadStatus.PENDING_WIFI -> Color(0xFFFDE68A)
+                                    CloudUploadStatus.FAILED -> Color(0xFFFCA5A5)
+                                    else -> Color.White
+                                },
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
                     }
                 }
 
                 session.avgRsrp?.let { rsrp ->
-                    Spacer(modifier = Modifier.weight(1f))
+                    val avgLabel = if (session.isDualSimLogging) "SIM1 Avg: $rsrp dBm" else "Avg: $rsrp dBm"
                     Text(
-                        text = "Avg: $rsrp dBm",
+                        text = avgLabel,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = getRsrpColor(rsrp)
+                        color = getRsrpColor(rsrp),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.wrapContentWidth()
                     )
                 }
             }
@@ -906,6 +1020,8 @@ fun SessionItemCard(
             if (session.isDualSimLogging) {
                 val comparison = dualSimBenchmarkComparison(session)
                 if (comparison.hasData) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val showSinrRow = comparison.sim1Sinr != null || comparison.sim2Sinr != null
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -921,122 +1037,168 @@ fun SessionItemCard(
                                 text = "DUAL-SIM BENCHMARK",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Sim2Tier1
+                                color = Sim2Tier1,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
-                            when (comparison.winner) {
-                                1 -> Text(
-                                    text = "WINNER: SIM 1",
+                            val (winnerText, winnerColor) = when (comparison.winner) {
+                                1 -> "WINNER: SIM 1" to SignalTier1
+                                2 -> "WINNER: SIM 2" to Sim2Tier1
+                                else -> "TIE / N/A" to Color(0xFF94A3B8)
+                            }
+                            Surface(
+                                color = winnerColor.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = winnerText,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = SignalTier1
-                                )
-                                2 -> Text(
-                                    text = "WINNER: SIM 2",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Sim2Tier1
-                                )
-                                else -> Text(
-                                    text = "TIE / N/A",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF94A3B8)
+                                    color = winnerColor,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = comparison.sim1Label,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFFCBD5E1)
+                                    color = Color(0xFFCBD5E1),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "RSRP ${comparison.sim1Rsrp?.let { "$it dBm" } ?: "N/A"}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = getRsrpColor(comparison.sim1Rsrp)
+                                    color = getRsrpColor(comparison.sim1Rsrp),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                Text(
-                                    text = "SINR ${comparison.sim1Sinr?.let { String.format("%.1f dB", it) } ?: "N/A"}",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFCBD5E1)
-                                )
+                                if (showSinrRow) {
+                                    Text(
+                                        text = "SINR ${comparison.sim1Sinr?.let { String.format(Locale.US, "%.1f dB", it) } ?: "N/A"}",
+                                        fontSize = 11.sp,
+                                        color = if (comparison.sim1Sinr != null) Color(0xFFCBD5E1) else Color(0xFF64748B),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = comparison.sim2Label,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Sim2Tier1
+                                    color = Sim2Tier1,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "RSRP ${comparison.sim2Rsrp?.let { "$it dBm" } ?: "N/A"}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = sim2RsrpColor(comparison.sim2Rsrp)
+                                    color = sim2RsrpColor(comparison.sim2Rsrp),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                Text(
-                                    text = "SINR ${comparison.sim2Sinr?.let { String.format("%.1f dB", it) } ?: "N/A"}",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFFCBD5E1)
-                                )
+                                if (showSinrRow) {
+                                    Text(
+                                        text = "SINR ${comparison.sim2Sinr?.let { String.format(Locale.US, "%.1f dB", it) } ?: "N/A"}",
+                                        fontSize = 11.sp,
+                                        color = if (comparison.sim2Sinr != null) Color(0xFFCBD5E1) else Color(0xFF64748B),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Surface(
                                 color = Color(0xFF1E293B),
                                 shape = RoundedCornerShape(4.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
+                                val rsrpDeltaFormatted = comparison.rsrpDeltaDb?.let {
+                                    String.format(Locale.US, "%+d dB", it)
+                                } ?: "N/A"
                                 Text(
-                                    text = "RSRP Δ ${comparison.rsrpDeltaDb?.let { "%+${it} dB" } ?: "N/A"} (SIM1-SIM2)",
+                                    text = "RSRP Δ $rsrpDeltaFormatted · SIM1 − SIM2",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color(0xFFCBD5E1),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
                                 )
                             }
-                            Surface(
-                                color = Color(0xFF1E293B),
-                                shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "SINR Δ ${comparison.sinrDeltaDb?.let { String.format("%+.1f dB", it) } ?: "N/A"} (SIM1-SIM2)",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFFCBD5E1),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                )
+                            if (showSinrRow) {
+                                Surface(
+                                    color = Color(0xFF1E293B),
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    val sinrDeltaFormatted = comparison.sinrDeltaDb?.let {
+                                        String.format(Locale.US, "%+.1f dB", it)
+                                    } ?: "N/A"
+                                    Text(
+                                        text = "SINR Δ $sinrDeltaFormatted · SIM1 − SIM2",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (comparison.sinrDeltaDb != null) Color(0xFFCBD5E1) else Color(0xFF64748B),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
 
-            // Action Buttons
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons: equal height >= 48dp, WCAG AA contrast, single-line labels
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = onExport,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0F766E),
+                        contentColor = Color.White
+                    ),
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(1.3f)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .weight(1.15f)
+                        .defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("EXPORT...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "EXPORT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 OutlinedButton(
@@ -1044,12 +1206,21 @@ fun SessionItemCard(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF60A5FA)),
                     border = BorderStroke(1.dp, Color(0xFF60A5FA).copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(0.9f)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("MAP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "MAP",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 OutlinedButton(
@@ -1057,12 +1228,21 @@ fun SessionItemCard(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF818CF8)),
                     border = BorderStroke(1.dp, Color(0xFF818CF8).copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.weight(0.8f)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .weight(0.9f)
+                        .defaultMinSize(minHeight = 48.dp)
                 ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(13.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("AI", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "AI",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
