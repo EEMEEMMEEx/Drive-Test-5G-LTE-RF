@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +40,12 @@ import com.drivetest.lte5g.ai.GeminiRfAdvisor
 import com.drivetest.lte5g.cloud.CloudConfigRepository
 import com.drivetest.lte5g.cloud.CloudTelemetrySyncManager
 import com.drivetest.lte5g.cloud.GoogleDriveAutoUploader
+import com.drivetest.lte5g.cloud.VehicleIdAvailability
+import com.drivetest.lte5g.cloud.VehicleIdClaimOutcome
+import com.drivetest.lte5g.cloud.VehicleIdGenerator
+import com.drivetest.lte5g.cloud.VehicleIdSyncIssue
+import com.drivetest.lte5g.cloud.VehicleIdSyncState
+import com.drivetest.lte5g.cloud.VehicleIdValidationResult
 import com.drivetest.lte5g.model.MeasurementCadence
 import com.drivetest.lte5g.service.DriveTestForegroundService
 import com.drivetest.lte5g.telephony.CellCollector
@@ -181,34 +188,53 @@ fun SettingsScreen(
     }
 
     val cloudConfig by CloudConfigRepository.config.collectAsStateWithLifecycle()
-    var vehicleIdInput by remember(cloudConfig.vehicleId) { mutableStateOf(cloudConfig.vehicleId) }
-    var vehicleIdError by remember { mutableStateOf<String?>(null) }
-    var vehicleIdNotice by remember { mutableStateOf<String?>(null) }
-    var isDuplicateHint by remember { mutableStateOf(false) }
-    var isCheckingId by remember { mutableStateOf(false) }
+    val deviceSuggestedVehicleId = remember { CloudConfigRepository.getDeviceSuggestedVehicleId() }
+    var vehicleIdInput by remember { mutableStateOf(cloudConfig.vehicleId) }
+    var lastObservedConfigId by remember { mutableStateOf(cloudConfig.vehicleId) }
+    var skipAvailabilityCheckFor by remember { mutableStateOf<String?>(null) }
+    var vehicleIdAvailability by remember { mutableStateOf<VehicleIdAvailability>(VehicleIdAvailability.Idle) }
+    var saveConflictMessage by remember { mutableStateOf<String?>(null) }
+    var saveConflictSuggestion by remember { mutableStateOf<String?>(null) }
+    var saveLocalNotice by remember { mutableStateOf<String?>(null) }
     var isSavingId by remember { mutableStateOf(false) }
-    var isIdSavedSuccess by remember { mutableStateOf(false) }
 
-    LaunchedEffect(vehicleIdInput, isSavingId, isIdSavedSuccess) {
-        if (isSavingId || isIdSavedSuccess) return@LaunchedEffect
-        val norm = vehicleIdInput.trim().uppercase(Locale.US)
-        if (norm.isBlank()) {
-            isCheckingId = false
-            isDuplicateHint = false
+    LaunchedEffect(cloudConfig.vehicleId) {
+        if (cloudConfig.vehicleId != lastObservedConfigId) {
+            val inputMatchedPrevious = vehicleIdInput.trim().uppercase(Locale.US) == lastObservedConfigId
+            if (inputMatchedPrevious || vehicleIdInput.isBlank()) {
+                vehicleIdInput = cloudConfig.vehicleId
+            }
+            lastObservedConfigId = cloudConfig.vehicleId
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (
+            cloudConfig.vehicleIdSyncState == VehicleIdSyncState.PENDING_SYNC ||
+            cloudConfig.vehicleIdSyncState == VehicleIdSyncState.UNCLAIMED
+        ) {
+            CloudConfigRepository.syncPendingVehicleIdClaim()
+        }
+    }
+
+    LaunchedEffect(vehicleIdInput) {
+        if (isSavingId) return@LaunchedEffect
+        val validation = VehicleIdGenerator.validate(vehicleIdInput)
+        if (validation is VehicleIdValidationResult.Invalid) {
+            vehicleIdAvailability = VehicleIdAvailability.Invalid(validation.reason)
             return@LaunchedEffect
         }
-        kotlinx.coroutines.delay(300)
-        isCheckingId = true
-        val valRes = CloudConfigRepository.validateVehicleId(norm)
-        isCheckingId = false
-        if (vehicleIdInput.trim().uppercase(Locale.US) == norm && !isSavingId && !isIdSavedSuccess) {
-            if (valRes.isSuccess && !valRes.getOrDefault(true)) {
-                isDuplicateHint = true
-                vehicleIdNotice = "$norm is in use — SAVE will auto-assign next free ID"
-            } else {
-                isDuplicateHint = false
-                vehicleIdNotice = null
-            }
+        val normalized = (validation as VehicleIdValidationResult.Valid).normalized
+        if (skipAvailabilityCheckFor == normalized) {
+            skipAvailabilityCheckFor = null
+            return@LaunchedEffect
+        }
+        vehicleIdAvailability = VehicleIdAvailability.Checking
+        kotlinx.coroutines.delay(350)
+        if (isSavingId) return@LaunchedEffect
+        val result = CloudConfigRepository.checkVehicleIdAvailability(normalized)
+        if (vehicleIdInput.trim().uppercase(Locale.US) == normalized && !isSavingId) {
+            vehicleIdAvailability = result
         }
     }
 
@@ -1005,7 +1031,7 @@ fun SettingsScreen(
             }
         }
 
-        // Cloud Fleet Telemetry & Google Drive Auto-Upload Card (Minimal & Unslop)
+        // Cloud Fleet Telemetry & Google Drive Auto-Upload Card
         Card(
             colors = CardDefaults.cardColors(containerColor = TelemetryCardBg),
             shape = RoundedCornerShape(14.dp),
@@ -1013,14 +1039,62 @@ fun SettingsScreen(
                 .fillMaxWidth()
                 .border(1.dp, TelemetryCardStroke, RoundedCornerShape(14.dp))
         ) {
+            val localValidation = VehicleIdGenerator.validate(vehicleIdInput)
+            val normalizedInput = (localValidation as? VehicleIdValidationResult.Valid)?.normalized
+            val inputMatchesSaved = normalizedInput != null && normalizedInput == cloudConfig.vehicleId
+
+            val (badgeText, badgeBg, badgeFg) = when (cloudConfig.vehicleIdSyncState) {
+                VehicleIdSyncState.SYNCED -> Triple(
+                    "ACTIVE",
+                    Color(0xFF065F46),
+                    Color(0xFFA7F3D0)
+                )
+                VehicleIdSyncState.PENDING_SYNC -> {
+                    if (cloudConfig.vehicleIdSyncIssue == VehicleIdSyncIssue.PERMISSION_DENIED) {
+                        Triple("LOCAL ONLY", Color(0xFF78350F), Color(0xFFFDE68A))
+                    } else {
+                        Triple("PENDING SYNC", Color(0xFF78350F), Color(0xFFFDE68A))
+                    }
+                }
+                VehicleIdSyncState.CONFLICT -> Triple(
+                    "ID CONFLICT",
+                    Color(0xFF7F1D1D),
+                    Color(0xFFFCA5A5)
+                )
+                VehicleIdSyncState.UNCLAIMED -> Triple(
+                    "NOT REGISTERED",
+                    Color(0xFF334155),
+                    Color(0xFFE2E8F0)
+                )
+            }
+
+            val isConflictState = saveConflictMessage != null ||
+                vehicleIdAvailability is VehicleIdAvailability.Taken ||
+                (inputMatchesSaved && cloudConfig.vehicleIdSyncState == VehicleIdSyncState.CONFLICT)
+
+            val conflictMessage = saveConflictMessage
+                ?: (vehicleIdAvailability as? VehicleIdAvailability.Taken)?.message
+                ?: CloudConfigRepository.DUPLICATE_ERROR_MESSAGE
+
+            val conflictSuggestion = saveConflictSuggestion
+                ?: (vehicleIdAvailability as? VehicleIdAvailability.Taken)?.suggestedAlternative
+                ?: cloudConfig.suggestedAlternativeId.takeIf {
+                    inputMatchesSaved && cloudConfig.vehicleIdSyncState == VehicleIdSyncState.CONFLICT
+                }
+
+            val hasErrorBorder = localValidation is VehicleIdValidationResult.Invalid || isConflictState
+
             Column(modifier = Modifier.padding(16.dp)) {
-                // Header with status badge
+                // Header with wrapping/ellipsized title so it never collides with status badge
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             Icons.Default.CloudSync,
                             contentDescription = null,
@@ -1032,84 +1106,43 @@ fun SettingsScreen(
                             text = "LIVE CLOUD FLEET TELEMETRY & NOC",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF94A3B8)
+                            color = Color(0xFFCBD5E1),
+                            lineHeight = 14.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = true
                         )
                     }
                     Surface(
-                        color = Color(0xFF065F46),
-                        shape = RoundedCornerShape(4.dp)
+                        color = badgeBg,
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "ACTIVE",
+                            text = badgeText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFA7F3D0),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            color = badgeFg,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Vehicle Identification Section
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "ข้อมูลประจำรถทดสอบ (Vehicle Identity)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
+                // Vehicle Identification Title (high-contrast Thai + English, full width)
+                Text(
+                    text = "ข้อมูลประจำรถทดสอบ (Vehicle Identity)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    lineHeight = 20.sp
+                )
 
-                    // Auto-generate next ID button
-                    TextButton(
-                        enabled = !isSavingId,
-                        onClick = {
-                            scope.launch {
-                                isSavingId = true
-                                vehicleIdError = null
-                                vehicleIdNotice = null
-                                isDuplicateHint = false
-                                isIdSavedSuccess = false
-                                val nextRes = CloudConfigRepository.queryNextAvailableVehicleId()
-                                val nextId = nextRes.getOrDefault("DT-01")
-                                val saveRes = CloudConfigRepository.saveVehicleId(nextId)
-                                isSavingId = false
-                                if (saveRes.isSuccess) {
-                                    val claim = saveRes.getOrThrow()
-                                    vehicleIdInput = claim.assignedId
-                                    vehicleIdNotice = claim.reassignmentNotice
-                                    isDuplicateHint = false
-                                    isIdSavedSuccess = true
-                                } else {
-                                    vehicleIdError = saveRes.exceptionOrNull()?.message
-                                }
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = TelemetryCyan,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Auto ID",
-                            fontSize = 11.sp,
-                            color = TelemetryCyan,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.height(10.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // Input field + SAVE button (>= 48dp touch targets)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1118,139 +1151,388 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = vehicleIdInput,
                         onValueChange = { raw ->
-                            val norm = raw.trim().uppercase(Locale.US)
-                            vehicleIdInput = norm
-                            isIdSavedSuccess = false
-                            isDuplicateHint = false
-                            vehicleIdNotice = null
-                            vehicleIdError = if (norm.isBlank()) "Vehicle ID cannot be blank" else null
+                            vehicleIdInput = raw
+                            skipAvailabilityCheckFor = null
+                            saveConflictMessage = null
+                            saveConflictSuggestion = null
+                            saveLocalNotice = null
                         },
-                        label = { Text("Vehicle ID (เช่น DT-01)", fontSize = 11.sp) },
+                        label = {
+                            Text(
+                                text = "Vehicle ID",
+                                fontSize = 12.sp
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                text = "เช่น ${VehicleIdGenerator.PLACEHOLDER_EXAMPLE_ID}",
+                                fontSize = 13.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        },
                         singleLine = true,
-                        isError = vehicleIdError != null,
+                        isError = hasErrorBorder,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (vehicleIdError != null) SignalTier5 else TelemetryCyan,
-                            unfocusedBorderColor = if (vehicleIdError != null) SignalTier5 else Color(0xFF334155),
-                            errorBorderColor = SignalTier5,
+                            focusedBorderColor = if (hasErrorBorder) Color(0xFFF87171) else TelemetryCyan,
+                            unfocusedBorderColor = if (hasErrorBorder) Color(0xFFF87171) else Color(0xFF475569),
+                            errorBorderColor = Color(0xFFF87171),
+                            focusedLabelColor = if (hasErrorBorder) Color(0xFFF87171) else TelemetryCyan,
+                            unfocusedLabelColor = if (hasErrorBorder) Color(0xFFF87171) else Color(0xFFCBD5E1),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
+                            focusedPlaceholderColor = Color(0xFF94A3B8),
+                            unfocusedPlaceholderColor = Color(0xFF94A3B8),
                             focusedContainerColor = Color(0xFF0F172A),
                             unfocusedContainerColor = Color(0xFF0F172A)
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 56.dp)
                     )
 
                     Button(
                         onClick = {
-                            val norm = vehicleIdInput.trim().uppercase(Locale.US)
+                            val candidate = vehicleIdInput
                             scope.launch {
                                 isSavingId = true
-                                vehicleIdError = null
-                                vehicleIdNotice = null
-                                isDuplicateHint = false
-                                isIdSavedSuccess = false
-                                val saveRes = CloudConfigRepository.saveVehicleId(norm)
+                                saveConflictMessage = null
+                                saveConflictSuggestion = null
+                                saveLocalNotice = null
+                                val outcome = CloudConfigRepository.saveVehicleId(candidate, isUserEdit = true)
                                 isSavingId = false
-                                if (saveRes.isSuccess) {
-                                    val claim = saveRes.getOrThrow()
-                                    vehicleIdInput = claim.assignedId
-                                    vehicleIdNotice = claim.reassignmentNotice
-                                    isDuplicateHint = false
-                                    isIdSavedSuccess = true
-                                } else {
-                                    vehicleIdError = saveRes.exceptionOrNull()?.message ?: "Failed to save ID"
+                                when (outcome) {
+                                    is VehicleIdClaimOutcome.Claimed -> {
+                                        skipAvailabilityCheckFor = outcome.vehicleId
+                                        vehicleIdInput = outcome.vehicleId
+                                        lastObservedConfigId = outcome.vehicleId
+                                        vehicleIdAvailability = VehicleIdAvailability.Available(
+                                            normalizedId = outcome.vehicleId,
+                                            ownedBySelf = true
+                                        )
+                                    }
+                                    is VehicleIdClaimOutcome.TakenByOtherDevice -> {
+                                        skipAvailabilityCheckFor = outcome.requestedId
+                                        saveConflictMessage = outcome.message
+                                        saveConflictSuggestion = outcome.suggestedAlternative
+                                        vehicleIdAvailability = VehicleIdAvailability.Taken(
+                                            normalizedId = outcome.requestedId,
+                                            suggestedAlternative = outcome.suggestedAlternative,
+                                            message = outcome.message
+                                        )
+                                    }
+                                    is VehicleIdClaimOutcome.SavedLocallyPendingSync -> {
+                                        skipAvailabilityCheckFor = outcome.vehicleId
+                                        vehicleIdInput = outcome.vehicleId
+                                        lastObservedConfigId = outcome.vehicleId
+                                        saveLocalNotice = outcome.message
+                                        vehicleIdAvailability = when (outcome.issue) {
+                                            VehicleIdSyncIssue.PERMISSION_DENIED ->
+                                                VehicleIdAvailability.PermissionDenied(outcome.vehicleId)
+                                            else ->
+                                                VehicleIdAvailability.Offline(outcome.vehicleId)
+                                        }
+                                    }
+                                    is VehicleIdClaimOutcome.InvalidInput -> {
+                                        vehicleIdAvailability = VehicleIdAvailability.Invalid(outcome.reason)
+                                    }
                                 }
                             }
                         },
-                        enabled = !isSavingId && vehicleIdError == null && vehicleIdInput.isNotBlank(),
+                        enabled = !isSavingId && localValidation is VehicleIdValidationResult.Valid,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = TelemetryCyan,
                             contentColor = Color(0xFF0F172A),
                             disabledContainerColor = Color(0xFF1E293B),
-                            disabledContentColor = Color(0xFF64748B)
+                            disabledContentColor = Color(0xFF94A3B8)
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(50.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .defaultMinSize(minWidth = 76.dp, minHeight = 52.dp)
                     ) {
                         if (isSavingId) {
                             CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.size(16.dp),
+                                color = Color(0xFF0F172A),
+                                modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("SAVE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("SAVE", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Inline validation status
-                if (isSavingId || isCheckingId) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (isSavingId) "Claiming Vehicle ID in fleet..." else "Checking ID availability in fleet...",
-                        fontSize = 11.sp,
-                        color = TelemetryCyan
-                    )
-                } else if (vehicleIdError != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // "Use device name" suggestion chip/button with aligned sparkle icon & >= 48dp touch target
+                OutlinedButton(
+                    enabled = !isSavingId,
+                    onClick = {
+                        skipAvailabilityCheckFor = null
+                        vehicleIdInput = deviceSuggestedVehicleId
+                        saveConflictMessage = null
+                        saveConflictSuggestion = null
+                        saveLocalNotice = null
+                    },
+                    border = BorderStroke(1.dp, TelemetryCyan.copy(alpha = 0.55f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF0F172A),
+                        contentColor = Color(0xFFE0F2FE)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Icon(
-                            Icons.Default.Warning,
+                            Icons.Default.AutoAwesome,
                             contentDescription = null,
-                            tint = SignalTier5,
-                            modifier = Modifier.size(14.dp)
+                            tint = TelemetryCyan,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = vehicleIdError ?: "",
-                            fontSize = 11.sp,
-                            color = SignalTier5,
-                            fontWeight = FontWeight.Medium
+                            text = "Use device name ($deviceSuggestedVehicleId)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFE0F2FE),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                } else if (isIdSavedSuccess || (vehicleIdInput == cloudConfig.vehicleId && !isDuplicateHint)) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = SignalTier1,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Vehicle ID registered & active for this device",
-                            fontSize = 11.sp,
-                            color = SignalTier1,
-                            fontWeight = FontWeight.Medium
-                        )
+                }
+
+                // Debounced real-time availability & registration status under the input
+                Spacer(modifier = Modifier.height(8.dp))
+                when {
+                    isSavingId -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF38BDF8),
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "Registering Vehicle ID in Firebase...",
+                                fontSize = 12.sp,
+                                color = Color(0xFF38BDF8),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
-                    if (!vehicleIdNotice.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = vehicleIdNotice ?: "",
-                            fontSize = 11.sp,
-                            color = TelemetryCyan,
-                            fontWeight = FontWeight.Medium
-                        )
+                    localValidation is VehicleIdValidationResult.Invalid -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFF87171),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = localValidation.reason,
+                                fontSize = 12.sp,
+                                color = Color(0xFFF87171),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
-                } else if (!vehicleIdNotice.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = vehicleIdNotice ?: "",
-                        fontSize = 11.sp,
-                        color = TelemetryCyan,
-                        fontWeight = FontWeight.Medium
-                    )
+                    isConflictState -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF87171),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = conflictMessage,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFF87171),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            if (!conflictSuggestion.isNullOrBlank()) {
+                                OutlinedButton(
+                                    enabled = !isSavingId,
+                                    onClick = {
+                                        skipAvailabilityCheckFor = null
+                                        vehicleIdInput = conflictSuggestion
+                                        saveConflictMessage = null
+                                        saveConflictSuggestion = null
+                                        saveLocalNotice = null
+                                    },
+                                    border = BorderStroke(1.dp, TelemetryCyan),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color(0xFF0F172A),
+                                        contentColor = Color(0xFFE0F2FE)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = TelemetryCyan,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Use suggested free ID: $conflictSuggestion",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFE0F2FE),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    inputMatchesSaved && cloudConfig.vehicleIdSyncState == VehicleIdSyncState.SYNCED -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF34D399),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Vehicle ID registered & active for this device",
+                                fontSize = 12.sp,
+                                color = Color(0xFF34D399),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    vehicleIdAvailability is VehicleIdAvailability.Checking -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF38BDF8),
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "Checking availability...",
+                                fontSize = 12.sp,
+                                color = Color(0xFF38BDF8),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    inputMatchesSaved && cloudConfig.vehicleIdSyncState == VehicleIdSyncState.PENDING_SYNC -> {
+                        val pendingText = saveLocalNotice ?: when (cloudConfig.vehicleIdSyncIssue) {
+                            VehicleIdSyncIssue.PERMISSION_DENIED ->
+                                "Saved locally — Firebase permission denied, will retry sync"
+                            VehicleIdSyncIssue.OFFLINE ->
+                                "Saved locally (offline) — will verify & sync when reconnected"
+                            else ->
+                                "Saved locally — pending Firebase registration"
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFBBF24),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = pendingText,
+                                fontSize = 12.sp,
+                                color = Color(0xFFFBBF24),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    vehicleIdAvailability is VehicleIdAvailability.Available -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF34D399),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Available — tap SAVE to register",
+                                fontSize = 12.sp,
+                                color = Color(0xFF34D399),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    vehicleIdAvailability is VehicleIdAvailability.PermissionDenied -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFBBF24),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Firebase permission denied — tap SAVE to store locally and sync later",
+                                fontSize = 12.sp,
+                                color = Color(0xFFFBBF24),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    vehicleIdAvailability is VehicleIdAvailability.Offline -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFBBF24),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Offline — tap SAVE to store locally and verify on reconnect",
+                                fontSize = 12.sp,
+                                color = Color(0xFFFBBF24),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
                 HorizontalDivider(color = Color(0xFF1E293B), thickness = 0.8.dp)
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Minimal status info (unslop)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -1258,15 +1540,15 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.CloudDone,
                         contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(14.dp)
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Telemetry streams live to Firebase • Auto-uploading KMZ, CSV, GeoJSON, MapInfo, PDF to Google Drive on Wi-Fi",
-                        fontSize = 10.sp,
-                        color = Color(0xFF64748B),
-                        lineHeight = 14.sp
+                        fontSize = 11.sp,
+                        color = Color(0xFF94A3B8),
+                        lineHeight = 15.sp
                     )
                 }
             }

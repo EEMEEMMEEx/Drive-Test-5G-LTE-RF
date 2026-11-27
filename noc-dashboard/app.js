@@ -1,5 +1,5 @@
 /**
- * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.14.0
+ * NOC Live Fleet Telemetry & GIS Dashboard — Drive Test LTE/5G v1.15.0
  * Features:
  * 1. 100% Real-Time Live Fleet Telemetry & Multi-SIM RF Inspector
  * 2. Historical Session Playback with Timeline Scrubber & Marker Animation
@@ -70,6 +70,7 @@ const state = {
     playTimer: null,
     marker: null,
     fullPolyline: null,
+    playedCasing: null,
     playedPolyline: null
   },
 
@@ -77,9 +78,53 @@ const state = {
   heatmap: {
     enabled: false,
     metric: 'RSRP', // 'RSRP' | 'SINR'
+    opacity: 0.52,
     layer: null
   }
 };
+
+// ---------------------------------------------------------------------------
+// Formatting Helpers (Consistent Dates, RAT Labels, Numbers)
+// ---------------------------------------------------------------------------
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatSessionDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(Number(ts));
+  if (isNaN(d.getTime())) return '—';
+  const day = String(d.getDate()).padStart(2, '0');
+  const mon = SHORT_MONTHS[d.getMonth()];
+  const beYear = d.getFullYear() + 543;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${day} ${mon} ${beYear} · ${hh}:${mm}`;
+}
+
+function formatTime24(ts, includeSeconds = true) {
+  if (!ts) return includeSeconds ? '--:--:--' : '--:--';
+  const d = new Date(Number(ts));
+  if (isNaN(d.getTime())) return includeSeconds ? '--:--:--' : '--:--';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  if (!includeSeconds) return `${hh}:${mm}`;
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function formatRatLabel(rat) {
+  if (!rat) return 'N/A';
+  const upper = String(rat).toUpperCase().trim();
+  if (upper === 'NR_NSA') return '5G NSA';
+  if (upper === 'NR_SA') return '5G SA';
+  if (upper === 'UNKNOWN') return 'N/A';
+  return upper;
+}
+
+function formatCount(n) {
+  const num = Number(n);
+  if (isNaN(num)) return '0';
+  return num.toLocaleString('en-US');
+}
 
 // ---------------------------------------------------------------------------
 // Leaflet Map Initialization
@@ -89,8 +134,11 @@ function initMap() {
   map = L.map('map', {
     center: [13.7563, 100.5018], // Bangkok Center
     zoom: 12,
-    zoomControl: true
+    zoomControl: false
   });
+
+  // Position dark-themed zoom control on bottom-right so top toolbar never overlaps it
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // OpenStreetMap with Dark NOC Styling
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -114,14 +162,24 @@ function initHeatmapLayer() {
 
   if (LayerClass) {
     state.heatmap.layer = new LayerClass({
-      radius: 65,
+      radius: 52,
       cellSize: 5,
       power: 2,
-      opacity: 0.75,
+      opacity: state.heatmap.opacity,
       metric: state.heatmap.metric,
       visible: state.heatmap.enabled
     });
     state.heatmap.layer.addTo(map);
+  }
+}
+
+function setHeatmapOpacity(percent) {
+  const clamped = Math.max(15, Math.min(95, Number(percent) || 52));
+  state.heatmap.opacity = clamped / 100;
+  const valEl = document.getElementById('heatmap-opacity-val');
+  if (valEl) valEl.textContent = `${clamped}%`;
+  if (state.heatmap.layer) {
+    state.heatmap.layer.setOptions({ opacity: state.heatmap.opacity });
   }
 }
 
@@ -167,6 +225,7 @@ function toggleHeatmap(forcedState) {
 
   if (state.heatmap.enabled) {
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
     label.textContent = 'HEATMAP: ON';
     metricSelector.style.display = 'flex';
 
@@ -177,6 +236,7 @@ function toggleHeatmap(forcedState) {
     }
   } else {
     btn.classList.remove('active');
+    btn.setAttribute('aria-pressed', 'false');
     label.textContent = 'HEATMAP: OFF';
     metricSelector.style.display = 'none';
 
@@ -195,7 +255,9 @@ function setHeatmapMetric(metric) {
   state.heatmap.metric = m;
 
   document.querySelectorAll('.metric-pill').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-metric') === m);
+    const active = btn.getAttribute('data-metric') === m;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   if (state.heatmap.layer) {
@@ -213,20 +275,20 @@ function updateLegendForMetric() {
   if (state.heatmap.enabled && state.heatmap.metric === 'SINR') {
     titleEl.textContent = 'SINR SIGNAL TIERS (3GPP)';
     scaleEl.innerHTML = `
-      <div class="scale-item"><span class="swatch bg-tier1"></span> ≥ 20 dB (Excellent)</div>
-      <div class="scale-item"><span class="swatch bg-tier2"></span> 13 to 20 dB (Good)</div>
-      <div class="scale-item"><span class="swatch bg-tier3"></span> 5 to 13 dB (Fair)</div>
-      <div class="scale-item"><span class="swatch bg-tier4"></span> 0 to 5 dB (Poor)</div>
-      <div class="scale-item"><span class="swatch bg-tier5"></span> &lt; 0 dB (Interference)</div>
+      <div class="scale-item"><span class="tier-pill bg-tier1">T1</span><span class="tier-range">&ge; 20 dB</span><span class="tier-name">Excellent</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier2">T2</span><span class="tier-range">13 to 20 dB</span><span class="tier-name">Good</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier3">T3</span><span class="tier-range">5 to 13 dB</span><span class="tier-name">Fair</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier4">T4</span><span class="tier-range">0 to 5 dB</span><span class="tier-name">Poor</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier5">T5</span><span class="tier-range">&lt; 0 dB</span><span class="tier-name">Interf.</span></div>
     `;
   } else {
     titleEl.textContent = 'RSRP SIGNAL TIERS (3GPP / ITU-R)';
     scaleEl.innerHTML = `
-      <div class="scale-item"><span class="swatch bg-tier1"></span> ≥ -80 dBm (Excellent)</div>
-      <div class="scale-item"><span class="swatch bg-tier2"></span> -80 to -90 dBm (Good)</div>
-      <div class="scale-item"><span class="swatch bg-tier3"></span> -90 to -100 dBm (Fair)</div>
-      <div class="scale-item"><span class="swatch bg-tier4"></span> -100 to -110 dBm (Poor)</div>
-      <div class="scale-item"><span class="swatch bg-tier5"></span> &lt; -110 dBm (Coverage Hole)</div>
+      <div class="scale-item"><span class="tier-pill bg-tier1">T1</span><span class="tier-range">&ge; -80 dBm</span><span class="tier-name">Excellent</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier2">T2</span><span class="tier-range">-80 to -90 dBm</span><span class="tier-name">Good</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier3">T3</span><span class="tier-range">-90 to -100 dBm</span><span class="tier-name">Fair</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier4">T4</span><span class="tier-range">-100 to -110 dBm</span><span class="tier-name">Poor</span></div>
+      <div class="scale-item"><span class="tier-pill bg-tier5">T5</span><span class="tier-range">&lt; -110 dBm</span><span class="tier-name">Hole</span></div>
     `;
   }
 }
@@ -241,17 +303,17 @@ function createVehicleIcon(vehicleId, bearing = 0, alertState = 'NORMAL') {
   const html = `
     <div class="custom-vehicle-marker" style="transform: rotate(${bearing}deg);">
       <div class="vehicle-halo" style="box-shadow: 0 0 14px ${glowColor}; border-color: ${glowColor};"></div>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="${glowColor}" stroke="#0b1120" stroke-width="1.5">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="${glowColor}" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round">
         <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
       </svg>
-      <div class="vehicle-marker-tag" style="transform: rotate(-${bearing}deg);">${vehicleId}</div>
+      <div class="vehicle-marker-tag" style="transform: rotate(-${bearing}deg); border-color: ${glowColor};">${vehicleId}</div>
     </div>
   `;
   return L.divIcon({
     html: html,
     className: 'leaflet-vehicle-icon',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
   });
 }
 
@@ -259,8 +321,8 @@ function createPlaybackMarkerIcon(label = 'PLAYBACK', bearing = 0, rsrp = -85) {
   const color = getRsrpColor(rsrp);
   const html = `
     <div class="custom-playback-marker" style="transform: rotate(${bearing}deg);">
-      <div class="playback-marker-halo" style="border-color: ${color}; box-shadow: 0 0 16px ${color};"></div>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="${color}" stroke="#0b1120" stroke-width="1.5">
+      <div class="playback-marker-halo" style="border-color: ${color}; box-shadow: 0 0 18px ${color};"></div>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="${color}" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round">
         <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
       </svg>
       <div class="playback-marker-tag" style="transform: rotate(-${bearing}deg); border-color: ${color};">${label}</div>
@@ -269,8 +331,8 @@ function createPlaybackMarkerIcon(label = 'PLAYBACK', bearing = 0, rsrp = -85) {
   return L.divIcon({
     html: html,
     className: 'leaflet-vehicle-icon',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
+    iconSize: [34, 34],
+    iconAnchor: [17, 17]
   });
 }
 
@@ -507,17 +569,27 @@ function renderInspector(d) {
 
   const vBadge = document.getElementById('inspector-vehicle-badge');
   if (state.mode === 'PLAYBACK') {
-    vBadge.textContent = `PLAYBACK • ${d.vehicleId || 'DT-UNIT'}`;
+    const label = `PLAYBACK • ${d.vehicleId || 'DT-UNIT'}`;
+    vBadge.textContent = label;
+    vBadge.title = label;
     vBadge.className = 'badge badge-amber';
   } else {
-    vBadge.textContent = `${d.vehicleId} • ${d.vehicleName || 'Vehicle'}`;
+    const label = `${d.vehicleId} • ${d.vehicleName || 'Vehicle'}`;
+    vBadge.textContent = label;
+    vBadge.title = label;
     vBadge.className = 'badge badge-cyan';
   }
 
   // SIM 1 (Primary)
-  document.getElementById('sim1-op').textContent = d.operator || 'Primary SIM';
-  document.getElementById('sim1-rat').textContent = d.rat ? `${d.rat} (${d.band || '—'})` : '—';
-  document.getElementById('sim1-pci').textContent = `${d.pci || '—'} / ${d.cellId || '—'}`;
+  const sim1OpText = d.operator || 'Primary SIM';
+  const sim1RatText = d.rat ? `${formatRatLabel(d.rat)} (${d.band || '—'})` : '—';
+  const sim1PciText = `${d.pci || '—'} / ${d.cellId || '—'}`;
+  const sim1OpEl = document.getElementById('sim1-op');
+  const sim1RatEl = document.getElementById('sim1-rat');
+  const sim1PciEl = document.getElementById('sim1-pci');
+  sim1OpEl.textContent = sim1OpText; sim1OpEl.title = sim1OpText;
+  sim1RatEl.textContent = sim1RatText; sim1RatEl.title = sim1RatText;
+  sim1PciEl.textContent = sim1PciText; sim1PciEl.title = sim1PciText;
 
   if (d.rsrp !== undefined && d.rsrp !== null && !isNaN(d.rsrp)) {
     const rsrp1 = Number(d.rsrp);
@@ -544,11 +616,25 @@ function renderInspector(d) {
   }
 
   // SIM 2 (Secondary / Benchmark)
+  const sim2Col = document.getElementById('sim2-column');
+  const deltaBox = document.getElementById('delta-box');
+  const deltaEl = document.getElementById('delta-val');
+
   if (d.sim2Rsrp !== undefined && d.sim2Rsrp !== null && !isNaN(d.sim2Rsrp)) {
+    if (sim2Col) sim2Col.classList.remove('sim-column--disabled');
     const sim2Rsrp = Math.round(Number(d.sim2Rsrp));
-    document.getElementById('sim2-op').textContent = d.sim2Operator || 'SIM 2 (Secondary)';
-    document.getElementById('sim2-rat').textContent = d.sim2Rat ? `${d.sim2Rat} (${d.sim2Band || '—'})` : (d.sim2Band ? `LTE (${d.sim2Band})` : '—');
-    document.getElementById('sim2-pci').textContent = `${d.sim2Pci || '—'}`;
+    const sim2OpText = d.sim2Operator || 'SIM 2 (Secondary)';
+    const sim2RatText = d.sim2Rat
+      ? `${formatRatLabel(d.sim2Rat)} (${d.sim2Band || '—'})`
+      : (d.sim2Band ? `LTE (${d.sim2Band})` : '—');
+    const sim2PciText = `${d.sim2Pci || '—'}`;
+
+    const sim2OpEl = document.getElementById('sim2-op');
+    const sim2RatEl = document.getElementById('sim2-rat');
+    const sim2PciEl = document.getElementById('sim2-pci');
+    sim2OpEl.textContent = sim2OpText; sim2OpEl.title = sim2OpText;
+    sim2RatEl.textContent = sim2RatText; sim2RatEl.title = sim2RatText;
+    sim2PciEl.textContent = sim2PciText; sim2PciEl.title = sim2PciText;
 
     document.getElementById('sim2-rsrp').textContent = `${sim2Rsrp} dBm`;
     document.getElementById('sim2-rsrp').style.color = getRsrpColor(sim2Rsrp);
@@ -570,28 +656,38 @@ function renderInspector(d) {
     // Delta
     if (d.rsrp !== undefined && d.rsrp !== null && !isNaN(d.rsrp)) {
       const delta = Number(d.rsrp) - sim2Rsrp;
-      const deltaEl = document.getElementById('delta-val');
       if (delta >= 0) {
-        deltaEl.textContent = `SIM 1 +${delta.toFixed(1)} dB (Dominant)`;
+        const msg = `SIM 1 +${delta.toFixed(1)} dB`;
+        deltaEl.textContent = msg;
+        deltaEl.title = `SIM 1 dominant by +${delta.toFixed(1)} dB over SIM 2`;
         deltaEl.className = 'delta-value text-emerald';
+        if (deltaBox) deltaBox.className = 'delta-box';
       } else {
-        deltaEl.textContent = `SIM 2 +${Math.abs(delta).toFixed(1)} dB (Dominant)`;
+        const msg = `SIM 2 +${Math.abs(delta).toFixed(1)} dB`;
+        deltaEl.textContent = msg;
+        deltaEl.title = `SIM 2 dominant by +${Math.abs(delta).toFixed(1)} dB over SIM 1`;
         deltaEl.className = 'delta-value text-amber';
+        if (deltaBox) deltaBox.className = 'delta-box delta-box--amber';
       }
     }
   } else {
-    document.getElementById('sim2-op').textContent = 'N/A';
-    document.getElementById('sim2-rat').textContent = 'Single SIM Mode';
-    document.getElementById('sim2-pci').textContent = '—';
-    document.getElementById('sim2-rsrp').textContent = '— dBm';
-    document.getElementById('sim2-rsrp').style.color = '#64748b';
+    if (sim2Col) sim2Col.classList.add('sim-column--disabled');
+    const sim2OpEl = document.getElementById('sim2-op');
+    const sim2RatEl = document.getElementById('sim2-rat');
+    const sim2PciEl = document.getElementById('sim2-pci');
+    sim2OpEl.textContent = 'N/A'; sim2OpEl.title = 'SIM 2 inactive (Single SIM capture)';
+    sim2RatEl.textContent = '—'; sim2RatEl.title = 'Not available in Single SIM mode';
+    sim2PciEl.textContent = '—'; sim2PciEl.title = 'Not available in Single SIM mode';
+    document.getElementById('sim2-rsrp').textContent = '—';
+    document.getElementById('sim2-rsrp').style.color = '';
     document.getElementById('sim2-rsrp-bar').style.width = '0%';
-    document.getElementById('sim2-sinr').textContent = '— dB';
+    document.getElementById('sim2-sinr').textContent = '—';
     document.getElementById('sim2-sinr-bar').style.width = '0%';
 
-    const deltaEl = document.getElementById('delta-val');
-    deltaEl.textContent = 'Single SIM Mode (No Benchmark)';
+    deltaEl.textContent = 'Single SIM · No Benchmark';
+    deltaEl.title = 'Single SIM Mode — no secondary benchmark SIM recorded';
     deltaEl.className = 'delta-value text-slate';
+    if (deltaBox) deltaBox.className = 'delta-box delta-box--neutral';
   }
 
   // Update Mobile Floating Bottom Drawer
@@ -631,6 +727,13 @@ function renderInspector(d) {
 }
 
 function resetInspector() {
+  const vBadge = document.getElementById('inspector-vehicle-badge');
+  if (vBadge) {
+    vBadge.textContent = 'NO VEHICLE';
+    vBadge.title = 'No vehicle selected';
+    vBadge.className = 'badge badge-cyan';
+  }
+
   document.getElementById('sim1-op').textContent = '—';
   document.getElementById('sim1-rat').textContent = '—';
   document.getElementById('sim1-pci').textContent = '—';
@@ -640,17 +743,22 @@ function resetInspector() {
   document.getElementById('sim1-sinr').textContent = '— dB';
   document.getElementById('sim1-sinr-bar').style.width = '0%';
 
-  document.getElementById('sim2-op').textContent = '—';
+  const sim2Col = document.getElementById('sim2-column');
+  if (sim2Col) sim2Col.classList.add('sim-column--disabled');
+  document.getElementById('sim2-op').textContent = 'N/A';
   document.getElementById('sim2-rat').textContent = '—';
   document.getElementById('sim2-pci').textContent = '—';
-  document.getElementById('sim2-rsrp').textContent = '— dBm';
-  document.getElementById('sim2-rsrp').style.color = '#94a3b8';
+  document.getElementById('sim2-rsrp').textContent = '—';
+  document.getElementById('sim2-rsrp').style.color = '';
   document.getElementById('sim2-rsrp-bar').style.width = '0%';
-  document.getElementById('sim2-sinr').textContent = '— dB';
+  document.getElementById('sim2-sinr').textContent = '—';
   document.getElementById('sim2-sinr-bar').style.width = '0%';
 
+  const deltaBox = document.getElementById('delta-box');
+  if (deltaBox) deltaBox.className = 'delta-box delta-box--neutral';
   const deltaEl = document.getElementById('delta-val');
   deltaEl.textContent = '—';
+  deltaEl.title = 'No active benchmark comparison';
   deltaEl.className = 'delta-value text-slate';
 
   const mobDrawer = document.getElementById('mobile-bottom-drawer');
@@ -715,6 +823,17 @@ function flyToCoords(lat, lon) {
 function fetchSessions() {
   const cleanUrl = state.firebaseUrl;
   if (!cleanUrl) return;
+
+  const container = document.getElementById('session-list');
+  if (container && state.playback.sessions.size === 0) {
+    container.innerHTML = `
+      <div class="session-loading-skeleton" aria-busy="true" aria-label="Loading sessions">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
+    `;
+  }
 
   const authParam = state.firebaseToken ? `?auth=${state.firebaseToken.trim()}` : '';
 
@@ -790,25 +909,61 @@ function populateSessions(sessionsObj) {
     return timeB - timeA;
   });
 
+  populateVehicleFilterOptions(sortedList);
   renderSessionsArchive(sortedList);
   populateSessionDropdown(sortedList);
+}
+
+function populateVehicleFilterOptions(sessionList) {
+  const filterEl = document.getElementById('session-filter-vehicle');
+  if (!filterEl) return;
+
+  const currentVal = filterEl.value;
+  const vehicles = Array.from(new Set(sessionList.map(s => s.vehicleId || 'DT-UNIT'))).sort();
+  filterEl.innerHTML = '<option value="">All Vehicles</option>';
+  vehicles.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    filterEl.appendChild(opt);
+  });
+  if (currentVal && vehicles.includes(currentVal)) {
+    filterEl.value = currentVal;
+  }
+}
+
+function resetSessionFilters() {
+  const searchEl = document.getElementById('session-search-input');
+  const clearBtn = document.getElementById('btn-clear-session-search');
+  const vehEl = document.getElementById('session-filter-vehicle');
+  const sortEl = document.getElementById('session-sort-select');
+  if (searchEl) searchEl.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (vehEl) vehEl.value = '';
+  if (sortEl) sortEl.value = 'date-desc';
+  renderSessionsArchive(Array.from(state.playback.sessions.values()));
 }
 
 function renderSessionsArchive(sessionList) {
   const container = document.getElementById('session-list');
   const badge = document.getElementById('roster-badge');
+  const summaryEl = document.getElementById('session-filter-summary');
+
   if (state.mode === 'PLAYBACK') {
     badge.textContent = `${sessionList.length} SESSIONS`;
+    const mobCount = document.getElementById('mobile-fleet-count');
+    if (mobCount) mobCount.textContent = sessionList.length;
   }
 
   if (sessionList.length === 0) {
+    if (summaryEl) summaryEl.textContent = '';
     container.innerHTML = `
       <div class="empty-state">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="empty-state-icon" aria-hidden="true">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
-        <div style="font-weight: 700; color: #94a3b8; font-size: 11px;">NO RECORDED SESSIONS</div>
-        <div style="font-size: 10px; color: #64748b; margin-top: 4px;">ยังไม่พบประวัติเซสชันใน Firebase</div>
+        <div class="empty-state-title">NO RECORDED SESSIONS</div>
+        <div class="empty-state-desc">ยังไม่พบประวัติเซสชันใน Firebase</div>
       </div>
     `;
     return;
@@ -819,36 +974,98 @@ function renderSessionsArchive(sessionList) {
   }[c]));
 
   const query = (document.getElementById('session-search-input')?.value || '').toLowerCase().trim();
-  const filtered = query
-    ? sessionList.filter(s =>
-        (s.sessionName || '').toLowerCase().includes(query) ||
-        (s.sessionId || '').toLowerCase().includes(query) ||
-        (s.vehicleId || '').toLowerCase().includes(query) ||
-        (s.operator || '').toLowerCase().includes(query)
-      )
-    : sessionList;
+  const clearBtn = document.getElementById('btn-clear-session-search');
+  if (clearBtn) clearBtn.style.display = query ? 'inline-flex' : 'none';
+
+  const selectedVeh = document.getElementById('session-filter-vehicle')?.value || '';
+  const sortMode = document.getElementById('session-sort-select')?.value || 'date-desc';
+
+  let filtered = sessionList.filter(s => {
+    if (selectedVeh && (s.vehicleId || 'DT-UNIT') !== selectedVeh) return false;
+    if (!query) return true;
+    return (s.sessionName || '').toLowerCase().includes(query) ||
+      (s.sessionId || '').toLowerCase().includes(query) ||
+      (s.vehicleId || '').toLowerCase().includes(query) ||
+      (s.operator || '').toLowerCase().includes(query) ||
+      formatRatLabel(s.rat).toLowerCase().includes(query);
+  });
+
+  filtered = filtered.slice().sort((a, b) => {
+    const timeA = a.updatedAt || a.startTime || 0;
+    const timeB = b.updatedAt || b.startTime || 0;
+    const rsrpA = (a.avgRsrp !== undefined && a.avgRsrp !== null && !isNaN(a.avgRsrp)) ? Number(a.avgRsrp) : -999;
+    const rsrpB = (b.avgRsrp !== undefined && b.avgRsrp !== null && !isNaN(b.avgRsrp)) ? Number(b.avgRsrp) : -999;
+    const ptsA = Number(a.sampleCount) || 0;
+    const ptsB = Number(b.sampleCount) || 0;
+
+    switch (sortMode) {
+      case 'date-asc': return timeA - timeB;
+      case 'rsrp-desc': return rsrpB - rsrpA;
+      case 'rsrp-asc': return (rsrpA === -999 ? 999 : rsrpA) - (rsrpB === -999 ? 999 : rsrpB);
+      case 'pts-desc': return ptsB - ptsA;
+      case 'date-desc':
+      default: return timeB - timeA;
+    }
+  });
+
+  if (summaryEl) {
+    if (query || selectedVeh) {
+      summaryEl.textContent = `Showing ${filtered.length} of ${sessionList.length} sessions`;
+    } else {
+      summaryEl.textContent = `${sessionList.length} sessions archived`;
+    }
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-title">NO MATCHING SESSIONS</div>
+        <div class="empty-state-desc">No sessions match your current search or vehicle filter.</div>
+        <button type="button" class="btn-reset-filters" onclick="resetSessionFilters()">Reset Filters</button>
+      </div>
+    `;
+    return;
+  }
 
   let html = '';
   filtered.forEach(s => {
     const isSelected = state.playback.currentSessionId === s.sessionId;
-    const dateStr = s.startTime ? new Date(s.startTime).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-    const rsrpColor = getRsrpColor(s.avgRsrp);
+    const rawTs = s.startTime || s.updatedAt;
+    const dateStr = formatSessionDate(rawTs);
+    const fullIso = rawTs ? new Date(Number(rawTs)).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'medium' }) : '';
+    const hasRsrp = s.avgRsrp !== undefined && s.avgRsrp !== null && !isNaN(s.avgRsrp);
+    const rsrpVal = hasRsrp ? `${Number(s.avgRsrp).toFixed(1)} dBm` : '—';
+    const rsrpColor = hasRsrp ? getRsrpColor(s.avgRsrp) : '#94a3b8';
+    const vehLabel = escapeHtml(s.vehicleId || 'DT-UNIT');
     const displayLabel = escapeHtml(s.sessionName || s.sessionId);
+    const ratLabel = escapeHtml(formatRatLabel(s.rat));
+    const cleanOp = String(s.operator || 'SIM 1').replace(/\s*\(SIM\s*\d+\)\s*$/i, (m) =>
+      /^SIM\s*\d+:/i.test(String(s.operator || '')) ? '' : m
+    );
+    const simLabel = escapeHtml(cleanOp);
+    const safeId = escapeHtml(s.sessionId);
 
     html += `
-      <div class="session-card ${isSelected ? 'selected' : ''}" onclick="loadSession('${s.sessionId}')">
+      <div
+        class="session-card ${isSelected ? 'selected' : ''}"
+        role="option"
+        tabindex="0"
+        aria-selected="${isSelected ? 'true' : 'false'}"
+        onclick="loadSession('${safeId}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();loadSession('${safeId}');}"
+      >
         <div class="session-card-top">
-          <span class="session-id">${escapeHtml(s.vehicleId || 'DT-UNIT')}</span>
-          <span class="session-badge">${s.sampleCount || 0} PTS</span>
+          <span class="session-id" title="${vehLabel}">${vehLabel}</span>
+          <span class="session-badge">${formatCount(s.sampleCount || 0)} PTS</span>
         </div>
         <div class="session-meta-row">
-          <span>${displayLabel}</span>
-          <span>${dateStr}</span>
+          <span class="session-subname" title="${displayLabel}">${displayLabel}</span>
+          <span class="session-date" title="${escapeHtml(fullIso)}">${dateStr}</span>
         </div>
         <div class="session-metrics-chips">
-          <span class="session-chip text-cyan">${escapeHtml(s.rat || '5G/LTE')}</span>
-          <span class="session-chip" style="color: ${rsrpColor};">RSRP ${s.avgRsrp !== undefined ? s.avgRsrp + ' dBm' : '—'}</span>
-          <span class="session-chip">${escapeHtml(s.operator || 'Field Unit')}</span>
+          <span class="session-chip session-chip--rat">${ratLabel}</span>
+          <span class="session-chip" style="color: ${rsrpColor};"><span class="session-chip-dot" style="background: ${rsrpColor};"></span>RSRP ${rsrpVal}</span>
+          <span class="session-chip session-chip--sim" title="${simLabel}">${simLabel}</span>
         </div>
       </div>
     `;
@@ -862,14 +1079,14 @@ function populateSessionDropdown(sessionList) {
   if (!select) return;
 
   const currentVal = select.value;
-  select.innerHTML = '<option value="">-- Choose Historical Session --</option>';
+  select.innerHTML = '<option value="">-- Choose Session --</option>';
 
   sessionList.forEach(s => {
-    const dateStr = s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const timeStr = formatTime24(s.startTime || s.updatedAt, false);
     const opt = document.createElement('option');
     opt.value = s.sessionId;
-    const label = s.sessionName || s.sessionId;
-    opt.textContent = `${s.vehicleId || 'Unit'} • ${label} (${s.sampleCount || 0} pts, ${dateStr})`;
+    opt.textContent = `${s.vehicleId || 'DT'} · ${timeStr} · ${formatCount(s.sampleCount || 0)}`;
+    opt.title = `${s.vehicleId || 'DT-UNIT'} • ${s.sessionName || s.sessionId} (${formatCount(s.sampleCount || 0)} pts)`;
     select.appendChild(opt);
   });
 
@@ -916,18 +1133,24 @@ function loadSession(sessionId) {
       state.playback.currentIndex = 0;
 
       const sessionMeta = state.playback.sessions.get(sessionId) || {};
-      sessionNameEl.textContent = `${sessionMeta.vehicleId || 'DT-UNIT'} • ${sessionId} (${points.length} pts)`;
+      const sessionTitle = `${sessionMeta.vehicleId || 'DT-UNIT'} • ${sessionId}`;
+      sessionNameEl.textContent = sessionTitle;
+      sessionNameEl.title = `${sessionTitle} (${formatCount(points.length)} pts)`;
 
       // Setup Scrubber Slider
       const scrubber = document.getElementById('playback-scrubber');
       scrubber.min = 0;
-      scrubber.max = points.length - 1;
+      scrubber.max = Math.max(0, points.length - 1);
       scrubber.value = 0;
+      scrubber.style.setProperty('--progress', '0%');
       scrubber.disabled = false;
 
-      // Draw Full Route Background Polyline
+      // Draw Full Route Background Polyline + High-Contrast Casing
       if (state.playback.fullPolyline) {
         map.removeLayer(state.playback.fullPolyline);
+      }
+      if (state.playback.playedCasing) {
+        map.removeLayer(state.playback.playedCasing);
       }
       if (state.playback.playedPolyline) {
         map.removeLayer(state.playback.playedPolyline);
@@ -935,16 +1158,26 @@ function loadSession(sessionId) {
 
       const allCoords = points.map(p => [p.lat, p.lon]);
       state.playback.fullPolyline = L.polyline(allCoords, {
-        color: '#475569',
-        weight: 4,
-        opacity: 0.45,
-        dashArray: '5, 8'
+        color: '#cbd5e1',
+        weight: 3.5,
+        opacity: 0.5,
+        dashArray: '6, 8'
+      }).addTo(map);
+
+      state.playback.playedCasing = L.polyline([[points[0].lat, points[0].lon]], {
+        color: '#070b14',
+        weight: 8,
+        opacity: 0.85,
+        lineCap: 'round',
+        lineJoin: 'round'
       }).addTo(map);
 
       state.playback.playedPolyline = L.polyline([[points[0].lat, points[0].lon]], {
         color: getRsrpColor(points[0].rsrp),
-        weight: 5,
-        opacity: 0.95
+        weight: 4.5,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
       }).addTo(map);
 
       // Fit Map to Trail
@@ -984,7 +1217,11 @@ function renderPlaybackStep(index) {
   state.playback.currentIndex = clampedIndex;
 
   const scrubber = document.getElementById('playback-scrubber');
-  if (scrubber) scrubber.value = clampedIndex;
+  if (scrubber) {
+    scrubber.value = clampedIndex;
+    const pct = points.length > 1 ? (clampedIndex / (points.length - 1)) * 100 : 100;
+    scrubber.style.setProperty('--progress', `${pct.toFixed(2)}%`);
+  }
 
   const pt = points[clampedIndex];
   if (!pt) return;
@@ -1008,22 +1245,25 @@ function renderPlaybackStep(index) {
     state.playback.marker.setIcon(createPlaybackMarkerIcon(vehicleLabel, bearing, pt.rsrp));
   }
 
-  // Update played polyline
+  // Update played polyline + dark high-contrast casing
+  const playedCoords = points.slice(0, clampedIndex + 1).map(p => [p.lat, p.lon]);
+  if (state.playback.playedCasing) {
+    state.playback.playedCasing.setLatLngs(playedCoords);
+  }
   if (state.playback.playedPolyline) {
-    const playedCoords = points.slice(0, clampedIndex + 1).map(p => [p.lat, p.lon]);
     state.playback.playedPolyline.setLatLngs(playedCoords);
     state.playback.playedPolyline.setStyle({ color: getRsrpColor(pt.rsrp) });
   }
 
-  // Update counters & timestamp display
+  // Update counters & full 24h timestamp display
   const timeDisplay = document.getElementById('scrubber-time-display');
   const sampleCounter = document.getElementById('scrubber-sample-counter');
   if (timeDisplay) {
     const ts = pt.ts || pt.timestamp;
-    timeDisplay.textContent = ts ? new Date(ts).toLocaleTimeString() : '--:--:--';
+    timeDisplay.textContent = formatTime24(ts, true);
   }
   if (sampleCounter) {
-    sampleCounter.textContent = `SAMPLE ${clampedIndex + 1} / ${points.length}`;
+    sampleCounter.textContent = `${formatCount(clampedIndex + 1)} / ${formatCount(points.length)}`;
   }
 
   // Drive Dual-SIM RF Inspector
@@ -1059,6 +1299,8 @@ function playPlayback() {
   }
 
   state.playback.isPlaying = true;
+  const playBtn = document.getElementById('btn-playback-play');
+  if (playBtn) playBtn.setAttribute('aria-pressed', 'true');
   document.getElementById('playback-icon-play').style.display = 'none';
   document.getElementById('playback-icon-pause').style.display = 'block';
 
@@ -1081,6 +1323,8 @@ function pausePlayback() {
     clearInterval(state.playback.playTimer);
     state.playback.playTimer = null;
   }
+  const playBtn = document.getElementById('btn-playback-play');
+  if (playBtn) playBtn.setAttribute('aria-pressed', 'false');
   const playIcon = document.getElementById('playback-icon-play');
   const pauseIcon = document.getElementById('playback-icon-pause');
   if (playIcon) playIcon.style.display = 'block';
@@ -1104,7 +1348,9 @@ function stepPlayback(delta) {
 function setPlaybackSpeed(speed) {
   state.playback.speed = Number(speed);
   document.querySelectorAll('.speed-btn').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.getAttribute('data-speed')) === state.playback.speed);
+    const active = Number(btn.getAttribute('data-speed')) === state.playback.speed;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   if (state.playback.isPlaying) {
@@ -1118,6 +1364,7 @@ function setPlaybackSpeed(speed) {
 function setMode(newMode) {
   if (state.mode === newMode) return;
   state.mode = newMode;
+  document.body.setAttribute('data-mode', newMode);
 
   const btnLive = document.getElementById('btn-mode-live');
   const btnPlayback = document.getElementById('btn-mode-playback');
@@ -1129,7 +1376,9 @@ function setMode(newMode) {
 
   if (newMode === 'LIVE') {
     btnLive.classList.add('active');
+    btnLive.setAttribute('aria-selected', 'true');
     btnPlayback.classList.remove('active');
+    btnPlayback.setAttribute('aria-selected', 'false');
 
     liveTab.style.display = 'flex';
     playbackTab.style.display = 'none';
@@ -1148,6 +1397,9 @@ function setMode(newMode) {
     }
     if (state.playback.fullPolyline && map.hasLayer(state.playback.fullPolyline)) {
       map.removeLayer(state.playback.fullPolyline);
+    }
+    if (state.playback.playedCasing && map.hasLayer(state.playback.playedCasing)) {
+      map.removeLayer(state.playback.playedCasing);
     }
     if (state.playback.playedPolyline && map.hasLayer(state.playback.playedPolyline)) {
       map.removeLayer(state.playback.playedPolyline);
@@ -1168,7 +1420,9 @@ function setMode(newMode) {
     }
   } else if (newMode === 'PLAYBACK') {
     btnPlayback.classList.add('active');
+    btnPlayback.setAttribute('aria-selected', 'true');
     btnLive.classList.remove('active');
+    btnLive.setAttribute('aria-selected', 'false');
 
     liveTab.style.display = 'none';
     playbackTab.style.display = 'flex';
@@ -1337,7 +1591,9 @@ function initMobileNav() {
 
   function switchTab(tab) {
     tabButtons.forEach(b => {
-      b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+      const active = b.getAttribute('data-tab') === tab;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
     });
 
     if (tab === 'map') {
@@ -1415,9 +1671,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.getElementById('btn-purge-offline').addEventListener('click', () => {
-    purgeOfflineVehicles();
-  });
+  // Destructive Purge Offline with Confirmation Modal
+  const purgeModal = document.getElementById('purge-confirm-modal');
+  const btnPurgeCancel = document.getElementById('btn-purge-cancel');
+  const btnPurgeConfirm = document.getElementById('btn-purge-confirm');
+  const btnPurgeOpen = document.getElementById('btn-purge-offline');
+
+  function openPurgeModal() {
+    if (!purgeModal) {
+      purgeOfflineVehicles();
+      return;
+    }
+    purgeModal.style.display = 'flex';
+    if (btnPurgeCancel) btnPurgeCancel.focus();
+  }
+
+  function closePurgeModal() {
+    if (!purgeModal) return;
+    purgeModal.style.display = 'none';
+    if (btnPurgeOpen) btnPurgeOpen.focus();
+  }
+
+  btnPurgeOpen.addEventListener('click', openPurgeModal);
+  if (btnPurgeCancel) btnPurgeCancel.addEventListener('click', closePurgeModal);
+  if (btnPurgeConfirm) {
+    btnPurgeConfirm.addEventListener('click', () => {
+      closePurgeModal();
+      purgeOfflineVehicles();
+    });
+  }
+  if (purgeModal) {
+    purgeModal.addEventListener('click', (e) => {
+      if (e.target === purgeModal) closePurgeModal();
+    });
+  }
 
   // Heatmap Controls
   document.getElementById('btn-toggle-heatmap').addEventListener('click', () => {
@@ -1431,6 +1718,57 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-metric-sinr').addEventListener('click', () => {
     setHeatmapMetric('SINR');
   });
+
+  const opacitySlider = document.getElementById('heatmap-opacity-slider');
+  if (opacitySlider) {
+    opacitySlider.addEventListener('input', (e) => {
+      setHeatmapOpacity(e.target.value);
+    });
+  }
+
+  // Collapsible Map Legend
+  const legendEl = document.getElementById('map-legend');
+  const legendBtn = document.getElementById('btn-toggle-legend');
+  if (legendEl && legendBtn) {
+    // Default collapsed on small mobile screens for unobstructed map view
+    if (window.innerWidth <= 768) {
+      legendEl.classList.add('collapsed');
+      legendBtn.setAttribute('aria-expanded', 'false');
+    }
+    legendBtn.addEventListener('click', () => {
+      const collapsed = legendEl.classList.toggle('collapsed');
+      legendBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+  }
+
+  // Collapsible Desktop Sidebars
+  const workspaceEl = document.getElementById('noc-workspace');
+  const panelLeft = document.getElementById('panel-left');
+  const panelRight = document.getElementById('panel-right');
+  const btnCollapseLeft = document.getElementById('btn-collapse-left');
+  const btnExpandLeft = document.getElementById('btn-expand-left');
+  const btnCollapseRight = document.getElementById('btn-collapse-right');
+  const btnExpandRight = document.getElementById('btn-expand-right');
+
+  function setSidebarCollapsed(side, collapsed) {
+    const panel = side === 'left' ? panelLeft : panelRight;
+    const collapseBtn = side === 'left' ? btnCollapseLeft : btnCollapseRight;
+    const expandBtn = side === 'left' ? btnExpandLeft : btnExpandRight;
+    if (!panel || !workspaceEl) return;
+
+    panel.classList.toggle('collapsed', collapsed);
+    workspaceEl.classList.toggle(`${side}-collapsed`, collapsed);
+    if (collapseBtn) collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (expandBtn) expandBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (map) {
+      setTimeout(() => map.invalidateSize(), 260);
+    }
+  }
+
+  if (btnCollapseLeft) btnCollapseLeft.addEventListener('click', () => setSidebarCollapsed('left', true));
+  if (btnExpandLeft) btnExpandLeft.addEventListener('click', () => setSidebarCollapsed('left', false));
+  if (btnCollapseRight) btnCollapseRight.addEventListener('click', () => setSidebarCollapsed('right', true));
+  if (btnExpandRight) btnExpandRight.addEventListener('click', () => setSidebarCollapsed('right', false));
 
   // Historical Playback Controls
   document.getElementById('btn-playback-play').addEventListener('click', () => {
@@ -1464,12 +1802,52 @@ document.addEventListener('DOMContentLoaded', () => {
     if (sId) loadSession(sId);
   });
 
-  // Session filter input & refresh button in left panel
-  document.getElementById('session-search-input').addEventListener('input', () => {
-    renderSessionsArchive(Array.from(state.playback.sessions.values()));
-  });
+  // Session search, clear, vehicle filter, sort & refresh in left panel
+  const sessionSearchInput = document.getElementById('session-search-input');
+  const btnClearSearch = document.getElementById('btn-clear-session-search');
+  const filterVehSelect = document.getElementById('session-filter-vehicle');
+  const sortSelect = document.getElementById('session-sort-select');
+
+  const rerenderSessions = () => renderSessionsArchive(Array.from(state.playback.sessions.values()));
+
+  if (sessionSearchInput) sessionSearchInput.addEventListener('input', rerenderSessions);
+  if (btnClearSearch) {
+    btnClearSearch.addEventListener('click', () => {
+      if (sessionSearchInput) {
+        sessionSearchInput.value = '';
+        sessionSearchInput.focus();
+      }
+      rerenderSessions();
+    });
+  }
+  if (filterVehSelect) filterVehSelect.addEventListener('change', rerenderSessions);
+  if (sortSelect) sortSelect.addEventListener('change', rerenderSessions);
 
   document.getElementById('btn-refresh-sessions-list').addEventListener('click', () => {
     fetchSessions();
+  });
+
+  // Keyboard Accessibility & Playback Shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && purgeModal && purgeModal.style.display !== 'none') {
+      closePurgeModal();
+      return;
+    }
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'select' || tag === 'textarea' || (e.target && e.target.isContentEditable)) {
+      return;
+    }
+    if (state.mode === 'PLAYBACK' && state.playback.samples.length > 0) {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        stepPlayback(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        stepPlayback(1);
+      }
+    }
   });
 });

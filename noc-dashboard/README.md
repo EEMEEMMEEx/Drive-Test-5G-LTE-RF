@@ -1,4 +1,4 @@
-# Live Fleet NOC Dashboard — Drive Test LTE/5G v1.13.0
+# Live Fleet NOC Dashboard — Drive Test LTE/5G v1.15.0
 
 Web Console สำหรับศูนย์ปฏิบัติการโครงข่าย (Network Operations Center — NOC) แสดงตำแหน่งรถทดสอบสัญญาณภาคสนาม (Drive Test Fleet) แบบ Real-Time พร้อมวิเคราะห์ค่า RF Telemetry 5G NR / LTE (Dual-SIM), เล่นข้อมูลย้อนหลัง (Historical Session Playback) และแสดงแผนที่คลื่นความร้อนความครอบคลุม (Multi-Vehicle Coverage Heatmap) อัตโนมัติ
 
@@ -46,13 +46,18 @@ Web Console สำหรับศูนย์ปฏิบัติการโ�
 
 ### วิธีที่ 2: รันผ่าน Local Web Server (แนะนำ)
 ```bash
-# ใช้ npx serve
+# ใช้ Go Local Server (จากโฟลเดอร์ noc-dashboard)
+go run .
+# หรือเปิดเบราว์เซอร์อัตโนมัติ / เปลี่ยนพอร์ต
+go run . -port 3000 -open
+
+# หรือใช้ npx serve
 npx serve noc-dashboard -p 3000
 
 # หรือใช้ Python
 python -m http.server 3000 --directory noc-dashboard
 ```
-เปิดเบราว์เซอร์ไปที่ `http://localhost:3000`
+เปิดเบราว์เซอร์ไปที่ `http://127.0.0.1:3000` (หรือ `http://localhost:3000`)
 
 ---
 

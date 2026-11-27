@@ -48,8 +48,8 @@ android {
     applicationId = "com.drivetest.lte5g"
     minSdk = 29
     targetSdk = 37
-    versionCode = 51
-    versionName = "1.13.7"
+    versionCode = 52
+    versionName = "1.13.8"
     manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     buildConfigField("String", "FIREBASE_DB_URL", "\"$firebaseDbUrl\"")

@@ -1,0 +1,31 @@
+{
+  "rules": {
+    "fleet": {
+      "vehicleClaims": {
+        ".read": true,
+        ".indexOn": ["deviceInstallId", "vehicleId", "updatedAt"],
+        "$canonicalId": {
+          ".write": "!data.exists() || !newData.exists() || data.child('deviceInstallId').val() == newData.child('deviceInstallId').val()",
+          ".validate": "newData.hasChildren(['vehicleId', 'canonicalId', 'deviceInstallId', 'claimedAt', 'updatedAt']) && newData.child('vehicleId').isString() && newData.child('vehicleId').val().matches(/^[A-Z0-9_-]{2,32}$/) && newData.child('vehicleId').val().matches(/.*[A-Z0-9].*/) && newData.child('vehicleId').val().toLowerCase() == $canonicalId && newData.child('canonicalId').isString() && newData.child('canonicalId').val() == $canonicalId && newData.child('canonicalId').val().matches(/^[a-z0-9_-]{2,32}$/) && newData.child('deviceInstallId').isString() && newData.child('deviceInstallId').val().length >= 8 && newData.child('deviceInstallId').val().length <= 128 && newData.child('claimedAt').isNumber() && newData.child('updatedAt').isNumber()"
+        }
+      },
+      "vehicles": {
+        ".read": true,
+        ".indexOn": ["deviceInstallId", "vehicleId", "updatedAt"],
+        "$vehicleId": {
+          ".write": "!data.exists() || !newData.exists() || !data.child('deviceInstallId').exists() || data.child('claimReleased').val() == true || data.child('deviceInstallId').val() == newData.child('deviceInstallId').val()",
+          ".validate": "(!newData.child('vehicleId').exists() || (newData.child('vehicleId').isString() && newData.child('vehicleId').val().matches(/^[A-Za-z0-9_-]{2,32}$/))) && (!newData.child('deviceInstallId').exists() || (newData.child('deviceInstallId').isString() && newData.child('deviceInstallId').val().length >= 8 && newData.child('deviceInstallId').val().length <= 128))"
+        }
+      },
+      "sessions": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["vehicleId", "updatedAt", "startTime"]
+      },
+      "trails": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}

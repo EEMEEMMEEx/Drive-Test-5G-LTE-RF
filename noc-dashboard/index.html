@@ -3,151 +3,234 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOC Fleet Telemetry & Live Map — Drive Test LTE/5G v1.14.1</title>
-  
+  <title>NOC Fleet Telemetry &amp; Live Map — Drive Test LTE/5G v1.15.0</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1120'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%2338bdf8' stroke-width='2' opacity='0.5'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2338bdf8'/%3E%3C/svg%3E">
+
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  
+
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-mode="LIVE">
   <div id="app">
     <!-- Top NOC Navigation Bar -->
-    <header class="noc-header">
+    <header class="noc-header" role="banner">
       <div class="brand">
-        <div class="radar-pulse"></div>
-        <div>
+        <div class="radar-pulse" aria-hidden="true"></div>
+        <div class="brand-text">
           <h1>DRIVE TEST LTE / 5G</h1>
-          <span class="sub-brand">NOC REAL-TIME FLEET TELEMETRY CONSOLE v1.14.1</span>
+          <span class="sub-brand">NOC REAL-TIME FLEET TELEMETRY CONSOLE v1.15.0</span>
         </div>
       </div>
 
       <!-- Live KPI Badges -->
-      <div class="kpi-group">
-        <div class="kpi-card">
+      <div class="kpi-group" role="region" aria-label="Fleet telemetry key performance indicators">
+        <div class="kpi-card kpi-card--cyan">
           <span class="kpi-label">ACTIVE FLEET</span>
-          <span class="kpi-value text-cyan" id="kpi-active-count">0</span>
+          <span class="kpi-value text-cyan" id="kpi-active-count" aria-live="polite">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card kpi-card--emerald">
           <span class="kpi-label">TOTAL SAMPLES</span>
-          <span class="kpi-value text-emerald" id="kpi-sample-count">0</span>
+          <span class="kpi-value text-emerald" id="kpi-sample-count" aria-live="polite">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card kpi-card--rose">
           <span class="kpi-label">ANOMALIES</span>
-          <span class="kpi-value text-rose" id="kpi-alert-count">0</span>
+          <span class="kpi-value text-rose" id="kpi-alert-count" aria-live="polite">0</span>
         </div>
-        <div class="kpi-card">
+        <div class="kpi-card kpi-card--sync">
           <span class="kpi-label">SYNC SOURCE</span>
-          <span class="kpi-value text-emerald" id="kpi-sync-mode">FIREBASE LIVE</span>
+          <span class="kpi-value text-emerald" id="kpi-sync-mode" aria-live="polite">FIREBASE LIVE</span>
         </div>
       </div>
 
       <!-- Action Status & Mode Switcher -->
       <div class="header-actions">
-        <div class="mode-switcher" id="mode-switcher">
-          <button class="mode-btn active" id="btn-mode-live" title="Real-time live fleet tracking">
-            <span class="dot-indicator dot-active"></span>
-            <span>LIVE FLEET</span>
+        <div class="mode-switcher" id="mode-switcher" role="tablist" aria-label="Console operating mode">
+          <button
+            type="button"
+            class="mode-btn mode-btn--live active"
+            id="btn-mode-live"
+            role="tab"
+            aria-selected="true"
+            title="Real-time live fleet tracking"
+          >
+            <span class="dot-indicator dot-active" aria-hidden="true"></span>
+            <span class="mode-btn-label">LIVE FLEET</span>
           </button>
-          <button class="mode-btn" id="btn-mode-playback" title="Historical session playback">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="5 3 19 12 5 21"/>
-              <path d="M12 2a10 10 0 1 0 10 10"/>
+          <button
+            type="button"
+            class="mode-btn mode-btn--playback"
+            id="btn-mode-playback"
+            role="tab"
+            aria-selected="false"
+            title="Historical session playback"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15.5 14"/>
             </svg>
-            <span>HISTORICAL PLAYBACK</span>
+            <span class="mode-btn-label">HISTORICAL PLAYBACK</span>
           </button>
         </div>
       </div>
     </header>
 
     <!-- Mobile Navigation Tab Bar (Shown only on Mobile/Tablet screens) -->
-    <nav class="mobile-nav-tabs" id="mobile-nav">
-      <button class="mobile-tab-btn active" data-tab="map">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+    <nav class="mobile-nav-tabs" id="mobile-nav" aria-label="Workspace panels">
+      <button type="button" class="mobile-tab-btn active" data-tab="map" aria-selected="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
         <span>MAP</span>
       </button>
-      <button class="mobile-tab-btn" data-tab="fleet">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+      <button type="button" class="mobile-tab-btn" data-tab="fleet" aria-selected="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
         <span id="mobile-fleet-tab-label">FLEET (<span id="mobile-fleet-count">0</span>)</span>
       </button>
-      <button class="mobile-tab-btn" data-tab="inspector">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <button type="button" class="mobile-tab-btn" data-tab="inspector" aria-selected="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         <span>RF INSPECTOR</span>
       </button>
     </nav>
 
     <!-- Main NOC Workspace -->
-    <main class="noc-workspace">
+    <main class="noc-workspace" id="noc-workspace">
       <!-- Left Panel: Fleet Roster & Historical Sessions -->
-      <aside class="panel panel-left">
+      <aside class="panel panel-left" id="panel-left" aria-label="Fleet roster and session archive">
         <div class="panel-header">
-          <h2 id="left-panel-title">FLEET ROSTER</h2>
-          <span class="badge" id="roster-badge">0 VEHICLES</span>
+          <div class="panel-header-title">
+            <h2 id="left-panel-title">FLEET ROSTER</h2>
+            <span class="badge" id="roster-badge">0 VEHICLES</span>
+          </div>
+          <button
+            type="button"
+            class="panel-collapse-btn"
+            id="btn-collapse-left"
+            title="Collapse left panel"
+            aria-label="Collapse left panel"
+            aria-expanded="true"
+            aria-controls="panel-left"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
         </div>
 
         <!-- Live Fleet View -->
         <div class="panel-tab-content active" id="panel-tab-live">
           <div class="vehicle-list" id="vehicle-list">
             <div class="empty-state">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="empty-state-icon" aria-hidden="true">
                 <path d="M4.93 4.93a10 10 0 0 1 14.14 0"/>
                 <path d="M7.76 7.76a6 6 0 0 1 8.48 0"/>
                 <circle cx="12" cy="12" r="2"/>
                 <path d="M12 14v8"/>
               </svg>
-              <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px; font-size: 12px; letter-spacing: 0.5px;">WAITING FOR FIELD VEHICLES</div>
-              <div style="font-size: 11px; color: #94a3b8; line-height: 1.5;">กำลังรอรับข้อมูลจากรถทดสอบ...<br>กดปุ่ม <b>START</b> บนแอปมือถือเพื่อเริ่มสตรีมสด</div>
+              <div class="empty-state-title text-cyan">WAITING FOR FIELD VEHICLES</div>
+              <div class="empty-state-desc">กำลังรอรับข้อมูลจากรถทดสอบ...<br>กดปุ่ม <strong>START</strong> บนแอปมือถือเพื่อเริ่มสตรีมสด</div>
             </div>
           </div>
         </div>
 
         <!-- Historical Playback Session Selector & Archive List -->
         <div class="panel-tab-content" id="panel-tab-playback" style="display: none;">
-          <div class="session-search-bar">
-            <div class="search-input-wrap">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="session-search-input" placeholder="Filter session / vehicle..." class="session-search-input">
+          <div class="session-controls">
+            <div class="session-search-bar">
+              <div class="search-input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input
+                  type="text"
+                  id="session-search-input"
+                  placeholder="Search vehicle, session ID, SIM..."
+                  class="session-search-input"
+                  aria-label="Filter recorded sessions"
+                >
+                <button
+                  type="button"
+                  id="btn-clear-session-search"
+                  class="search-clear-btn"
+                  title="Clear search"
+                  aria-label="Clear search"
+                  style="display: none;"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <button type="button" id="btn-refresh-sessions-list" class="btn-icon" title="Refresh session list from Firebase" aria-label="Refresh session list from Firebase">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              </button>
             </div>
-            <button id="btn-refresh-sessions-list" class="btn-icon" title="Refresh session list from Firebase">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            </button>
+            <div class="session-filter-row">
+              <select id="session-filter-vehicle" class="session-filter-select" aria-label="Filter sessions by vehicle">
+                <option value="">All Vehicles</option>
+              </select>
+              <select id="session-sort-select" class="session-filter-select" aria-label="Sort recorded sessions">
+                <option value="date-desc">Date: Newest</option>
+                <option value="date-asc">Date: Oldest</option>
+                <option value="rsrp-desc">RSRP: Best</option>
+                <option value="rsrp-asc">RSRP: Weakest</option>
+                <option value="pts-desc">Points: Most</option>
+              </select>
+            </div>
+            <div class="session-filter-summary" id="session-filter-summary" aria-live="polite"></div>
           </div>
-          <div class="session-list" id="session-list">
+
+          <div class="session-list" id="session-list" role="listbox" aria-label="Recorded drive test sessions">
             <div class="empty-state">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="empty-state-icon" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
-              <div>No recorded sessions found.</div>
+              <div class="empty-state-title">NO RECORDED SESSIONS</div>
+              <div class="empty-state-desc">No recorded sessions found.</div>
             </div>
-          </div>
-        </div>
-
-        <div class="rsrp-legend">
-          <div class="legend-title" id="legend-title">RSRP SIGNAL TIERS (3GPP / ITU-R)</div>
-          <div class="legend-scale" id="legend-scale">
-            <div class="scale-item"><span class="swatch bg-tier1"></span> ≥ -80 dBm (Excellent)</div>
-            <div class="scale-item"><span class="swatch bg-tier2"></span> -80 to -90 dBm (Good)</div>
-            <div class="scale-item"><span class="swatch bg-tier3"></span> -90 to -100 dBm (Fair)</div>
-            <div class="scale-item"><span class="swatch bg-tier4"></span> -100 to -110 dBm (Poor)</div>
-            <div class="scale-item"><span class="swatch bg-tier5"></span> &lt; -110 dBm (Coverage Hole)</div>
           </div>
         </div>
       </aside>
 
       <!-- Center: Fullscreen Dark GIS Map -->
-      <section class="map-container">
+      <section class="map-container" aria-label="Telemetry GIS Map">
         <div id="map"></div>
-        <div class="map-controls">
+
+        <!-- Collapsed Sidebar Expand Handles -->
+        <button
+          type="button"
+          class="sidebar-expand-btn sidebar-expand-left"
+          id="btn-expand-left"
+          title="Show left panel"
+          aria-label="Show left panel"
+          aria-expanded="false"
+          aria-controls="panel-left"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+
+        <button
+          type="button"
+          class="sidebar-expand-btn sidebar-expand-right"
+          id="btn-expand-right"
+          title="Show RF Inspector panel"
+          aria-label="Show RF Inspector panel"
+          aria-expanded="false"
+          aria-controls="panel-right"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <!-- Map Floating Toolbar -->
+        <div class="map-controls" role="toolbar" aria-label="Map layer and fleet controls">
           <!-- Heatmap Layer Control Group -->
-          <div class="heatmap-control-group">
-            <button id="btn-toggle-heatmap" class="map-btn" title="Toggle Multi-Vehicle Coverage Heatmap">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="toolbar-group heatmap-control-group">
+            <button
+              type="button"
+              id="btn-toggle-heatmap"
+              class="map-btn"
+              aria-pressed="false"
+              title="Toggle Multi-Vehicle Coverage Heatmap"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M3.5 12a8.5 8.5 0 0 1 17 0"/>
                 <path d="M7 12a5 5 0 0 1 10 0"/>
@@ -155,93 +238,145 @@
               <span id="heatmap-btn-label">HEATMAP: OFF</span>
             </button>
             <div class="heatmap-metric-selector" id="heatmap-metric-selector" style="display: none;">
-              <button class="metric-pill active" id="btn-metric-rsrp" data-metric="RSRP" title="Interpolate RSRP signal (-135 to -55 dBm)">RSRP</button>
-              <button class="metric-pill" id="btn-metric-sinr" data-metric="SINR" title="Interpolate SINR signal (-10 to 30 dB)">SINR</button>
+              <button type="button" class="metric-pill active" id="btn-metric-rsrp" data-metric="RSRP" aria-pressed="true" title="Interpolate RSRP signal (-135 to -55 dBm)">RSRP</button>
+              <button type="button" class="metric-pill" id="btn-metric-sinr" data-metric="SINR" aria-pressed="false" title="Interpolate SINR signal (-10 to 30 dB)">SINR</button>
+              <div class="heatmap-opacity-control" title="Adjust heatmap overlay opacity">
+                <label for="heatmap-opacity-slider" class="opacity-label">OPA</label>
+                <input
+                  type="range"
+                  id="heatmap-opacity-slider"
+                  min="15"
+                  max="95"
+                  step="5"
+                  value="52"
+                  aria-label="Heatmap overlay opacity percentage"
+                >
+                <span class="opacity-val" id="heatmap-opacity-val">52%</span>
+              </div>
             </div>
           </div>
 
-          <button id="btn-center-fleet" class="map-btn" title="Fit all fleet vehicles">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
-            <span>FIT ALL</span>
-          </button>
-          <button id="btn-clear-trails" class="map-btn" title="Clear breadcrumb trails">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14s1.5-2 4-2 4 2 6 2 4-2 6-2"/><path d="M4 20s1.5-2 4-2 4 2 6 2 4-2 6-2"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
-            <span>CLEAR TRAILS</span>
-          </button>
-          <button id="btn-purge-offline" class="map-btn map-btn-danger" title="Purge inactive vehicles from database">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <!-- Navigation & Trail Controls Group -->
+          <div class="toolbar-group">
+            <button type="button" id="btn-center-fleet" class="map-btn" title="Fit map to active fleet or playback route">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>
+              <span>FIT ALL</span>
+            </button>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <button type="button" id="btn-clear-trails" class="map-btn" title="Clear breadcrumb trails on map">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14s1.5-2 4-2 4 2 6 2 4-2 6-2"/><path d="M4 20s1.5-2 4-2 4 2 6 2 4-2 6-2"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+              <span>CLEAR TRAILS</span>
+            </button>
+          </div>
+
+          <!-- Destructive Action Separated -->
+          <button type="button" id="btn-purge-offline" class="map-btn map-btn-danger" title="Purge inactive vehicles from database (confirmation required)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             <span>PURGE OFFLINE</span>
           </button>
         </div>
 
+        <!-- Collapsible Signal-Tier Legend Overlay on Map -->
+        <div class="map-legend rsrp-legend" id="map-legend" role="region" aria-label="RF signal tier legend">
+          <button
+            type="button"
+            class="legend-toggle-btn"
+            id="btn-toggle-legend"
+            aria-expanded="true"
+            aria-controls="legend-scale"
+            title="Collapse or expand signal tier legend"
+          >
+            <span class="legend-title" id="legend-title">RSRP SIGNAL TIERS (3GPP / ITU-R)</span>
+            <svg class="legend-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="legend-scale" id="legend-scale">
+            <div class="scale-item"><span class="tier-pill bg-tier1">T1</span><span class="tier-range">&ge; -80 dBm</span><span class="tier-name">Excellent</span></div>
+            <div class="scale-item"><span class="tier-pill bg-tier2">T2</span><span class="tier-range">-80 to -90 dBm</span><span class="tier-name">Good</span></div>
+            <div class="scale-item"><span class="tier-pill bg-tier3">T3</span><span class="tier-range">-90 to -100 dBm</span><span class="tier-name">Fair</span></div>
+            <div class="scale-item"><span class="tier-pill bg-tier4">T4</span><span class="tier-range">-100 to -110 dBm</span><span class="tier-name">Poor</span></div>
+            <div class="scale-item"><span class="tier-pill bg-tier5">T5</span><span class="tier-range">&lt; -110 dBm</span><span class="tier-name">Hole</span></div>
+          </div>
+        </div>
+
         <!-- Timeline Playback Scrubber Bar (Historical Playback Mode) -->
-        <div class="playback-scrubber-bar" id="playback-scrubber-bar" style="display: none;">
-          <div class="scrubber-transport">
-            <button id="btn-playback-step-back" class="scrubber-btn" title="Step Back (1 sample)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
-            </button>
-            <button id="btn-playback-play" class="scrubber-btn scrubber-btn-primary" title="Play / Pause">
-              <svg id="playback-icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21"/></svg>
-              <svg id="playback-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-            </button>
-            <button id="btn-playback-step-fwd" class="scrubber-btn" title="Step Forward (1 sample)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-            </button>
-            <div class="speed-selector">
-              <button class="speed-btn active" data-speed="1">1x</button>
-              <button class="speed-btn" data-speed="2">2x</button>
-              <button class="speed-btn" data-speed="5">5x</button>
+        <div class="playback-scrubber-bar" id="playback-scrubber-bar" style="display: none;" role="region" aria-label="Historical session playback controls">
+          <div class="scrubber-row-top">
+            <div class="scrubber-session-info">
+              <span class="scrubber-mode-pill">PLAYBACK</span>
+              <span id="scrubber-session-name" class="scrubber-session-name" title="No session loaded">NO SESSION LOADED</span>
             </div>
-          </div>
 
-          <div class="scrubber-timeline">
-            <div class="scrubber-meta">
-              <div class="scrubber-session-info">
-                <span class="scrubber-lbl">SESSION:</span>
-                <span id="scrubber-session-name" class="text-cyan">NO SESSION LOADED</span>
-              </div>
-              <div class="scrubber-counters">
+            <div class="scrubber-top-right">
+              <div class="scrubber-counters" aria-live="polite">
                 <span id="scrubber-time-display" class="scrubber-time">--:--:--</span>
-                <span class="scrubber-dot">•</span>
-                <span id="scrubber-sample-counter" class="scrubber-counter">SAMPLE 0 / 0</span>
+                <span class="scrubber-dot" aria-hidden="true">&bull;</span>
+                <span id="scrubber-sample-counter" class="scrubber-counter">0 / 0</span>
               </div>
-            </div>
-            <div class="slider-wrapper">
-              <input type="range" id="playback-scrubber" min="0" max="100" value="0" step="1" disabled>
+              <select id="playback-session-select" class="scrubber-select" title="Choose historical session" aria-label="Choose historical session">
+                <option value="">-- Choose Session --</option>
+              </select>
             </div>
           </div>
 
-          <div class="scrubber-actions">
-            <select id="playback-session-select" class="scrubber-select" title="Choose historical session">
-              <option value="">-- Choose Session --</option>
-            </select>
+          <div class="scrubber-row-bottom">
+            <div class="scrubber-transport">
+              <button type="button" id="btn-playback-step-back" class="scrubber-btn" title="Step Back 1 sample (Left Arrow)" aria-label="Step back one sample">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+              </button>
+              <button type="button" id="btn-playback-play" class="scrubber-btn scrubber-btn-primary" title="Play / Pause (Space)" aria-label="Play or pause playback" aria-pressed="false">
+                <svg id="playback-icon-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="5 3 19 12 5 21"/></svg>
+                <svg id="playback-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none;" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+              <button type="button" id="btn-playback-step-fwd" class="scrubber-btn" title="Step Forward 1 sample (Right Arrow)" aria-label="Step forward one sample">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+              </button>
+            </div>
+
+            <div class="slider-wrapper">
+              <input
+                type="range"
+                id="playback-scrubber"
+                min="0"
+                max="100"
+                value="0"
+                step="1"
+                disabled
+                aria-label="Playback sample timeline scrubber"
+              >
+            </div>
+
+            <div class="speed-selector" role="group" aria-label="Playback speed">
+              <button type="button" class="speed-btn active" data-speed="1" aria-pressed="true">1x</button>
+              <button type="button" class="speed-btn" data-speed="2" aria-pressed="false">2x</button>
+              <button type="button" class="speed-btn" data-speed="5" aria-pressed="false">5x</button>
+            </div>
           </div>
         </div>
 
         <!-- Mobile Floating Mini Drawer (Shown on mobile when a vehicle is selected) -->
         <div class="mobile-bottom-drawer" id="mobile-bottom-drawer">
           <div class="mobile-drawer-header">
-            <div>
+            <div class="mobile-drawer-title-wrap">
               <span class="mobile-drawer-id" id="mob-drawer-id">NO VEHICLE</span>
-              <span class="mobile-drawer-op" id="mob-drawer-op">—</span>
+              <span class="mobile-drawer-op" id="mob-drawer-op">&mdash;</span>
             </div>
-            <button class="mobile-drawer-btn" id="mob-btn-details">
+            <button type="button" class="mobile-drawer-btn" id="mob-btn-details">
               <span>FULL RF</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
           <div class="mobile-drawer-metrics">
             <div class="mob-metric">
               <span class="mob-lbl">RAT / BAND</span>
-              <span class="mob-val text-cyan" id="mob-drawer-rat">—</span>
+              <span class="mob-val text-cyan" id="mob-drawer-rat">&mdash;</span>
             </div>
             <div class="mob-metric">
               <span class="mob-lbl">RSRP</span>
-              <span class="mob-val" id="mob-drawer-rsrp">— dBm</span>
+              <span class="mob-val" id="mob-drawer-rsrp">&mdash; dBm</span>
             </div>
             <div class="mob-metric">
               <span class="mob-lbl">SINR</span>
-              <span class="mob-val" id="mob-drawer-sinr">— dB</span>
+              <span class="mob-val" id="mob-drawer-sinr">&mdash; dB</span>
             </div>
             <div class="mob-metric">
               <span class="mob-lbl">SPEED</span>
@@ -252,70 +387,88 @@
       </section>
 
       <!-- Right Panel: Dual-SIM Telemetry & Anomaly Alerts -->
-      <aside class="panel panel-right">
+      <aside class="panel panel-right" id="panel-right" aria-label="Dual-SIM RF inspector and anomaly feed">
         <!-- Dual SIM Inspector -->
         <div class="panel-header">
-          <h2>DUAL-SIM RF INSPECTOR</h2>
-          <span class="badge badge-cyan" id="inspector-vehicle-badge">NO VEHICLE SELECTED</span>
+          <div class="panel-header-title">
+            <h2>DUAL-SIM RF INSPECTOR</h2>
+            <span class="badge badge-cyan" id="inspector-vehicle-badge" title="No vehicle selected">NO VEHICLE</span>
+          </div>
+          <button
+            type="button"
+            class="panel-collapse-btn"
+            id="btn-collapse-right"
+            title="Collapse RF Inspector panel"
+            aria-label="Collapse RF Inspector panel"
+            aria-expanded="true"
+            aria-controls="panel-right"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
         </div>
 
         <div class="inspector-card" id="inspector-card">
           <div class="sim-comparison">
             <!-- SIM 1 Primary -->
-            <div class="sim-column">
+            <div class="sim-column" id="sim1-column">
               <div class="sim-header">
-                <span class="sim-chip sim-1">SIM 1 (PRIMARY)</span>
-                <span class="sim-op" id="sim1-op">—</span>
+                <div class="sim-header-row">
+                  <span class="sim-chip sim-1">SIM 1 &bull; PRIMARY</span>
+                </div>
+                <span class="sim-op" id="sim1-op" title="—">&mdash;</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">RAT / Band</span>
-                <span class="val text-cyan" id="sim1-rat">—</span>
+                <span class="val text-cyan" id="sim1-rat" title="—">&mdash;</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">PCI / NCI</span>
-                <span class="val" id="sim1-pci">—</span>
+                <span class="val" id="sim1-pci" title="—">&mdash;</span>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>RSRP</span>
-                  <span class="gauge-val" id="sim1-rsrp">— dBm</span>
+                  <span class="gauge-val" id="sim1-rsrp">&mdash; dBm</span>
                 </div>
                 <div class="progress-bar"><div class="progress-fill bg-tier5" id="sim1-rsrp-bar" style="width: 0%"></div></div>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>SINR</span>
-                  <span class="gauge-val" id="sim1-sinr">— dB</span>
+                  <span class="gauge-val" id="sim1-sinr">&mdash; dB</span>
                 </div>
                 <div class="progress-bar"><div class="progress-fill bg-cyan" id="sim1-sinr-bar" style="width: 0%"></div></div>
               </div>
             </div>
 
             <!-- SIM 2 Secondary -->
-            <div class="sim-column">
+            <div class="sim-column sim-column--disabled" id="sim2-column">
               <div class="sim-header">
-                <span class="sim-chip sim-2">SIM 2 (BENCHMARK)</span>
-                <span class="sim-op" id="sim2-op">—</span>
+                <div class="sim-header-row">
+                  <span class="sim-chip sim-2">SIM 2 &bull; BENCHMARK</span>
+                  <span class="sim-status-tag" id="sim2-status-tag">INACTIVE</span>
+                </div>
+                <span class="sim-op" id="sim2-op" title="N/A">N/A</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">RAT / Band</span>
-                <span class="val text-amber" id="sim2-rat">—</span>
+                <span class="val text-amber" id="sim2-rat" title="—">&mdash;</span>
               </div>
               <div class="sim-metric-row">
                 <span class="lbl">PCI / Cell ID</span>
-                <span class="val" id="sim2-pci">—</span>
+                <span class="val" id="sim2-pci" title="—">&mdash;</span>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>RSRP</span>
-                  <span class="gauge-val" id="sim2-rsrp">— dBm</span>
+                  <span class="gauge-val" id="sim2-rsrp">&mdash;</span>
                 </div>
                 <div class="progress-bar"><div class="progress-fill bg-tier5" id="sim2-rsrp-bar" style="width: 0%"></div></div>
               </div>
               <div class="sim-gauge">
                 <div class="gauge-labels">
                   <span>SINR</span>
-                  <span class="gauge-val" id="sim2-sinr">— dB</span>
+                  <span class="gauge-val" id="sim2-sinr">&mdash;</span>
                 </div>
                 <div class="progress-bar"><div class="progress-fill bg-amber" id="sim2-sinr-bar" style="width: 0%"></div></div>
               </div>
@@ -323,22 +476,43 @@
           </div>
 
           <!-- Benchmark Delta -->
-          <div class="delta-box" id="delta-box">
-            <span class="delta-title">RSRP ADVANTAGE:</span>
-            <span class="delta-value" id="delta-val">—</span>
+          <div class="delta-box delta-box--neutral" id="delta-box">
+            <span class="delta-title">RSRP ADVANTAGE</span>
+            <span class="delta-value text-slate" id="delta-val" title="No active benchmark comparison">&mdash;</span>
           </div>
         </div>
 
         <!-- Anomaly Alert Feed -->
         <div class="panel-header alerts-header">
-          <h2>LIVE RF ANOMALIES</h2>
+          <div class="panel-header-title">
+            <h2>LIVE RF ANOMALIES</h2>
+          </div>
           <span class="badge badge-rose" id="alerts-count-badge">0 ALERTS</span>
         </div>
-        <div class="alerts-feed" id="alerts-feed">
+        <div class="alerts-feed" id="alerts-feed" aria-live="polite">
           <div class="empty-state">No active anomalies detected in current fleet route.</div>
         </div>
       </aside>
     </main>
+  </div>
+
+  <!-- Confirmation Dialog for Destructive Purge Offline Action -->
+  <div class="modal-backdrop" id="purge-confirm-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="purge-modal-title" aria-describedby="purge-modal-desc">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-danger" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <h3 id="purge-modal-title">Purge Offline Vehicles?</h3>
+          <p id="purge-modal-desc">This permanently removes inactive or stale vehicle records (no heartbeat &gt; 2 min) from Firebase live fleet storage. Historical session archives will not be affected.</p>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btn-purge-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="btn-purge-confirm">Confirm Purge</button>
+      </div>
+    </div>
   </div>
 
   <script src="env.js"></script>
